@@ -1,13 +1,10 @@
 # Order App Base
-
-Clean base template for a full-stack order project:
 - `backend` (Node.js + Express)
 - `frontend-web` (React + Vite)
 - `mobile-app` (Expo + React Native)
 - `docker-compose.yml` (db, redis, backend, frontend)
 
 ## Current scope
-- Removed sample business logic and old seeded data.
 - Kept only minimal skeleton APIs/screens to start new implementation.
 
 ## Run local (without Docker)
@@ -23,14 +20,6 @@ Clean base template for a full-stack order project:
 1. Ensure `.env` exists at repo root.
 2. Run `docker compose up -d --build`
 3. Backend health check: `http://localhost:5000/health`
-
-## Git push clean base
-1. `git init`
-2. `git add .`
-3. `git commit -m "chore: initialize clean project base"`
-4. `git branch -M main`
-5. `git remote add origin <YOUR_GIT_URL>`
-6. `git push -u origin main`
 
 ## Notes
 - `mobile-app/.git` can be removed if you want a single root repository.
