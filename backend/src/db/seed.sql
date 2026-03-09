@@ -1,0 +1,2 @@
+-- Base seed template.
+-- Add optional initial data here.

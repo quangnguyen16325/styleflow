@@ -1,0 +1,10 @@
+{
+  "name": "order-app",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix frontend-web run dev",
+    "dev:mobile": "npm --prefix mobile-app run start"
+  }
+}

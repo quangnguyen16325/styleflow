@@ -1,0 +1,18 @@
+.app {
+  max-width: 720px;
+  margin: 3rem auto;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+p {
+  margin: 0.35rem 0;
+}

@@ -1,0 +1,2 @@
+-- Base schema template.
+-- Add your project tables here.
