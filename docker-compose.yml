@@ -72,6 +72,22 @@ services:
       sh -c "[ -d node_modules ] && [ \"$(ls -A node_modules 2>/dev/null)\" ] ||
       npm install --no-audit --no-fund; npm run dev -- --host 0.0.0.0 --port 3000"
 
+  n8n:
+    image: n8nio/n8n:2.11.3
+    container_name: order-n8n
+    ports:
+      - "${N8N_PORT}:5678"
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+        
 volumes:
   db_data:
   redis_data:
