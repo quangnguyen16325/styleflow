@@ -5,6 +5,14 @@
   "scripts": {
     "dev:backend": "npm --prefix backend run dev",
     "dev:web": "npm --prefix frontend-web run dev",
-    "dev:mobile": "npm --prefix mobile-app run start"
+    "dev:mobile": "npm --prefix mobile-app run start",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend-web run lint && npm --prefix mobile-app run lint",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "build:web": "npm --prefix frontend-web run build",
+    "check": "npm run lint && npm run format:check && npm run build:web"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.1"
   }
 }
