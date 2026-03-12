@@ -30,3 +30,4 @@ mobile-app/web-build/
 
 # Docker local volumes/data
 *.pid
+n8n-data/
