@@ -29,3 +29,6 @@
 
 - `mobile-app/.git` can be removed if you want a single root repository.
 - Keep secrets only in `.env` and never commit them.
+
+## Test Pull Request
+This line was added to test the Pull Request feature.
