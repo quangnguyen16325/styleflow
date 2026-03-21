@@ -56,5 +56,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose config
+      - name: Prepare env for docker compose validation
+        run: |
+          cp .env_example .env
+          sed -i 's/^POSTGRES_DB=$/POSTGRES_DB=styleflow/' .env
+          sed -i 's/^POSTGRES_USER=$/POSTGRES_USER=styleflow_user/' .env
+          sed -i 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=styleflow_pass/' .env
+          sed -i 's/^REDIS_PORT=$/REDIS_PORT=6379/' .env
+          sed -i 's/^N8N_ENCRYPTION_KEY=$/N8N_ENCRYPTION_KEY=test_n8n_encryption_key_32_chars/' .env
+      - run: docker compose --env-file .env config
       - run: docker compose -f docker-compose.prod.yml --env-file .env.prod.example config
