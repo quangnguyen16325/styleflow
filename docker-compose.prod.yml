@@ -1,20 +1,4 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: styleflow-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   redis:
     image: redis:7-alpine
     container_name: styleflow-redis
@@ -77,6 +61,5 @@ services:
       - n8n_data:/home/node/.n8n
 
 volumes:
-  db_data:
   redis_data:
   n8n_data:
