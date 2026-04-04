@@ -5,7 +5,9 @@ const router = Router();
 
 router.get("/", async (_req, res) => {
   try {
-    const { rows } = await pool.query(`${listOrdersBaseQuery} GROUP BY o.id, c.id ORDER BY o.created_at DESC`);
+    const { rows } = await pool.query(
+      `${listOrdersBaseQuery} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+    );
 
     res.json(rows.map(mapOrderRow));
   } catch (error) {
@@ -31,9 +33,10 @@ router.get("/:id", async (req, res) => {
   }
 
   try {
-    const { rows } = await pool.query(`${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`, [
-      orderId,
-    ]);
+    const { rows } = await pool.query(
+      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      [orderId],
+    );
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -306,7 +309,10 @@ function validateOrderPayload(body) {
     }
   }
 
-  if (body.shippingFee != null && (Number.isNaN(Number(body.shippingFee)) || Number(body.shippingFee) < 0)) {
+  if (
+    body.shippingFee != null &&
+    (Number.isNaN(Number(body.shippingFee)) || Number(body.shippingFee) < 0)
+  ) {
     return "Shipping fee must be a non-negative number";
   }
 
