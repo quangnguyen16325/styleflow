@@ -37,12 +37,15 @@ Common error codes:
 
 ```json
 {
-  "id": "prod_001",
+  "id": 1,
+  "sku": "TSHIRT-001",
   "name": "Classic T-Shirt",
-  "description": "Cotton t-shirt",
-  "price": 199000,
-  "imageUrl": "https://cdn.example.com/products/shirt-1.jpg",
-  "stock": 20,
+  "basePrice": 199000,
+  "category": "apparel",
+  "stockQty": 20,
+  "reservedQty": 0,
+  "availableQty": 20,
+  "minStockLevel": 5,
   "createdAt": "2026-04-02T10:00:00.000Z"
 }
 ```
@@ -51,10 +54,21 @@ Common error codes:
 
 ```json
 {
-  "productId": "prod_001",
+  "id": 1,
+  "productId": 1,
   "quantity": 2,
-  "unitPrice": 199000,
-  "lineTotal": 398000
+  "priceAtPurchase": 199000
+}
+```
+
+## Customer Model
+
+```json
+{
+  "id": 1,
+  "fullName": "Nguyen Van A",
+  "phone": "0901234567",
+  "email": "nguyenvana@example.com"
 }
 ```
 
@@ -62,22 +76,30 @@ Common error codes:
 
 ```json
 {
-  "id": "ord_001",
-  "customerName": "Nguyen Van A",
-  "customerPhone": "0901234567",
-  "customerAddress": "123 Nguyen Trai, HCMC",
-  "note": "Call before delivery",
+  "id": 1,
   "status": "pending",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
   "items": [
     {
-      "productId": "prod_001",
+      "id": 1,
+      "productId": 1,
       "quantity": 2,
-      "unitPrice": 199000,
-      "lineTotal": 398000
+      "priceAtPurchase": 199000
     }
   ],
-  "totalAmount": 398000,
-  "createdAt": "2026-04-02T10:15:00.000Z"
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:15:00.000Z"
 }
 ```
 
@@ -105,12 +127,15 @@ Response `200`:
 ```json
 [
   {
-    "id": "prod_001",
+    "id": 1,
+    "sku": "TSHIRT-001",
     "name": "Classic T-Shirt",
-    "description": "Cotton t-shirt",
-    "price": 199000,
-    "imageUrl": "https://cdn.example.com/products/shirt-1.jpg",
-    "stock": 20,
+    "basePrice": 199000,
+    "category": "apparel",
+    "stockQty": 20,
+    "reservedQty": 0,
+    "availableQty": 20,
+    "minStockLevel": 5,
     "createdAt": "2026-04-02T10:00:00.000Z"
   }
 ]
@@ -124,12 +149,15 @@ Response `200`:
 
 ```json
 {
-  "id": "prod_001",
+  "id": 1,
+  "sku": "TSHIRT-001",
   "name": "Classic T-Shirt",
-  "description": "Cotton t-shirt",
-  "price": 199000,
-  "imageUrl": "https://cdn.example.com/products/shirt-1.jpg",
-  "stock": 20,
+  "basePrice": 199000,
+  "category": "apparel",
+  "stockQty": 20,
+  "reservedQty": 0,
+  "availableQty": 20,
+  "minStockLevel": 5,
   "createdAt": "2026-04-02T10:00:00.000Z"
 }
 ```
@@ -153,13 +181,17 @@ Request body:
 
 ```json
 {
-  "customerName": "Nguyen Van A",
-  "customerPhone": "0901234567",
-  "customerAddress": "123 Nguyen Trai, HCMC",
-  "note": "Call before delivery",
+  "customer": {
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "shippingFee": 20000,
   "items": [
     {
-      "productId": "prod_001",
+      "productId": 1,
       "quantity": 2
     }
   ]
@@ -167,35 +199,46 @@ Request body:
 ```
 
 Rules:
-- `customerName`: required, string
-- `customerPhone`: required, string
-- `customerAddress`: required, string
-- `note`: optional, string
+- `customer.fullName`: required, string
+- `customer.phone`: required, string
+- `customer.email`: required, string
+- `shippingAddress`: required, string
+- `city`: required, string
+- `shippingFee`: optional, non-negative number
 - `items`: required, array, minimum 1 item
 - `productId`: required
 - `quantity`: required, integer, greater than 0
-- `unitPrice`, `lineTotal`, `totalAmount` are computed by the backend
+- `priceAtPurchase` and `totalAmount` are computed by the backend
+- backend creates or updates the customer by phone
 
 Response `201`:
 
 ```json
 {
-  "id": "ord_001",
-  "customerName": "Nguyen Van A",
-  "customerPhone": "0901234567",
-  "customerAddress": "123 Nguyen Trai, HCMC",
-  "note": "Call before delivery",
+  "id": 1,
   "status": "pending",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
   "items": [
     {
-      "productId": "prod_001",
+      "id": 1,
+      "productId": 1,
       "quantity": 2,
-      "unitPrice": 199000,
-      "lineTotal": 398000
+      "priceAtPurchase": 199000
     }
   ],
-  "totalAmount": 398000,
-  "createdAt": "2026-04-02T10:15:00.000Z"
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:15:00.000Z"
 }
 ```
 
@@ -219,22 +262,30 @@ Response `200`:
 ```json
 [
   {
-    "id": "ord_001",
-    "customerName": "Nguyen Van A",
-    "customerPhone": "0901234567",
-    "customerAddress": "123 Nguyen Trai, HCMC",
-    "note": "Call before delivery",
+    "id": 1,
     "status": "pending",
+    "totalAmount": 418000,
+    "shippingFee": 20000,
+    "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+    "failCount": 0,
+    "shippingAddress": "123 Nguyen Trai, HCMC",
+    "city": "Ho Chi Minh City",
+    "customer": {
+      "id": 1,
+      "fullName": "Nguyen Van A",
+      "phone": "0901234567",
+      "email": "nguyenvana@example.com"
+    },
     "items": [
       {
-        "productId": "prod_001",
+        "id": 1,
+        "productId": 1,
         "quantity": 2,
-        "unitPrice": 199000,
-        "lineTotal": 398000
+        "priceAtPurchase": 199000
       }
     ],
-    "totalAmount": 398000,
-    "createdAt": "2026-04-02T10:15:00.000Z"
+    "createdAt": "2026-04-02T10:15:00.000Z",
+    "updatedAt": "2026-04-02T10:15:00.000Z"
   }
 ]
 ```
@@ -242,6 +293,6 @@ Response `200`:
 ## Notes For Frontend Web And Mobile
 
 - Only use fields defined in this contract
-- Do not send `unitPrice`, `lineTotal`, or `totalAmount` from clients
+- Do not send `priceAtPurchase` or `totalAmount` from clients
 - UI can calculate temporary totals for display, but backend is the source of truth
 - Contract changes should be versioned and announced by the team lead
