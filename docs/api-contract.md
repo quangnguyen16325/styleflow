@@ -290,9 +290,56 @@ Response `200`:
 ]
 ```
 
+### `GET /orders/:id`
+
+Get one order by id.
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "status": "pending",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "quantity": 2,
+      "priceAtPurchase": 199000
+    }
+  ],
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:15:00.000Z"
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Order not found"
+  }
+}
+```
+
 ## Notes For Frontend Web And Mobile
 
 - Only use fields defined in this contract
 - Do not send `priceAtPurchase` or `totalAmount` from clients
 - UI can calculate temporary totals for display, but backend is the source of truth
 - Contract changes should be versioned and announced by the team lead
+- Creating an order increases `inventory.reserved_qty` and creates an `inventory_transactions` record with type `RESERVE`
