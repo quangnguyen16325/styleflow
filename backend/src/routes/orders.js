@@ -5,42 +5,7 @@ const router = Router();
 
 router.get("/", async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `
-        SELECT
-          o.id,
-          o.status,
-          o.total_amount,
-          o.shipping_fee,
-          o.payment_expires_at,
-          o.fail_count,
-          o.shipping_address,
-          o.city,
-          o.created_at,
-          o.updated_at,
-          c.id AS customer_id,
-          c.full_name,
-          c.phone,
-          c.email,
-          COALESCE(
-            json_agg(
-              json_build_object(
-                'id', oi.id,
-                'productId', oi.product_id,
-                'quantity', oi.quantity,
-                'priceAtPurchase', oi.price_at_purchase
-              )
-              ORDER BY oi.id
-            ) FILTER (WHERE oi.id IS NOT NULL),
-            '[]'::json
-          ) AS items
-        FROM orders o
-        JOIN customers c ON c.id = o.customer_id
-        LEFT JOIN order_items oi ON oi.order_id = o.id
-        GROUP BY o.id, c.id
-        ORDER BY o.created_at DESC
-      `,
-    );
+    const { rows } = await pool.query(`${listOrdersBaseQuery} GROUP BY o.id, c.id ORDER BY o.created_at DESC`);
 
     res.json(rows.map(mapOrderRow));
   } catch (error) {
@@ -49,6 +14,43 @@ router.get("/", async (_req, res) => {
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to fetch orders",
+      },
+    });
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  try {
+    const { rows } = await pool.query(`${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`, [
+      orderId,
+    ]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    return res.json(mapOrderRow(rows[0]));
+  } catch (error) {
+    console.error(`GET /orders/${orderId} failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to fetch order",
       },
     });
   }
@@ -92,6 +94,7 @@ router.post("/", async (req, res) => {
       `
         SELECT
           p.id,
+          i.id AS inventory_id,
           p.base_price,
           COALESCE(i.stock_qty, 0) AS stock_qty,
           COALESCE(i.reserved_qty, 0) AS reserved_qty
@@ -163,6 +166,21 @@ router.post("/", async (req, res) => {
         `,
         [item.quantity, item.productId],
       );
+
+      await client.query(
+        `
+          INSERT INTO inventory_transactions (
+            inventory_id,
+            change_amount,
+            type,
+            order_id,
+            created_by,
+            reference_id
+          )
+          VALUES ($1, $2, 'RESERVE', $3, 'SYSTEM', $4)
+        `,
+        [product.inventory_id, -item.quantity, orderRow.id, `ORDER_${orderRow.id}`],
+      );
     }
 
     await client.query("COMMIT");
@@ -211,6 +229,39 @@ router.post("/", async (req, res) => {
 });
 
 export default router;
+
+const listOrdersBaseQuery = `
+  SELECT
+    o.id,
+    o.status,
+    o.total_amount,
+    o.shipping_fee,
+    o.payment_expires_at,
+    o.fail_count,
+    o.shipping_address,
+    o.city,
+    o.created_at,
+    o.updated_at,
+    c.id AS customer_id,
+    c.full_name,
+    c.phone,
+    c.email,
+    COALESCE(
+      json_agg(
+        json_build_object(
+          'id', oi.id,
+          'productId', oi.product_id,
+          'quantity', oi.quantity,
+          'priceAtPurchase', oi.price_at_purchase
+        )
+        ORDER BY oi.id
+      ) FILTER (WHERE oi.id IS NOT NULL),
+      '[]'::json
+    ) AS items
+  FROM orders o
+  JOIN customers c ON c.id = o.customer_id
+  LEFT JOIN order_items oi ON oi.order_id = o.id
+`;
 
 function validateOrderPayload(body) {
   if (!body || typeof body !== "object") {

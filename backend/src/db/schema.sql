@@ -30,6 +30,19 @@ CREATE TABLE IF NOT EXISTS inventory (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  inventory_id BIGINT NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+  change_amount INTEGER NOT NULL,
+  type VARCHAR(50) NOT NULL CHECK (
+    type IN ('RESERVE', 'SALE', 'RESTOCK', 'RETURN', 'EXPIRED_CANCEL')
+  ),
+  order_id BIGINT,
+  created_by VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
+  reference_id VARCHAR(100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS orders (
   id BIGSERIAL PRIMARY KEY,
   customer_id BIGINT NOT NULL REFERENCES customers(id),
@@ -57,6 +70,9 @@ CREATE TABLE IF NOT EXISTS order_items (
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_inventory_id ON inventory_transactions(inventory_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_order_id ON inventory_transactions(order_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_type ON inventory_transactions(type);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
