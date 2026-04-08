@@ -1,4 +1,4 @@
-# API Contract v0.1
+# API Contract v0.2
 
 Base URL:
 - Production: `https://api.ecloria.co.uk`
@@ -257,6 +257,10 @@ Response `400`:
 
 Get order list.
 
+Query params:
+- `status` optional
+- allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
 Response `200`:
 
 ```json
@@ -322,6 +326,81 @@ Response `200`:
   ],
   "createdAt": "2026-04-02T10:15:00.000Z",
   "updatedAt": "2026-04-02T10:15:00.000Z"
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Order not found"
+  }
+}
+```
+
+### `PATCH /orders/:id/status`
+
+Update order status.
+
+Request body:
+
+```json
+{
+  "status": "processing"
+}
+```
+
+Allowed status values:
+- `pending`
+- `awaiting_payment`
+- `paid`
+- `processing`
+- `shipping`
+- `completed`
+- `cancelled`
+- `failed`
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "status": "processing",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "quantity": 2,
+      "priceAtPurchase": 199000
+    }
+  ],
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:20:00.000Z"
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "A valid order status is required"
+  }
 }
 ```
 

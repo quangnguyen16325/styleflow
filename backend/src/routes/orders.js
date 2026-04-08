@@ -3,10 +3,23 @@ import { pool } from "../db/pool.js";
 
 const router = Router();
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
+  const normalizedStatus = normalizeStatusFilter(req.query.status);
+  if (req.query.status != null && !normalizedStatus) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid order status filter",
+      },
+    });
+  }
+
   try {
+    const whereClause = normalizedStatus ? " WHERE o.status = $1" : "";
+    const params = normalizedStatus ? [normalizedStatus] : [];
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      params,
     );
 
     res.json(rows.map(mapOrderRow));
@@ -54,6 +67,66 @@ router.get("/:id", async (req, res) => {
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to fetch order",
+      },
+    });
+  }
+});
+
+router.patch("/:id/status", async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const nextStatus = normalizeStatusFilter(req.body?.status);
+  if (!nextStatus) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "A valid order status is required",
+      },
+    });
+  }
+
+  try {
+    const updateResult = await pool.query(
+      `
+        UPDATE orders
+        SET
+          status = $2,
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING id
+      `,
+      [orderId, nextStatus],
+    );
+
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const { rows } = await pool.query(
+      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      [orderId],
+    );
+
+    return res.json(mapOrderRow(rows[0]));
+  } catch (error) {
+    console.error(`PATCH /orders/${orderId}/status failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to update order status",
       },
     });
   }
@@ -341,6 +414,15 @@ function mapOrderRow(row) {
   };
 }
 
+function normalizeStatusFilter(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return ORDER_STATUSES.includes(normalizedValue) ? normalizedValue : null;
+}
+
 function mapOrderItemRow(item) {
   return {
     id: item.id,
@@ -351,3 +433,14 @@ function mapOrderItemRow(item) {
 }
 
 class ValidationError extends Error {}
+
+const ORDER_STATUSES = [
+  "pending",
+  "awaiting_payment",
+  "paid",
+  "processing",
+  "shipping",
+  "completed",
+  "cancelled",
+  "failed",
+];
