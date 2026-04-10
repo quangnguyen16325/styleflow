@@ -1,21 +1,26 @@
-import { useEffect, useState } from "react";
-import { getApiHealth } from "./api";
-import "./App.css";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import AdminLayout from './components/layouts/AdminLayout';
+import Dashboard from './pages/Dashboard';
+import ProductList from './pages/Products/ProductList';
+import ProductDetails from './pages/Products/ProductDetails';
+import OrderList from './pages/Orders/OrderList';
+import OrderDetails from './pages/Orders/OrderDetails';
+import './App.css';
 
-export default function App() {
-  const [status, setStatus] = useState("Checking backend...");
-
-  useEffect(() => {
-    getApiHealth()
-      .then(() => setStatus("Backend connected"))
-      .catch(() => setStatus("Backend not reachable"));
-  }, []);
-
+function App() {
   return (
-    <main className="app">
-      <h1>Order App Base (Web)</h1>
-      <p>This is a clean base template.</p>
-      <p>Status: {status}</p>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AdminLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="products" element={<ProductList />} />
+          <Route path="products/:id" element={<ProductDetails />} />
+          <Route path="orders" element={<OrderList />} />
+          <Route path="orders/:id" element={<OrderDetails />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
+
+export default App;
