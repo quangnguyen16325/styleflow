@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+/* eslint-disable react/prop-types */
+import React, { createContext, useContext, useState, useCallback } from "react";
 
 // ── Context ──────────────────────────────────────────────────────────────────
 
@@ -35,9 +36,9 @@ export function AuthProvider({ children }) {
     try {
       await new Promise((r) => setTimeout(r, 500));
       setUser({
-        fullName: fullName?.trim() || 'Quang Anh',
-        phone: phone?.trim() || '',
-        email: email?.trim() || '',
+        fullName: fullName?.trim() || "Quang Anh",
+        phone: phone?.trim() || "",
+        email: email?.trim() || "",
       });
       return { success: true };
     } finally {
@@ -54,7 +55,7 @@ export function AuthProvider({ children }) {
    * - Nếu đã đăng nhập → tên từ form
    * - Nếu chưa → mặc định "Quang Anh"
    */
-  const displayName = user?.fullName || 'Quang Anh';
+  const displayName = user?.fullName || "Quang Anh";
 
   return (
     <AuthContext.Provider value={{ user, displayName, isLoading, login, register, logout }}>
@@ -67,6 +68,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
+  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 }

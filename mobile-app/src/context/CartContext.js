@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+/* eslint-disable react/prop-types */
+import React, { createContext, useContext, useState, useCallback } from "react";
 
 // ── Context ──────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ export function CartProvider({ children }) {
         return prev.map((i) =>
           i.productId === product.id
             ? { ...i, quantity: Math.min(i.quantity + quantity, product.availableQty) }
-            : i
+            : i,
         );
       }
       return [
@@ -45,10 +46,8 @@ export function CartProvider({ children }) {
     }
     setItems((prev) =>
       prev.map((i) =>
-        i.productId === productId
-          ? { ...i, quantity: Math.min(quantity, i.availableQty) }
-          : i
-      )
+        i.productId === productId ? { ...i, quantity: Math.min(quantity, i.availableQty) } : i,
+      ),
     );
   }, []);
 
@@ -90,6 +89,6 @@ export function CartProvider({ children }) {
 
 export function useCart() {
   const ctx = useContext(CartContext);
-  if (!ctx) throw new Error('useCart must be used inside <CartProvider>');
+  if (!ctx) throw new Error("useCart must be used inside <CartProvider>");
   return ctx;
 }

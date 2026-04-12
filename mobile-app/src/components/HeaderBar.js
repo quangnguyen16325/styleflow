@@ -1,16 +1,16 @@
 /* eslint-disable react/prop-types */
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { COLORS } from '../constants/colors';
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useAuth } from "../context/AuthContext";
+import { COLORS } from "../constants/colors";
 
 // Lấy lời chào theo giờ hiện tại
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return 'Chào buổi sáng ☀️';
-  if (hour >= 12 && hour < 18) return 'Chào buổi chiều 🌤️';
-  if (hour >= 18 && hour < 22) return 'Chào buổi tối 🌆';
-  return 'Khuya rồi nhé 🌙';
+  if (hour >= 5 && hour < 12) return "Chào buổi sáng ☀️";
+  if (hour >= 12 && hour < 18) return "Chào buổi chiều 🌤️";
+  if (hour >= 18 && hour < 22) return "Chào buổi tối 🌆";
+  return "Khuya rồi nhé 🌙";
 }
 
 /**
@@ -56,9 +56,9 @@ export default function HeaderBar({ onSettingsPress }) {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 14,
@@ -67,8 +67,8 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.divider,
   },
   left: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
     gap: 12,
   },
@@ -85,8 +85,8 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: "800",
+    color: "#FFFFFF",
     letterSpacing: 1,
   },
   greetingBlock: {
@@ -95,12 +95,12 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    fontWeight: '400',
+    fontWeight: "400",
     lineHeight: 16,
   },
   userName: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textPrimary,
     lineHeight: 20,
   },
@@ -109,8 +109,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: COLORS.bgInput,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: COLORS.border,
   },

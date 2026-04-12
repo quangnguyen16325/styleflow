@@ -1,16 +1,16 @@
 /* eslint-disable react/prop-types */
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useCart } from '../context/CartContext';
-import { COLORS } from '../constants/colors';
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useCart } from "../context/CartContext";
+import { COLORS } from "../constants/colors";
 
 // Tab definitions — phải khớp với tên route trong navigator
 const TABS = [
-  { key: 'Home', label: 'Trang chủ', icon: '🏠', iconActive: '🏠' },
-  { key: 'Wishlist', label: 'Yêu thích', icon: '🤍', iconActive: '❤️' },
-  { key: 'Track', label: 'Đơn hàng', icon: '📦', iconActive: '📦', centerTab: true },
-  { key: 'Cart', label: 'Giỏ hàng', icon: '🛍️', iconActive: '🛍️' },
-  { key: 'Profile', label: 'Tôi', icon: '👤', iconActive: '👤' },
+  { key: "Home", label: "Trang chủ", icon: "🏠", iconActive: "🏠" },
+  { key: "Wishlist", label: "Yêu thích", icon: "🤍", iconActive: "❤️" },
+  { key: "Track", label: "Đơn hàng", icon: "📦", iconActive: "📦", centerTab: true },
+  { key: "Cart", label: "Giỏ hàng", icon: "🛍️", iconActive: "🛍️" },
+  { key: "Profile", label: "Tôi", icon: "👤", iconActive: "👤" },
 ];
 
 /**
@@ -58,9 +58,9 @@ export default function BottomTabBar({ activeTab, onTabPress }) {
               <View style={styles.iconWrapper}>
                 <Text style={styles.tabIcon}>{isActive ? tab.iconActive : tab.icon}</Text>
                 {/* Badge đỏ chỉ hiển thị trên tab Cart */}
-                {tab.key === 'Cart' && totalCount > 0 && (
+                {tab.key === "Cart" && totalCount > 0 && (
                   <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{totalCount > 99 ? '99+' : totalCount}</Text>
+                    <Text style={styles.badgeText}>{totalCount > 99 ? "99+" : totalCount}</Text>
                   </View>
                 )}
               </View>
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.bgPrimary,
     paddingBottom: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: -4 },
@@ -88,8 +88,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.divider,
   },
   tabRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    alignItems: "flex-end",
     paddingHorizontal: 4,
     paddingTop: 4,
   },
@@ -97,11 +97,11 @@ const styles = StyleSheet.create({
   // Normal tab
   tabBtn: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 6,
   },
   iconWrapper: {
-    position: 'relative',
+    position: "relative",
     marginBottom: 3,
   },
   tabIcon: {
@@ -110,38 +110,38 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 10,
     color: COLORS.textMuted,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   tabLabelActive: {
     color: COLORS.primary,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   // Badge on cart
   badge: {
-    position: 'absolute',
+    position: "absolute",
     top: -4,
     right: -8,
     backgroundColor: COLORS.danger,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 4,
     borderWidth: 1.5,
     borderColor: COLORS.bgPrimary,
   },
   badgeText: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
 
   // Center (floating) tab
   centerTabBtn: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: -20, // Float lên trên
   },
   centerCircle: {
@@ -149,8 +149,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 3,
     borderColor: COLORS.bgPrimary,
     shadowColor: COLORS.primary,
@@ -170,10 +170,10 @@ const styles = StyleSheet.create({
   centerLabel: {
     fontSize: 10,
     color: COLORS.textMuted,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   centerLabelActive: {
     color: COLORS.accent,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

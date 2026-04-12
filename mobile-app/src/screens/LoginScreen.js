@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,27 +12,27 @@ import {
   StatusBar,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../context/AuthContext';
-import { COLORS } from '../constants/colors';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../context/AuthContext";
+import { COLORS } from "../constants/colors";
 
 export default function LoginScreen({ navigation }) {
   const { login, isLoading } = useAuth();
 
   const [form, setForm] = useState({
-    fullName: '',
-    phone: '',
-    email: '',
+    fullName: "",
+    phone: "",
+    email: "",
   });
   const [errors, setErrors] = useState({});
 
   const validate = () => {
     const newErrors = {};
-    if (!form.fullName.trim()) newErrors.fullName = 'Vui lòng nhập họ tên';
-    if (!form.phone.trim()) newErrors.phone = 'Vui lòng nhập số điện thoại';
-    if (!form.email.trim()) newErrors.email = 'Vui lòng nhập email';
-    else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Email không hợp lệ';
+    if (!form.fullName.trim()) newErrors.fullName = "Vui lòng nhập họ tên";
+    if (!form.phone.trim()) newErrors.phone = "Vui lòng nhập số điện thoại";
+    if (!form.email.trim()) newErrors.email = "Vui lòng nhập email";
+    else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = "Email không hợp lệ";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -41,9 +41,9 @@ export default function LoginScreen({ navigation }) {
     if (!validate()) return;
     const result = await login(form);
     if (result.success) {
-      navigation.replace('MainApp');
+      navigation.replace("MainApp");
     } else {
-      Alert.alert('Lỗi', 'Đăng nhập thất bại. Vui lòng thử lại.');
+      Alert.alert("Lỗi", "Đăng nhập thất bại. Vui lòng thử lại.");
     }
   };
 
@@ -53,11 +53,11 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bgPrimary} />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Header */}
@@ -75,14 +75,14 @@ export default function LoginScreen({ navigation }) {
               label="Họ và tên"
               placeholder="Nguyễn Văn A"
               value={form.fullName}
-              onChangeText={(v) => setField('fullName', v)}
+              onChangeText={(v) => setField("fullName", v)}
               error={errors.fullName}
             />
             <InputField
               label="Số điện thoại"
               placeholder="0901234567"
               value={form.phone}
-              onChangeText={(v) => setField('phone', v)}
+              onChangeText={(v) => setField("phone", v)}
               error={errors.phone}
               keyboardType="phone-pad"
             />
@@ -90,7 +90,7 @@ export default function LoginScreen({ navigation }) {
               label="Email"
               placeholder="example@gmail.com"
               value={form.email}
-              onChangeText={(v) => setField('email', v)}
+              onChangeText={(v) => setField("email", v)}
               error={errors.email}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -113,7 +113,7 @@ export default function LoginScreen({ navigation }) {
           {/* Register link */}
           <View style={styles.registerRow}>
             <Text style={styles.registerLabel}>Chưa có tài khoản? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <TouchableOpacity onPress={() => navigation.navigate("Register")}>
               <Text style={styles.registerLink}>Đăng ký ngay</Text>
             </TouchableOpacity>
           </View>
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
 
   headerSection: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: 36,
     paddingBottom: 32,
   },
@@ -152,8 +152,8 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
     shadowColor: COLORS.primary,
     shadowOpacity: 0.4,
@@ -161,10 +161,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
-  logoText: { fontSize: 36, fontWeight: '800', color: '#fff' },
+  logoText: { fontSize: 36, fontWeight: "800", color: "#fff" },
   title: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: "800",
     color: COLORS.textPrimary,
     marginBottom: 6,
   },
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bgCard,
     borderRadius: 20,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   fieldContainer: { marginBottom: 20 },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: COLORS.danger,
-    backgroundColor: '#FFF5F5',
+    backgroundColor: "#FFF5F5",
   },
   errorText: {
     fontSize: 12,
@@ -217,8 +217,8 @@ const styles = StyleSheet.create({
     height: 56,
     backgroundColor: COLORS.primary,
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 8,
     shadowColor: COLORS.primary,
     shadowOpacity: 0.35,
@@ -228,21 +228,21 @@ const styles = StyleSheet.create({
   },
   loginBtnDisabled: { opacity: 0.7 },
   loginBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.3,
   },
 
   registerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   registerLabel: { fontSize: 15, color: COLORS.textSecondary },
   registerLink: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.primary,
   },
 });
