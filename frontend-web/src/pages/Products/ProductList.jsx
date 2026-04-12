@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ApiService from '../../api';
-import LoadingSpinner from '../ui/LoadingSpinner';
-import ErrorMessage from '../ui/ErrorMessage';
-import EmptyState from '../ui/EmptyState';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import ErrorMessage from '../../components/ui/ErrorMessage';
+import EmptyState from '../../components/ui/EmptyState';
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
