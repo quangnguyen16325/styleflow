@@ -93,8 +93,31 @@ router.patch("/:id/status", async (req, res) => {
     });
   }
 
+  const client = await pool.connect();
   try {
-    const updateResult = await pool.query(
+    await client.query("BEGIN");
+
+    const currentOrderResult = await client.query(
+      `
+        SELECT id, status
+        FROM orders
+        WHERE id = $1
+      `,
+      [orderId],
+    );
+
+    if (currentOrderResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const previousStatus = currentOrderResult.rows[0].status;
+    await client.query(
       `
         UPDATE orders
         SET
@@ -106,14 +129,34 @@ router.patch("/:id/status", async (req, res) => {
       [orderId, nextStatus],
     );
 
-    if (updateResult.rows.length === 0) {
-      return res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "Order not found",
-        },
-      });
+    if (previousStatus !== "failed" && nextStatus === "failed") {
+      await client.query(
+        `
+          INSERT INTO issues (
+            order_id,
+            type,
+            severity,
+            status,
+            log_history
+          )
+          VALUES (
+            $1,
+            'ORDER_FAILED',
+            'high',
+            'open',
+            jsonb_build_array(
+              jsonb_build_object(
+                'timestamp', NOW(),
+                'message', $2::text
+              )
+            )
+          )
+        `,
+        [orderId, `Order status changed from ${previousStatus} to failed`],
+      );
     }
+
+    await client.query("COMMIT");
 
     const { rows } = await pool.query(
       `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
@@ -122,6 +165,7 @@ router.patch("/:id/status", async (req, res) => {
 
     return res.json(mapOrderRow(rows[0]));
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error(`PATCH /orders/${orderId}/status failed:`, error);
     return res.status(500).json({
       error: {
@@ -129,6 +173,8 @@ router.patch("/:id/status", async (req, res) => {
         message: "Failed to update order status",
       },
     });
+  } finally {
+    client.release();
   }
 });
 

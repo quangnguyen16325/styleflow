@@ -173,6 +173,17 @@ Response `404`:
 }
 ```
 
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Product id must be a positive integer"
+  }
+}
+```
+
 ### `POST /orders`
 
 Create a new order.
@@ -242,6 +253,11 @@ Response `201`:
 }
 ```
 
+Side effects:
+- backend creates or updates the customer by phone
+- backend increases `inventory.reserved_qty`
+- backend creates an `inventory_transactions` record with type `RESERVE`
+
 Response `400`:
 
 ```json
@@ -260,6 +276,17 @@ Get order list.
 Query params:
 - `status` optional
 - allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid order status filter"
+  }
+}
+```
 
 Response `200`:
 
@@ -340,6 +367,17 @@ Response `404`:
 }
 ```
 
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Order id must be a positive integer"
+  }
+}
+```
+
 ### `PATCH /orders/:id/status`
 
 Update order status.
@@ -361,6 +399,12 @@ Allowed status values:
 - `completed`
 - `cancelled`
 - `failed`
+
+Side effects:
+- when status changes to `failed`, backend automatically creates an `issue` record with:
+  - `type = ORDER_FAILED`
+  - `severity = high`
+  - `status = open`
 
 Response `200`:
 
@@ -421,4 +465,6 @@ Response `404`:
 - Do not send `priceAtPurchase` or `totalAmount` from clients
 - UI can calculate temporary totals for display, but backend is the source of truth
 - Contract changes should be versioned and announced by the team lead
-- Creating an order increases `inventory.reserved_qty` and creates an `inventory_transactions` record with type `RESERVE`
+- `GET /products/:id` and `GET /orders/:id` require a positive integer id
+- `GET /orders` supports optional `status` filtering
+- Changing an order status to `failed` automatically creates an `issue` record for issue tracking and n8n automation
