@@ -87,9 +87,50 @@ export default function OrderDetails() {
         </div>
       </div>
 
-      {/* Placeholder for items & total summary (To be completed in Commit 10) */}
-      <div style={{ backgroundColor: '#f9f9f9', padding: '24px', borderRadius: '8px', border: '1px dashed #ccc', textAlign: 'center', color: '#777' }}>
-        <em>Items and Financial Summary will be displayed here in the next phase.</em>
+      {/* Items and Financial Summary */}
+      <div style={{ backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e0e0e0', marginBottom: '30px' }}>
+        <h3 style={{ margin: 0, padding: '16px 24px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e0e0e0' }}>Ordered Items</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Product ID</th>
+              <th style={{ textAlign: 'right' }}>Quantity</th>
+              <th style={{ textAlign: 'right' }}>Unit Price</th>
+              <th style={{ textAlign: 'right' }}>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(order.items || []).map((item, index) => (
+              <tr key={index}>
+                <td style={{ fontWeight: '500' }}>{item.productId}</td>
+                <td style={{ textAlign: 'right' }}>{item.quantity}</td>
+                <td style={{ textAlign: 'right' }}>{item.priceAtPurchase.toLocaleString()} đ</td>
+                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                  {(item.quantity * item.priceAtPurchase).toLocaleString()} đ
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Financial Totals */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ width: '320px', backgroundColor: '#fff', padding: '24px', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+          <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px' }}>Financial Summary</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', color: '#5f6368' }}>
+            <span>Subtotal (Items)</span>
+            <span>{(order.totalAmount - (order.shippingFee || 0)).toLocaleString()} đ</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', color: '#5f6368' }}>
+            <span>Shipping Fee</span>
+            <span>{(order.shippingFee || 0).toLocaleString()} đ</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '15px', borderTop: '2px solid #e0e0e0', fontSize: '18px' }}>
+            <span style={{ fontWeight: 'bold' }}>Total Amount</span>
+            <span style={{ color: '#1a73e8', fontWeight: 'bold' }}>{(order.totalAmount || 0).toLocaleString()} đ</span>
+          </div>
+        </div>
       </div>
 
     </div>
