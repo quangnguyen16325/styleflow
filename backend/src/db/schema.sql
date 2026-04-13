@@ -3,8 +3,13 @@ CREATE TABLE IF NOT EXISTS customers (
   full_name VARCHAR(255) NOT NULL,
   phone VARCHAR(50) NOT NULL UNIQUE,
   email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash TEXT,
+  role VARCHAR(30) NOT NULL DEFAULT 'customer' CHECK (
+    role IN ('customer', 'admin', 'staff')
+  ),
   abuse_score INTEGER NOT NULL DEFAULT 0 CHECK (abuse_score >= 0),
   is_blacklisted BOOLEAN NOT NULL DEFAULT FALSE,
+  last_login_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -83,8 +88,37 @@ CREATE TABLE IF NOT EXISTS order_items (
   price_at_purchase NUMERIC(12, 2) NOT NULL CHECK (price_at_purchase >= 0)
 );
 
+ALTER TABLE customers
+ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+ALTER TABLE customers
+ADD COLUMN IF NOT EXISTS role VARCHAR(30) DEFAULT 'customer';
+
+UPDATE customers
+SET role = 'customer'
+WHERE role IS NULL;
+
+ALTER TABLE customers
+ALTER COLUMN role SET DEFAULT 'customer';
+
+ALTER TABLE customers
+ALTER COLUMN role SET NOT NULL;
+
+ALTER TABLE customers
+DROP CONSTRAINT IF EXISTS customers_role_check;
+
+ALTER TABLE customers
+ADD CONSTRAINT customers_role_check CHECK (
+  role IN ('customer', 'admin', 'staff')
+);
+
+ALTER TABLE customers
+ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_role ON customers(role);
+CREATE INDEX IF NOT EXISTS idx_customers_blacklisted ON customers(is_blacklisted);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_inventory_id ON inventory_transactions(inventory_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_order_id ON inventory_transactions(order_id);

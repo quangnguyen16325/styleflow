@@ -1,4 +1,4 @@
-# API Contract v0.2
+# API Contract v0.3
 
 Base URL:
 - Production: `https://api.ecloria.co.uk`
@@ -32,6 +32,9 @@ Common error codes:
 - `VALIDATION_ERROR`
 - `NOT_FOUND`
 - `INTERNAL_ERROR`
+- `UNAUTHORIZED`
+- `FORBIDDEN`
+- `CONFLICT`
 
 ## Product Model
 
@@ -69,6 +72,25 @@ Common error codes:
   "fullName": "Nguyen Van A",
   "phone": "0901234567",
   "email": "nguyenvana@example.com"
+}
+```
+
+## Auth Response Model
+
+```json
+{
+  "token": "jwt-token",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
 }
 ```
 
@@ -115,6 +137,132 @@ Response `200`:
 {
   "ok": true,
   "service": "backend"
+}
+```
+
+### `POST /auth/register`
+
+Register a new customer account.
+
+Request body:
+
+```json
+{
+  "fullName": "Nguyen Van A",
+  "phone": "0901234567",
+  "email": "nguyenvana@example.com",
+  "password": "secret123"
+}
+```
+
+Rules:
+- `fullName`: required
+- `phone`: required
+- `email`: required
+- `password`: required, minimum 8 characters
+
+Response `201`:
+
+```json
+{
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+}
+```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "Customer already exists"
+  }
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "password must be at least 8 characters"
+  }
+}
+```
+
+### `POST /auth/login`
+
+Login with email and password.
+
+Request body:
+
+```json
+{
+  "email": "nguyenvana@example.com",
+  "password": "secret123"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "token": "jwt-token",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+}
+```
+
+Response `401`:
+
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid email or password"
+  }
+}
+```
+
+Response `403`:
+
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Customer is blacklisted"
+  }
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "email is required"
+  }
 }
 ```
 

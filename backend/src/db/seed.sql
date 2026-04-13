@@ -45,3 +45,21 @@ VALUES
   (2, 10, 0, 3, 1.20, 12),
   (3, 30, 0, 5, 3.10, 6)
 ON CONFLICT (product_id) DO NOTHING;
+
+SELECT setval(
+  pg_get_serial_sequence('customers', 'id'),
+  COALESCE((SELECT MAX(id) FROM customers), 1),
+  true
+);
+
+SELECT setval(
+  pg_get_serial_sequence('products', 'id'),
+  COALESCE((SELECT MAX(id) FROM products), 1),
+  true
+);
+
+SELECT setval(
+  pg_get_serial_sequence('inventory', 'id'),
+  COALESCE((SELECT MAX(id) FROM inventory), 1),
+  true
+);

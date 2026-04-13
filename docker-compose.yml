@@ -37,6 +37,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       PORT: ${BACKEND_PORT}
+      JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       WEB_ORIGIN: http://localhost:${FRONTEND_PORT}
