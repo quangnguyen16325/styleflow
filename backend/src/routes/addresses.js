@@ -4,7 +4,7 @@ import { pool } from "../db/pool.js";
 const router = Router({ mergeParams: true });
 
 router.get("/", async (req, res) => {
-  const customerId = parsePositiveInteger(req.params.customerId);
+  const customerId = getCustomerIdFromRequest(req);
   if (!customerId) {
     return res.status(400).json(validationError("Customer id must be a positive integer"));
   }
@@ -47,7 +47,7 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/:addressId", async (req, res) => {
-  const customerId = parsePositiveInteger(req.params.customerId);
+  const customerId = getCustomerIdFromRequest(req);
   const addressId = parsePositiveInteger(req.params.addressId);
   if (!customerId) {
     return res.status(400).json(validationError("Customer id must be a positive integer"));
@@ -94,7 +94,7 @@ router.get("/:addressId", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const customerId = parsePositiveInteger(req.params.customerId);
+  const customerId = getCustomerIdFromRequest(req);
   if (!customerId) {
     return res.status(400).json(validationError("Customer id must be a positive integer"));
   }
@@ -190,7 +190,7 @@ router.post("/", async (req, res) => {
 });
 
 router.patch("/:addressId", async (req, res) => {
-  const customerId = parsePositiveInteger(req.params.customerId);
+  const customerId = getCustomerIdFromRequest(req);
   const addressId = parsePositiveInteger(req.params.addressId);
   if (!customerId) {
     return res.status(400).json(validationError("Customer id must be a positive integer"));
@@ -298,7 +298,7 @@ router.patch("/:addressId", async (req, res) => {
 });
 
 router.delete("/:addressId", async (req, res) => {
-  const customerId = parsePositiveInteger(req.params.customerId);
+  const customerId = getCustomerIdFromRequest(req);
   const addressId = parsePositiveInteger(req.params.addressId);
   if (!customerId) {
     return res.status(400).json(validationError("Customer id must be a positive integer"));
@@ -492,6 +492,10 @@ function parsePositiveInteger(value) {
   }
 
   return parsed;
+}
+
+function getCustomerIdFromRequest(req) {
+  return parsePositiveInteger(req.params.customerId ?? req.authCustomer?.id);
 }
 
 function getTrimmedString(value) {

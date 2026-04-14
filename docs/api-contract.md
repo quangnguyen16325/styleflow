@@ -1,4 +1,4 @@
-# API Contract v0.4
+# API Contract v0.5
 
 Base URL:
 - Production: `https://api.ecloria.co.uk`
@@ -7,6 +7,9 @@ Base URL:
 Content-Type:
 - Request: `application/json`
 - Response: `application/json`
+
+Authorization:
+- Authenticated endpoints require `Authorization: Bearer <token>`
 
 ## Response Rules
 
@@ -315,6 +318,56 @@ Response `400`:
 }
 ```
 
+### `GET /me`
+
+Get the authenticated customer profile.
+
+Response `200`:
+
+```json
+{
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+}
+```
+
+### `GET /me/addresses`
+
+Get all addresses of the authenticated customer.
+
+Response `200`:
+- array of `Customer Address Model`
+
+### `POST /me/addresses`
+
+Create a new address for the authenticated customer.
+
+Response `201`:
+- `Customer Address Model`
+
+### `PATCH /me/addresses/:addressId`
+
+Update one address of the authenticated customer.
+
+Response `200`:
+- `Customer Address Model`
+
+### `DELETE /me/addresses/:addressId`
+
+Delete one address of the authenticated customer.
+
+Response `204`:
+- empty body
+
 ### `GET /customers/:customerId/addresses`
 
 Get all addresses for one customer.
@@ -621,34 +674,12 @@ Response `400`:
 
 ### `POST /orders`
 
-Create a new order.
+Create a new order for the authenticated customer.
 
-Request body, guest checkout:
-
-```json
-{
-  "customer": {
-    "fullName": "Nguyen Van A",
-    "phone": "0901234567",
-    "email": "nguyenvana@example.com"
-  },
-  "shippingAddress": "123 Nguyen Trai, HCMC",
-  "city": "Ho Chi Minh City",
-  "shippingFee": 20000,
-  "items": [
-    {
-      "productId": 1,
-      "quantity": 2
-    }
-  ]
-}
-```
-
-Request body, logged-in customer using saved address:
+Request body using a saved address:
 
 ```json
 {
-  "customerId": 1,
   "addressId": 1,
   "shippingFee": 20000,
   "items": [
@@ -660,11 +691,10 @@ Request body, logged-in customer using saved address:
 }
 ```
 
-Request body, logged-in customer using a new address:
+Request body using a new address:
 
 ```json
 {
-  "customerId": 1,
   "newAddress": {
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
@@ -686,11 +716,10 @@ Request body, logged-in customer using a new address:
 ```
 
 Rules:
-- guest checkout requires `customer.fullName`, `customer.phone`, `customer.email`
-- logged-in checkout requires `customerId`
-- use either `addressId` or `newAddress` for logged-in checkout
+- authenticated endpoint only
+- customer identity is taken from the JWT token
+- use either `addressId` or `newAddress`
 - do not send both `addressId` and `newAddress`
-- legacy guest checkout with `shippingAddress` and `city` is still supported
 - `newAddress.receiverName`: required
 - `newAddress.receiverPhone`: required
 - `newAddress.addressLine`: required
@@ -700,10 +729,7 @@ Rules:
 - `productId`: required
 - `quantity`: required, integer, greater than 0
 - `priceAtPurchase` and `totalAmount` are computed by the backend
-- backend resolves customer identity by both `email` and `phone`
-- backend does not overwrite a different customer's email or phone
-- if `email` and `phone` map to conflicting customer records, request fails with `409`
-- when `addressId` is used, it must belong to the same `customerId`
+- when `addressId` is used, it must belong to the authenticated customer
 
 Response `201`:
 
@@ -749,9 +775,7 @@ Response `201`:
 ```
 
 Side effects:
-- backend creates a new customer only when neither `email` nor `phone` exists
-- backend updates only `customer.fullName` when `email` and `phone` match the same existing customer
-- backend copies a shipping snapshot into the order from `addressId`, `newAddress`, or legacy shipping fields
+- backend copies a shipping snapshot into the order from `addressId` or `newAddress`
 - backend increases `inventory.reserved_qty`
 - backend creates an `inventory_transactions` record with type `RESERVE`
 
@@ -766,20 +790,16 @@ Response `400`:
 }
 ```
 
-Response `409`:
+Response `401`:
 
 ```json
 {
   "error": {
-    "code": "EMAIL_ALREADY_IN_USE",
-    "message": "Email is already used by another customer"
+    "code": "UNAUTHORIZED",
+    "message": "Authorization token is required"
   }
 }
 ```
-
-Other possible conflict codes for this endpoint:
-- `PHONE_ALREADY_IN_USE`
-- `CUSTOMER_IDENTITY_CONFLICT`
 
 ### `GET /orders`
 
@@ -980,3 +1000,12 @@ Response `404`:
 - `GET /products/:id` and `GET /orders/:id` require a positive integer id
 - `GET /orders` supports optional `status` filtering
 - Changing an order status to `failed` automatically creates an `issue` record for issue tracking and n8n automation
+
+## Planned Next Scope
+
+The following backend capabilities are planned for the next phase and are not implemented yet:
+- delivery callback webhook
+- address change request workflow
+- refund request workflow
+- payment failover and incident tracking APIs
+- admin issue management APIs

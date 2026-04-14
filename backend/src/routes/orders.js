@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuth } from "../middleware/require-auth.js";
 import { pool } from "../db/pool.js";
 
 const router = Router();
@@ -178,7 +179,7 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const validationError = validateOrderPayload(req.body);
   if (validationError) {
     return res.status(400).json({
@@ -189,16 +190,14 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const { customer, items } = req.body;
+  const { items } = req.body;
   const shippingFee = Number(req.body.shippingFee ?? 0);
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    const customerRow = req.body.customerId
-      ? await resolveAuthenticatedCustomerForOrder(client, req.body.customerId)
-      : await resolveCustomerForOrder(client, customer);
+    const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
     const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
 
     const productIds = items.map((item) => item.productId);
@@ -354,15 +353,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    if (error instanceof ConflictError) {
-      return res.status(409).json({
-        error: {
-          code: error.code,
-          message: error.message,
-        },
-      });
-    }
-
     console.error("POST /orders failed:", error);
     return res.status(500).json({
       error: {
@@ -423,28 +413,8 @@ function validateOrderPayload(body) {
     return "Request body is required";
   }
 
-  const hasCustomerId = Number.isInteger(body.customerId) && body.customerId > 0;
-  if (!hasCustomerId) {
-    if (!body.customer || typeof body.customer !== "object") {
-      return "Customer information is required for guest checkout";
-    }
-
-    if (!body.customer.fullName?.trim()) {
-      return "Customer fullName is required";
-    }
-
-    if (!body.customer.phone?.trim()) {
-      return "Customer phone is required";
-    }
-
-    if (!body.customer.email?.trim()) {
-      return "Customer email is required";
-    }
-  }
-
   const hasAddressId = body.addressId != null;
   const hasNewAddress = body.newAddress != null;
-  const hasLegacyShipping = body.shippingAddress?.trim() && body.city?.trim();
 
   if (hasAddressId && hasNewAddress) {
     return "Use either addressId or newAddress, not both";
@@ -453,10 +423,6 @@ function validateOrderPayload(body) {
   if (hasAddressId) {
     if (!Number.isInteger(body.addressId) || body.addressId <= 0) {
       return "addressId must be a positive integer";
-    }
-
-    if (!hasCustomerId) {
-      return "customerId is required when using addressId";
     }
   }
 
@@ -467,7 +433,7 @@ function validateOrderPayload(body) {
     }
   }
 
-  if (!hasAddressId && !hasNewAddress && !hasLegacyShipping) {
+  if (!hasAddressId && !hasNewAddress) {
     return "Shipping information is required";
   }
 
@@ -552,76 +518,6 @@ function mapShippingRow(row) {
 }
 
 class ValidationError extends Error {}
-class ConflictError extends Error {
-  constructor(code, message) {
-    super(message);
-    this.code = code;
-  }
-}
-
-async function resolveCustomerForOrder(client, customer) {
-  const normalizedCustomer = {
-    fullName: customer.fullName.trim(),
-    phone: customer.phone.trim(),
-    email: customer.email.trim().toLowerCase(),
-  };
-
-  const { rows } = await client.query(
-    `
-      SELECT id, full_name, phone, email
-      FROM customers
-      WHERE email = $1 OR phone = $2
-      ORDER BY id ASC
-    `,
-    [normalizedCustomer.email, normalizedCustomer.phone],
-  );
-
-  if (rows.length === 0) {
-    const insertResult = await client.query(
-      `
-        INSERT INTO customers (full_name, phone, email)
-        VALUES ($1, $2, $3)
-        RETURNING id, full_name, phone, email
-      `,
-      [normalizedCustomer.fullName, normalizedCustomer.phone, normalizedCustomer.email],
-    );
-
-    return insertResult.rows[0];
-  }
-
-  const emailCustomer = rows.find((row) => row.email === normalizedCustomer.email) ?? null;
-  const phoneCustomer = rows.find((row) => row.phone === normalizedCustomer.phone) ?? null;
-
-  if (emailCustomer && phoneCustomer && emailCustomer.id !== phoneCustomer.id) {
-    throw new ConflictError(
-      "CUSTOMER_IDENTITY_CONFLICT",
-      "Email and phone belong to different customers",
-    );
-  }
-
-  if (emailCustomer && emailCustomer.phone !== normalizedCustomer.phone) {
-    throw new ConflictError("EMAIL_ALREADY_IN_USE", "Email is already used by another customer");
-  }
-
-  if (phoneCustomer && phoneCustomer.email !== normalizedCustomer.email) {
-    throw new ConflictError("PHONE_ALREADY_IN_USE", "Phone is already used by another customer");
-  }
-
-  const existingCustomer = emailCustomer ?? phoneCustomer;
-  const updateResult = await client.query(
-    `
-      UPDATE customers
-      SET
-        full_name = $2,
-        updated_at = NOW()
-      WHERE id = $1
-      RETURNING id, full_name, phone, email
-    `,
-    [existingCustomer.id, normalizedCustomer.fullName],
-  );
-
-  return updateResult.rows[0];
-}
 
 async function resolveAuthenticatedCustomerForOrder(client, customerId) {
   const { rows } = await client.query(
@@ -683,18 +579,6 @@ async function resolveShippingSnapshot(client, body, customerRow) {
       postal_code: body.newAddress.postalCode?.trim() || null,
     });
   }
-
-  return mapShippingAddressRecord({
-    id: null,
-    receiver_name: customerRow.full_name,
-    receiver_phone: customerRow.phone,
-    address_line: body.shippingAddress.trim(),
-    ward: null,
-    district: null,
-    city: body.city.trim(),
-    country: "Vietnam",
-    postal_code: null,
-  });
 }
 
 function mapShippingAddressRecord(row) {
