@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
 CREATE TABLE IF NOT EXISTS orders (
   id BIGSERIAL PRIMARY KEY,
   customer_id BIGINT NOT NULL REFERENCES customers(id),
+  customer_address_id BIGINT REFERENCES customer_addresses(id) ON DELETE SET NULL,
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
     status IN ('pending', 'awaiting_payment', 'paid', 'processing', 'shipping', 'completed', 'cancelled', 'failed')
   ),
@@ -75,8 +76,15 @@ CREATE TABLE IF NOT EXISTS orders (
   shipping_fee NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (shipping_fee >= 0),
   payment_expires_at TIMESTAMPTZ,
   fail_count INTEGER NOT NULL DEFAULT 0 CHECK (fail_count >= 0),
+  shipping_receiver_name VARCHAR(255),
+  shipping_receiver_phone VARCHAR(50),
+  shipping_address_line TEXT,
+  shipping_ward VARCHAR(120),
+  shipping_district VARCHAR(120),
   shipping_address TEXT NOT NULL,
   city VARCHAR(120) NOT NULL,
+  shipping_country VARCHAR(120) NOT NULL DEFAULT 'Vietnam',
+  shipping_postal_code VARCHAR(30),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -132,6 +140,39 @@ ADD CONSTRAINT customers_role_check CHECK (
 ALTER TABLE customers
 ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS customer_address_id BIGINT REFERENCES customer_addresses(id) ON DELETE SET NULL;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_receiver_name VARCHAR(255);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_receiver_phone VARCHAR(50);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_address_line TEXT;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_ward VARCHAR(120);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_district VARCHAR(120);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(120) NOT NULL DEFAULT 'Vietnam';
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_postal_code VARCHAR(30);
+
+UPDATE orders
+SET
+  shipping_receiver_name = COALESCE(shipping_receiver_name, ''),
+  shipping_receiver_phone = COALESCE(shipping_receiver_phone, ''),
+  shipping_address_line = COALESCE(shipping_address_line, shipping_address)
+WHERE shipping_receiver_name IS NULL
+   OR shipping_receiver_phone IS NULL
+   OR shipping_address_line IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
 CREATE INDEX IF NOT EXISTS idx_customers_role ON customers(role);
@@ -151,6 +192,7 @@ CREATE INDEX IF NOT EXISTS idx_issues_type ON issues(type);
 CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
 CREATE INDEX IF NOT EXISTS idx_issues_severity ON issues(severity);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_customer_address_id ON orders(customer_address_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);

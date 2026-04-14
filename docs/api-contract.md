@@ -96,6 +96,22 @@ Common error codes:
 }
 ```
 
+## Shipping Snapshot Model
+
+```json
+{
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+}
+```
+
 ## Auth Response Model
 
 ```json
@@ -125,8 +141,20 @@ Common error codes:
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
+  "customerAddressId": 1,
   "shippingAddress": "123 Nguyen Trai, HCMC",
   "city": "Ho Chi Minh City",
+  "shipping": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+  },
   "customer": {
     "id": 1,
     "fullName": "Nguyen Van A",
@@ -595,7 +623,7 @@ Response `400`:
 
 Create a new order.
 
-Request body:
+Request body, guest checkout:
 
 ```json
 {
@@ -616,18 +644,66 @@ Request body:
 }
 ```
 
+Request body, logged-in customer using saved address:
+
+```json
+{
+  "customerId": 1,
+  "addressId": 1,
+  "shippingFee": 20000,
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    }
+  ]
+}
+```
+
+Request body, logged-in customer using a new address:
+
+```json
+{
+  "customerId": 1,
+  "newAddress": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000"
+  },
+  "shippingFee": 20000,
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    }
+  ]
+}
+```
+
 Rules:
-- `customer.fullName`: required, string
-- `customer.phone`: required, string
-- `customer.email`: required, string
-- `shippingAddress`: required, string
-- `city`: required, string
+- guest checkout requires `customer.fullName`, `customer.phone`, `customer.email`
+- logged-in checkout requires `customerId`
+- use either `addressId` or `newAddress` for logged-in checkout
+- do not send both `addressId` and `newAddress`
+- legacy guest checkout with `shippingAddress` and `city` is still supported
+- `newAddress.receiverName`: required
+- `newAddress.receiverPhone`: required
+- `newAddress.addressLine`: required
+- `newAddress.city`: required
 - `shippingFee`: optional, non-negative number
 - `items`: required, array, minimum 1 item
 - `productId`: required
 - `quantity`: required, integer, greater than 0
 - `priceAtPurchase` and `totalAmount` are computed by the backend
-- backend creates or updates the customer by phone
+- backend resolves customer identity by both `email` and `phone`
+- backend does not overwrite a different customer's email or phone
+- if `email` and `phone` map to conflicting customer records, request fails with `409`
+- when `addressId` is used, it must belong to the same `customerId`
 
 Response `201`:
 
@@ -639,8 +715,20 @@ Response `201`:
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
+  "customerAddressId": 1,
   "shippingAddress": "123 Nguyen Trai, HCMC",
   "city": "Ho Chi Minh City",
+  "shipping": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+  },
   "customer": {
     "id": 1,
     "fullName": "Nguyen Van A",
@@ -661,7 +749,9 @@ Response `201`:
 ```
 
 Side effects:
-- backend creates or updates the customer by phone
+- backend creates a new customer only when neither `email` nor `phone` exists
+- backend updates only `customer.fullName` when `email` and `phone` match the same existing customer
+- backend copies a shipping snapshot into the order from `addressId`, `newAddress`, or legacy shipping fields
 - backend increases `inventory.reserved_qty`
 - backend creates an `inventory_transactions` record with type `RESERVE`
 
@@ -675,6 +765,21 @@ Response `400`:
   }
 }
 ```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "EMAIL_ALREADY_IN_USE",
+    "message": "Email is already used by another customer"
+  }
+}
+```
+
+Other possible conflict codes for this endpoint:
+- `PHONE_ALREADY_IN_USE`
+- `CUSTOMER_IDENTITY_CONFLICT`
 
 ### `GET /orders`
 

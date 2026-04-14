@@ -189,27 +189,17 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const { customer, shippingAddress, city, items } = req.body;
+  const { customer, items } = req.body;
   const shippingFee = Number(req.body.shippingFee ?? 0);
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    const customerResult = await client.query(
-      `
-        INSERT INTO customers (full_name, phone, email)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (phone) DO UPDATE
-        SET
-          full_name = EXCLUDED.full_name,
-          email = EXCLUDED.email,
-          updated_at = NOW()
-        RETURNING id, full_name, phone, email
-      `,
-      [customer.fullName.trim(), customer.phone.trim(), customer.email.trim().toLowerCase()],
-    );
-    const customerRow = customerResult.rows[0];
+    const customerRow = req.body.customerId
+      ? await resolveAuthenticatedCustomerForOrder(client, req.body.customerId)
+      : await resolveCustomerForOrder(client, customer);
+    const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
 
     const productIds = items.map((item) => item.productId);
     const productResult = await client.query(
@@ -249,17 +239,41 @@ router.post("/", async (req, res) => {
       `
         INSERT INTO orders (
           customer_id,
+          customer_address_id,
           status,
           total_amount,
           shipping_fee,
+          shipping_receiver_name,
+          shipping_receiver_phone,
+          shipping_address_line,
+          shipping_ward,
+          shipping_district,
           shipping_address,
           city,
+          shipping_country,
+          shipping_postal_code,
           payment_expires_at
         )
-        VALUES ($1, 'pending', $2, $3, $4, $5, NOW() + INTERVAL '24 hours')
+        VALUES (
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW() + INTERVAL '24 hours'
+        )
         RETURNING *
       `,
-      [customerRow.id, totalAmount, shippingFee, shippingAddress.trim(), city.trim()],
+      [
+        customerRow.id,
+        shippingSnapshot.customerAddressId,
+        totalAmount,
+        shippingFee,
+        shippingSnapshot.receiverName,
+        shippingSnapshot.receiverPhone,
+        shippingSnapshot.addressLine,
+        shippingSnapshot.ward,
+        shippingSnapshot.district,
+        shippingSnapshot.fullAddress,
+        shippingSnapshot.city,
+        shippingSnapshot.country,
+        shippingSnapshot.postalCode,
+      ],
     );
     const orderRow = orderResult.rows[0];
 
@@ -314,8 +328,10 @@ router.post("/", async (req, res) => {
       shippingFee: Number(orderRow.shipping_fee),
       paymentExpiresAt: orderRow.payment_expires_at,
       failCount: orderRow.fail_count,
+      customerAddressId: orderRow.customer_address_id,
       shippingAddress: orderRow.shipping_address,
       city: orderRow.city,
+      shipping: mapShippingRow(orderRow),
       createdAt: orderRow.created_at,
       updatedAt: orderRow.updated_at,
       customer: {
@@ -333,6 +349,15 @@ router.post("/", async (req, res) => {
       return res.status(400).json({
         error: {
           code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ConflictError) {
+      return res.status(409).json({
+        error: {
+          code: error.code,
           message: error.message,
         },
       });
@@ -360,8 +385,16 @@ const listOrdersBaseQuery = `
     o.shipping_fee,
     o.payment_expires_at,
     o.fail_count,
+    o.customer_address_id,
+    o.shipping_receiver_name,
+    o.shipping_receiver_phone,
+    o.shipping_address_line,
+    o.shipping_ward,
+    o.shipping_district,
     o.shipping_address,
     o.city,
+    o.shipping_country,
+    o.shipping_postal_code,
     o.created_at,
     o.updated_at,
     c.id AS customer_id,
@@ -390,28 +423,52 @@ function validateOrderPayload(body) {
     return "Request body is required";
   }
 
-  if (!body.customer || typeof body.customer !== "object") {
-    return "Customer information is required";
+  const hasCustomerId = Number.isInteger(body.customerId) && body.customerId > 0;
+  if (!hasCustomerId) {
+    if (!body.customer || typeof body.customer !== "object") {
+      return "Customer information is required for guest checkout";
+    }
+
+    if (!body.customer.fullName?.trim()) {
+      return "Customer fullName is required";
+    }
+
+    if (!body.customer.phone?.trim()) {
+      return "Customer phone is required";
+    }
+
+    if (!body.customer.email?.trim()) {
+      return "Customer email is required";
+    }
   }
 
-  if (!body.customer.fullName?.trim()) {
-    return "Customer fullName is required";
+  const hasAddressId = body.addressId != null;
+  const hasNewAddress = body.newAddress != null;
+  const hasLegacyShipping = body.shippingAddress?.trim() && body.city?.trim();
+
+  if (hasAddressId && hasNewAddress) {
+    return "Use either addressId or newAddress, not both";
   }
 
-  if (!body.customer.phone?.trim()) {
-    return "Customer phone is required";
+  if (hasAddressId) {
+    if (!Number.isInteger(body.addressId) || body.addressId <= 0) {
+      return "addressId must be a positive integer";
+    }
+
+    if (!hasCustomerId) {
+      return "customerId is required when using addressId";
+    }
   }
 
-  if (!body.customer.email?.trim()) {
-    return "Customer email is required";
+  if (hasNewAddress) {
+    const addressError = validateShippingAddressPayload(body.newAddress);
+    if (addressError) {
+      return addressError;
+    }
   }
 
-  if (!body.shippingAddress?.trim()) {
-    return "Shipping address is required";
-  }
-
-  if (!body.city?.trim()) {
-    return "City is required";
+  if (!hasAddressId && !hasNewAddress && !hasLegacyShipping) {
+    return "Shipping information is required";
   }
 
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -446,8 +503,10 @@ function mapOrderRow(row) {
     shippingFee: Number(row.shipping_fee),
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
+    customerAddressId: row.customer_address_id,
     shippingAddress: row.shipping_address,
     city: row.city,
+    shipping: mapShippingRow(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     customer: {
@@ -478,7 +537,206 @@ function mapOrderItemRow(item) {
   };
 }
 
+function mapShippingRow(row) {
+  return {
+    receiverName: row.shipping_receiver_name,
+    receiverPhone: row.shipping_receiver_phone,
+    addressLine: row.shipping_address_line,
+    ward: row.shipping_ward,
+    district: row.shipping_district,
+    city: row.city,
+    country: row.shipping_country,
+    postalCode: row.shipping_postal_code,
+    fullAddress: row.shipping_address,
+  };
+}
+
 class ValidationError extends Error {}
+class ConflictError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+}
+
+async function resolveCustomerForOrder(client, customer) {
+  const normalizedCustomer = {
+    fullName: customer.fullName.trim(),
+    phone: customer.phone.trim(),
+    email: customer.email.trim().toLowerCase(),
+  };
+
+  const { rows } = await client.query(
+    `
+      SELECT id, full_name, phone, email
+      FROM customers
+      WHERE email = $1 OR phone = $2
+      ORDER BY id ASC
+    `,
+    [normalizedCustomer.email, normalizedCustomer.phone],
+  );
+
+  if (rows.length === 0) {
+    const insertResult = await client.query(
+      `
+        INSERT INTO customers (full_name, phone, email)
+        VALUES ($1, $2, $3)
+        RETURNING id, full_name, phone, email
+      `,
+      [normalizedCustomer.fullName, normalizedCustomer.phone, normalizedCustomer.email],
+    );
+
+    return insertResult.rows[0];
+  }
+
+  const emailCustomer = rows.find((row) => row.email === normalizedCustomer.email) ?? null;
+  const phoneCustomer = rows.find((row) => row.phone === normalizedCustomer.phone) ?? null;
+
+  if (emailCustomer && phoneCustomer && emailCustomer.id !== phoneCustomer.id) {
+    throw new ConflictError(
+      "CUSTOMER_IDENTITY_CONFLICT",
+      "Email and phone belong to different customers",
+    );
+  }
+
+  if (emailCustomer && emailCustomer.phone !== normalizedCustomer.phone) {
+    throw new ConflictError("EMAIL_ALREADY_IN_USE", "Email is already used by another customer");
+  }
+
+  if (phoneCustomer && phoneCustomer.email !== normalizedCustomer.email) {
+    throw new ConflictError("PHONE_ALREADY_IN_USE", "Phone is already used by another customer");
+  }
+
+  const existingCustomer = emailCustomer ?? phoneCustomer;
+  const updateResult = await client.query(
+    `
+      UPDATE customers
+      SET
+        full_name = $2,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, full_name, phone, email
+    `,
+    [existingCustomer.id, normalizedCustomer.fullName],
+  );
+
+  return updateResult.rows[0];
+}
+
+async function resolveAuthenticatedCustomerForOrder(client, customerId) {
+  const { rows } = await client.query(
+    `
+      SELECT id, full_name, phone, email
+      FROM customers
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [customerId],
+  );
+
+  if (rows.length === 0) {
+    throw new ValidationError("Customer not found");
+  }
+
+  return rows[0];
+}
+
+async function resolveShippingSnapshot(client, body, customerRow) {
+  if (body.addressId != null) {
+    const { rows } = await client.query(
+      `
+        SELECT
+          id,
+          customer_id,
+          receiver_name,
+          receiver_phone,
+          address_line,
+          ward,
+          district,
+          city,
+          country,
+          postal_code
+        FROM customer_addresses
+        WHERE id = $1 AND customer_id = $2
+        LIMIT 1
+      `,
+      [body.addressId, customerRow.id],
+    );
+
+    if (rows.length === 0) {
+      throw new ValidationError("Address not found for customer");
+    }
+
+    return mapShippingAddressRecord(rows[0]);
+  }
+
+  if (body.newAddress) {
+    return mapShippingAddressRecord({
+      id: null,
+      receiver_name: body.newAddress.receiverName.trim(),
+      receiver_phone: body.newAddress.receiverPhone.trim(),
+      address_line: body.newAddress.addressLine.trim(),
+      ward: body.newAddress.ward?.trim() || null,
+      district: body.newAddress.district?.trim() || null,
+      city: body.newAddress.city.trim(),
+      country: body.newAddress.country?.trim() || "Vietnam",
+      postal_code: body.newAddress.postalCode?.trim() || null,
+    });
+  }
+
+  return mapShippingAddressRecord({
+    id: null,
+    receiver_name: customerRow.full_name,
+    receiver_phone: customerRow.phone,
+    address_line: body.shippingAddress.trim(),
+    ward: null,
+    district: null,
+    city: body.city.trim(),
+    country: "Vietnam",
+    postal_code: null,
+  });
+}
+
+function mapShippingAddressRecord(row) {
+  const parts = [row.address_line, row.ward, row.district, row.city, row.country].filter(Boolean);
+
+  return {
+    customerAddressId: row.id,
+    receiverName: row.receiver_name,
+    receiverPhone: row.receiver_phone,
+    addressLine: row.address_line,
+    ward: row.ward,
+    district: row.district,
+    city: row.city,
+    country: row.country,
+    postalCode: row.postal_code,
+    fullAddress: parts.join(", "),
+  };
+}
+
+function validateShippingAddressPayload(address) {
+  if (!address || typeof address !== "object") {
+    return "newAddress is invalid";
+  }
+
+  if (!address.receiverName?.trim()) {
+    return "newAddress.receiverName is required";
+  }
+
+  if (!address.receiverPhone?.trim()) {
+    return "newAddress.receiverPhone is required";
+  }
+
+  if (!address.addressLine?.trim()) {
+    return "newAddress.addressLine is required";
+  }
+
+  if (!address.city?.trim()) {
+    return "newAddress.city is required";
+  }
+
+  return null;
+}
 
 const ORDER_STATUSES = [
   "pending",
