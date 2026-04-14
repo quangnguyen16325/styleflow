@@ -3,6 +3,7 @@ import cors from "cors";
 
 import { migrate } from "./db/migrate.js";
 import authRouter from "./routes/auth.js";
+import addressesRouter from "./routes/addresses.js";
 import productsRouter from "./routes/products.js";
 import ordersRouter from "./routes/orders.js";
 
@@ -20,6 +21,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/customers/:customerId/addresses", addressesRouter);
 app.use("/products", productsRouter);
 app.use("/orders", ordersRouter);
 

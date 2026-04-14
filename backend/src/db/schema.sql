@@ -14,6 +14,23 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS customer_addresses (
+  id BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  label VARCHAR(50) NOT NULL DEFAULT 'home',
+  receiver_name VARCHAR(255) NOT NULL,
+  receiver_phone VARCHAR(50) NOT NULL,
+  address_line TEXT NOT NULL,
+  ward VARCHAR(120),
+  district VARCHAR(120),
+  city VARCHAR(120) NOT NULL,
+  country VARCHAR(120) NOT NULL DEFAULT 'Vietnam',
+  postal_code VARCHAR(30),
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS products (
   id BIGSERIAL PRIMARY KEY,
   sku VARCHAR(100) NOT NULL UNIQUE,
@@ -119,6 +136,11 @@ CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
 CREATE INDEX IF NOT EXISTS idx_customers_role ON customers(role);
 CREATE INDEX IF NOT EXISTS idx_customers_blacklisted ON customers(is_blacklisted);
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_customer_id ON customer_addresses(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_city ON customer_addresses(city);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_customer_addresses_default_per_customer
+ON customer_addresses(customer_id)
+WHERE is_default = TRUE;
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_inventory_id ON inventory_transactions(inventory_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_order_id ON inventory_transactions(order_id);

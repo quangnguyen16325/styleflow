@@ -1,4 +1,4 @@
-# API Contract v0.3
+# API Contract v0.4
 
 Base URL:
 - Production: `https://api.ecloria.co.uk`
@@ -72,6 +72,27 @@ Common error codes:
   "fullName": "Nguyen Van A",
   "phone": "0901234567",
   "email": "nguyenvana@example.com"
+}
+```
+
+## Customer Address Model
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
 }
 ```
 
@@ -262,6 +283,244 @@ Response `400`:
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "email is required"
+  }
+}
+```
+
+### `GET /customers/:customerId/addresses`
+
+Get all addresses for one customer.
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 1,
+    "customerId": 1,
+    "label": "home",
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "isDefault": true,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Customer id must be a positive integer"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Customer not found"
+  }
+}
+```
+
+### `GET /customers/:customerId/addresses/:addressId`
+
+Get one address by id for one customer.
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Address id must be a positive integer"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Address not found"
+  }
+}
+```
+
+### `POST /customers/:customerId/addresses`
+
+Create a new address for one customer.
+
+Request body:
+
+```json
+{
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true
+}
+```
+
+Rules:
+- `receiverName`: required
+- `receiverPhone`: required
+- `addressLine`: required
+- `city`: required
+- `label`: optional, defaults to `home`
+- `country`: optional, defaults to `Vietnam`
+- `isDefault`: optional boolean
+
+Response `201`:
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+### `PATCH /customers/:customerId/addresses/:addressId`
+
+Update one address for one customer.
+
+Request body:
+
+```json
+{
+  "label": "office",
+  "receiverPhone": "0911111111",
+  "isDefault": true
+}
+```
+
+Rules:
+- request body must include at least one address field
+- `isDefault = true` will unset other default addresses of the same customer
+- if the current default address is deleted or unset, backend assigns another existing address as default when possible
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "office",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0911111111",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:05:00.000Z"
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "At least one address field is required"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Address not found"
+  }
+}
+```
+
+### `DELETE /customers/:customerId/addresses/:addressId`
+
+Delete one address for one customer.
+
+Response `204`:
+- empty body
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Address id must be a positive integer"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Address not found"
   }
 }
 ```
