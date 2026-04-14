@@ -37,20 +37,20 @@ export default function ProductDetailScreen() {
   const sizes = ["S", "M", "L", "XL", "XXL", "XXXL"];
 
   useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        const data = await getProductById(productId);
+        setProduct(data);
+      } catch (error) {
+        console.error("Error fetching product:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchProduct();
   }, [productId]);
-
-  const fetchProduct = async () => {
-    try {
-      setLoading(true);
-      const data = await getProductById(productId);
-      setProduct(data);
-    } catch (error) {
-      console.error("Error fetching product:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const increaseQty = () => setQuantity((p) => p + 1);
   const decreaseQty = () => {
@@ -90,18 +90,10 @@ export default function ProductDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
         {/* ── HERO IMAGE — Full-screen ── */}
         <View style={styles.heroWrapper}>
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
         </View>
 
         {/* ── CONTENT PANEL — slides over hero on scroll ── */}
@@ -123,33 +115,22 @@ export default function ProductDetailScreen() {
           </View>
           <View style={styles.variationChips}>
             <View style={styles.chipOutline}>
-              <Text style={styles.chipLabel}>
-                {colorVariants[selectedColor].name}
-              </Text>
+              <Text style={styles.chipLabel}>{colorVariants[selectedColor].name}</Text>
             </View>
             <View style={styles.chipOutline}>
               <Text style={styles.chipLabel}>{selectedSize}</Text>
             </View>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.colorScroll}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorScroll}>
             {colorVariants.map((c, i) => {
               const isActive = selectedColor === i;
               return (
                 <TouchableOpacity
                   key={i}
                   onPress={() => setSelectedColor(i)}
-                  style={[
-                    styles.colorThumb,
-                    isActive && styles.colorThumbActive,
-                  ]}
+                  style={[styles.colorThumb, isActive && styles.colorThumbActive]}
                 >
-                  <View
-                    style={[styles.colorThumbInner, { backgroundColor: c.hex }]}
-                  />
+                  <View style={[styles.colorThumbInner, { backgroundColor: c.hex }]} />
                   {isActive && (
                     <View style={styles.checkBadge}>
                       <Text style={styles.checkMark}>✓</Text>
@@ -266,8 +247,8 @@ export default function ProductDetailScreen() {
               </View>
             </View>
             <Text style={styles.reviewBody} numberOfLines={2}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-              eiusmod tempor incididunt ut labore et dolore magna aliqua...
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+              incididunt ut labore et dolore magna aliqua...
             </Text>
           </View>
           <TouchableOpacity style={styles.viewAllBtn}>
@@ -306,11 +287,7 @@ export default function ProductDetailScreen() {
           <View style={styles.gridRow}>
             {youMightLike.map((item) => (
               <View key={item.id} style={styles.gridCard}>
-                <Image
-                  source={{ uri: item.image }}
-                  style={styles.gridImage}
-                  resizeMode="cover"
-                />
+                <Image source={{ uri: item.image }} style={styles.gridImage} resizeMode="cover" />
                 <Text style={styles.gridName} numberOfLines={2}>
                   {item.name}
                 </Text>
@@ -319,7 +296,6 @@ export default function ProductDetailScreen() {
             ))}
           </View>
 
-
           {/* Spacer for bottom bar */}
           <View style={{ height: 100 }} />
         </View>
@@ -327,13 +303,8 @@ export default function ProductDetailScreen() {
 
       {/* ── FIXED BOTTOM BAR ── */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.heartBtn}
-          onPress={() => setLiked(!liked)}
-        >
-          <Text style={[styles.heartIcon, liked && styles.heartActive]}>
-            {liked ? "♥" : "♡"}
-          </Text>
+        <TouchableOpacity style={styles.heartBtn} onPress={() => setLiked(!liked)}>
+          <Text style={[styles.heartIcon, liked && styles.heartActive]}>{liked ? "♥" : "♡"}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.85}>
           <Text style={styles.addCartText}>Add to cart</Text>
