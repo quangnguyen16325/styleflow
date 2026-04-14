@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 
 import { migrate } from "./db/migrate.js";
+import authRouter from "./routes/auth.js";
 import productsRouter from "./routes/products.js";
 import ordersRouter from "./routes/orders.js";
 
@@ -18,6 +19,7 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "backend" });
 });
 
+app.use("/auth", authRouter);
 app.use("/products", productsRouter);
 app.use("/orders", ordersRouter);
 

@@ -3,10 +3,23 @@ import { pool } from "../db/pool.js";
 
 const router = Router();
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
+  const normalizedStatus = normalizeStatusFilter(req.query.status);
+  if (req.query.status != null && !normalizedStatus) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid order status filter",
+      },
+    });
+  }
+
   try {
+    const whereClause = normalizedStatus ? " WHERE o.status = $1" : "";
+    const params = normalizedStatus ? [normalizedStatus] : [];
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      params,
     );
 
     res.json(rows.map(mapOrderRow));
@@ -56,6 +69,112 @@ router.get("/:id", async (req, res) => {
         message: "Failed to fetch order",
       },
     });
+  }
+});
+
+router.patch("/:id/status", async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const nextStatus = normalizeStatusFilter(req.body?.status);
+  if (!nextStatus) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "A valid order status is required",
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const currentOrderResult = await client.query(
+      `
+        SELECT id, status
+        FROM orders
+        WHERE id = $1
+      `,
+      [orderId],
+    );
+
+    if (currentOrderResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const previousStatus = currentOrderResult.rows[0].status;
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          status = $2,
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING id
+      `,
+      [orderId, nextStatus],
+    );
+
+    if (previousStatus !== "failed" && nextStatus === "failed") {
+      await client.query(
+        `
+          INSERT INTO issues (
+            order_id,
+            type,
+            severity,
+            status,
+            log_history
+          )
+          VALUES (
+            $1,
+            'ORDER_FAILED',
+            'high',
+            'open',
+            jsonb_build_array(
+              jsonb_build_object(
+                'timestamp', NOW(),
+                'message', $2::text
+              )
+            )
+          )
+        `,
+        [orderId, `Order status changed from ${previousStatus} to failed`],
+      );
+    }
+
+    await client.query("COMMIT");
+
+    const { rows } = await pool.query(
+      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      [orderId],
+    );
+
+    return res.json(mapOrderRow(rows[0]));
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`PATCH /orders/${orderId}/status failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to update order status",
+      },
+    });
+  } finally {
+    client.release();
   }
 });
 
@@ -341,6 +460,15 @@ function mapOrderRow(row) {
   };
 }
 
+function normalizeStatusFilter(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return ORDER_STATUSES.includes(normalizedValue) ? normalizedValue : null;
+}
+
 function mapOrderItemRow(item) {
   return {
     id: item.id,
@@ -351,3 +479,14 @@ function mapOrderItemRow(item) {
 }
 
 class ValidationError extends Error {}
+
+const ORDER_STATUSES = [
+  "pending",
+  "awaiting_payment",
+  "paid",
+  "processing",
+  "shipping",
+  "completed",
+  "cancelled",
+  "failed",
+];

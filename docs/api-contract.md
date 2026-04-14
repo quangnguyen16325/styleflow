@@ -1,4 +1,4 @@
-# API Contract v0.1
+# API Contract v0.3
 
 Base URL:
 - Production: `https://api.ecloria.co.uk`
@@ -32,6 +32,9 @@ Common error codes:
 - `VALIDATION_ERROR`
 - `NOT_FOUND`
 - `INTERNAL_ERROR`
+- `UNAUTHORIZED`
+- `FORBIDDEN`
+- `CONFLICT`
 
 ## Product Model
 
@@ -69,6 +72,25 @@ Common error codes:
   "fullName": "Nguyen Van A",
   "phone": "0901234567",
   "email": "nguyenvana@example.com"
+}
+```
+
+## Auth Response Model
+
+```json
+{
+  "token": "jwt-token",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
 }
 ```
 
@@ -115,6 +137,132 @@ Response `200`:
 {
   "ok": true,
   "service": "backend"
+}
+```
+
+### `POST /auth/register`
+
+Register a new customer account.
+
+Request body:
+
+```json
+{
+  "fullName": "Nguyen Van A",
+  "phone": "0901234567",
+  "email": "nguyenvana@example.com",
+  "password": "secret123"
+}
+```
+
+Rules:
+- `fullName`: required
+- `phone`: required
+- `email`: required
+- `password`: required, minimum 8 characters
+
+Response `201`:
+
+```json
+{
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+}
+```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "Customer already exists"
+  }
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "password must be at least 8 characters"
+  }
+}
+```
+
+### `POST /auth/login`
+
+Login with email and password.
+
+Request body:
+
+```json
+{
+  "email": "nguyenvana@example.com",
+  "password": "secret123"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "token": "jwt-token",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+}
+```
+
+Response `401`:
+
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid email or password"
+  }
+}
+```
+
+Response `403`:
+
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Customer is blacklisted"
+  }
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "email is required"
+  }
 }
 ```
 
@@ -169,6 +317,17 @@ Response `404`:
   "error": {
     "code": "NOT_FOUND",
     "message": "Product not found"
+  }
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Product id must be a positive integer"
   }
 }
 ```
@@ -242,6 +401,11 @@ Response `201`:
 }
 ```
 
+Side effects:
+- backend creates or updates the customer by phone
+- backend increases `inventory.reserved_qty`
+- backend creates an `inventory_transactions` record with type `RESERVE`
+
 Response `400`:
 
 ```json
@@ -256,6 +420,21 @@ Response `400`:
 ### `GET /orders`
 
 Get order list.
+
+Query params:
+- `status` optional
+- allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid order status filter"
+  }
+}
+```
 
 Response `200`:
 
@@ -336,10 +515,104 @@ Response `404`:
 }
 ```
 
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Order id must be a positive integer"
+  }
+}
+```
+
+### `PATCH /orders/:id/status`
+
+Update order status.
+
+Request body:
+
+```json
+{
+  "status": "processing"
+}
+```
+
+Allowed status values:
+- `pending`
+- `awaiting_payment`
+- `paid`
+- `processing`
+- `shipping`
+- `completed`
+- `cancelled`
+- `failed`
+
+Side effects:
+- when status changes to `failed`, backend automatically creates an `issue` record with:
+  - `type = ORDER_FAILED`
+  - `severity = high`
+  - `status = open`
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "status": "processing",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "quantity": 2,
+      "priceAtPurchase": 199000
+    }
+  ],
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:20:00.000Z"
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "A valid order status is required"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Order not found"
+  }
+}
+```
+
 ## Notes For Frontend Web And Mobile
 
 - Only use fields defined in this contract
 - Do not send `priceAtPurchase` or `totalAmount` from clients
 - UI can calculate temporary totals for display, but backend is the source of truth
 - Contract changes should be versioned and announced by the team lead
-- Creating an order increases `inventory.reserved_qty` and creates an `inventory_transactions` record with type `RESERVE`
+- `GET /products/:id` and `GET /orders/:id` require a positive integer id
+- `GET /orders` supports optional `status` filtering
+- Changing an order status to `failed` automatically creates an `issue` record for issue tracking and n8n automation
