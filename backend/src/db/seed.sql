@@ -1,16 +1,53 @@
-INSERT INTO customers (id, full_name, phone, email)
+INSERT INTO customers (
+  id,
+  full_name,
+  phone,
+  email,
+  password_hash,
+  role,
+  abuse_score,
+  is_blacklisted
+)
 VALUES
   (
     1,
     'Nguyen Van A',
     '0901234567',
-    'nguyenvana@example.com'
+    'nguyenvana@example.com',
+    '$2b$10$2nXovS6fkWMqsQzXWNzB1.0/R2y/SNO2V1/OqdwBnCKV6hzJpqLOS',
+    'customer',
+    0,
+    FALSE
   ),
   (
     2,
     'Tran Thi B',
     '0902345678',
-    'tranthib@example.com'
+    'tranthib@example.com',
+    '$2b$10$2nXovS6fkWMqsQzXWNzB1.0/R2y/SNO2V1/OqdwBnCKV6hzJpqLOS',
+    'customer',
+    1,
+    FALSE
+  ),
+  (
+    3,
+    'Admin Demo',
+    '0903000001',
+    'admin@example.com',
+    '$2b$10$2nXovS6fkWMqsQzXWNzB1.0/R2y/SNO2V1/OqdwBnCKV6hzJpqLOS',
+    'admin',
+    0,
+    FALSE
+  ),
+  (
+    4,
+    'Staff Demo',
+    '0903000002',
+    'staff@example.com',
+    '$2b$10$2nXovS6fkWMqsQzXWNzB1.0/R2y/SNO2V1/OqdwBnCKV6hzJpqLOS',
+    'staff',
+    0,
+    FALSE
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -92,6 +129,32 @@ VALUES
     'Tran Thi B',
     '0902345678',
     '88 Tran Phu',
+    'Hai Chau 1',
+    'Hai Chau',
+    'Da Nang',
+    'Vietnam',
+    '550000',
+    TRUE
+  ),
+  (
+    3,
+    'office',
+    'Admin Demo',
+    '0903000001',
+    '1 Admin Street',
+    'Ben Nghe',
+    'District 1',
+    'Ho Chi Minh City',
+    'Vietnam',
+    '700000',
+    TRUE
+  ),
+  (
+    4,
+    'office',
+    'Staff Demo',
+    '0903000002',
+    '2 Staff Street',
     'Hai Chau 1',
     'Hai Chau',
     'Da Nang',

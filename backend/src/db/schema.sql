@@ -114,6 +114,8 @@ CREATE TABLE IF NOT EXISTS orders (
     )
   ),
   address_change_requested_at TIMESTAMPTZ,
+  address_change_payload JSONB,
+  address_change_fee_delta NUMERIC(10, 2),
   shipping_fee_approved BOOLEAN NOT NULL DEFAULT FALSE,
   total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
   shipping_fee NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (shipping_fee >= 0),
@@ -147,6 +149,7 @@ CREATE TABLE IF NOT EXISTS payment_logs (
   id BIGSERIAL PRIMARY KEY,
   order_id BIGINT REFERENCES orders(id) ON DELETE SET NULL,
   incident_id VARCHAR(120),
+  external_event_id VARCHAR(120),
   gateway_name VARCHAR(50) NOT NULL,
   transaction_ref VARCHAR(120),
   source VARCHAR(50) NOT NULL,
@@ -164,6 +167,26 @@ CREATE TABLE IF NOT EXISTS system_config (
   config_value TEXT,
   config_type VARCHAR(50) NOT NULL DEFAULT 'string',
   description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS refund_requests (
+  id BIGSERIAL PRIMARY KEY,
+  order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
+    status IN (
+      'pending',
+      'manual_review_required',
+      'approved',
+      'rejected',
+      'refunded'
+    )
+  ),
+  abuse_score_snapshot INTEGER NOT NULL DEFAULT 0 CHECK (abuse_score_snapshot >= 0),
+  review_note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -354,6 +377,12 @@ ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS address_change_requested_at TIMESTAMPTZ;
 
 ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS address_change_payload JSONB;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS address_change_fee_delta NUMERIC(10, 2);
+
+ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_fee_approved BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE orders
@@ -376,6 +405,39 @@ ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(120) NOT NULL DEFAULT 'Vietnam
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_postal_code VARCHAR(30);
+
+ALTER TABLE payment_logs
+ADD COLUMN IF NOT EXISTS external_event_id VARCHAR(120);
+
+ALTER TABLE refund_requests
+ADD COLUMN IF NOT EXISTS review_note TEXT;
+
+ALTER TABLE refund_requests
+ADD COLUMN IF NOT EXISTS abuse_score_snapshot INTEGER DEFAULT 0;
+
+UPDATE refund_requests
+SET abuse_score_snapshot = 0
+WHERE abuse_score_snapshot IS NULL;
+
+ALTER TABLE refund_requests
+ALTER COLUMN abuse_score_snapshot SET DEFAULT 0;
+
+ALTER TABLE refund_requests
+ALTER COLUMN abuse_score_snapshot SET NOT NULL;
+
+ALTER TABLE refund_requests
+DROP CONSTRAINT IF EXISTS refund_requests_status_check;
+
+ALTER TABLE refund_requests
+ADD CONSTRAINT refund_requests_status_check CHECK (
+  status IN (
+    'pending',
+    'manual_review_required',
+    'approved',
+    'rejected',
+    'refunded'
+  )
+);
 
 UPDATE orders
 SET
@@ -420,3 +482,9 @@ CREATE INDEX IF NOT EXISTS idx_payment_logs_order_id ON payment_logs(order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_gateway_name ON payment_logs(gateway_name);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_transaction_ref ON payment_logs(transaction_ref);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_incident_id ON payment_logs(incident_id);
+DROP INDEX IF EXISTS uniq_payment_logs_external_event_id;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_payment_logs_external_event_id
+ON payment_logs(external_event_id);
+CREATE INDEX IF NOT EXISTS idx_refund_requests_order_id ON refund_requests(order_id);
+CREATE INDEX IF NOT EXISTS idx_refund_requests_customer_id ON refund_requests(customer_id);
+CREATE INDEX IF NOT EXISTS idx_refund_requests_status ON refund_requests(status);
