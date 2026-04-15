@@ -8,11 +8,10 @@ import ProductList from './pages/Products/ProductList';
 import ProductDetails from './pages/Products/ProductDetails';
 import OrderList from './pages/Orders/OrderList';
 import OrderDetails from './pages/Orders/OrderDetails';
+import IssueList from './pages/Issues/IssueList';
+import IssueDetails from './pages/Issues/IssueDetails';
+import NotFound from './pages/NotFound';
 import './App.css';
-
-// Placeholders for issues to prevent crashing before Commit 2/3 of Phase 2
-function IssueList() { return <h1>Issues Tracking</h1>; }
-function IssueDetails() { return <h1>Issue Details</h1>; }
 
 function App() {
   return (
@@ -29,10 +28,9 @@ function App() {
             <Route path="products/:id" element={<ProductDetails />} />
             <Route path="orders" element={<OrderList />} />
             <Route path="orders/:id" element={<OrderDetails />} />
-            
-            {/* New routes for phase 2 */}
             <Route path="issues" element={<IssueList />} />
             <Route path="issues/:id" element={<IssueDetails />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
       </Routes>
