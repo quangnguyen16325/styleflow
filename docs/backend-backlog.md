@@ -72,7 +72,7 @@ These fields are added for workflow support. Some of them are already exposed th
 ### Inventory Lifecycle Follow-ups
 
 - reconcile lifecycle rules for more delivery/payment edge cases
-- tighten duplicate protection for `SALE`, `EXPIRED_CANCEL`, and `RETURN`
+- expand lifecycle coverage for additional warehouse and payment recovery scenarios
 
 ## Role and Access Backlog
 
@@ -120,5 +120,5 @@ These fields are added for workflow support. Some of them are already exposed th
 ## Suggested Implementation Order
 
 1. Keep the current customer-facing and admin contract stable for web/mobile.
-2. Tighten duplicate protection for inventory lifecycle transitions.
-3. Normalize delivery issue type from `MANUAL_REVIEW` to `DELIVERY_FAILED`.
+2. Reconcile remaining delivery/payment lifecycle edge cases.
+3. Expand inventory/admin observability if n8n needs richer diagnostics.

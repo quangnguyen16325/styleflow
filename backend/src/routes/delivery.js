@@ -114,7 +114,7 @@ router.post("/delivery-callback", async (req, res) => {
             )
             VALUES (
               $1,
-              'MANUAL_REVIEW',
+              'DELIVERY_FAILED',
               'high',
               'open',
               jsonb_build_array(

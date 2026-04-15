@@ -140,7 +140,7 @@ Common error codes:
   "id": 1,
   "orderId": 12,
   "productId": null,
-  "type": "PAYMENT_ERROR",
+  "type": "DELIVERY_FAILED",
   "severity": "high",
   "status": "open",
   "logHistory": [],
@@ -989,6 +989,14 @@ Other possible `action` values:
 - `returned`
 - `updated`
 
+Side effects:
+- when delivery reaches `DELIVERED`, backend records `SALE` inventory transactions once
+- when delivery reaches `RETURNED`, backend records `RETURN` inventory transactions once
+- when delivery fails 3 times, backend creates an issue with:
+  - `type = DELIVERY_FAILED`
+  - `severity = high`
+  - `status = open`
+
 ### `POST /payment-events`
 
 Process payment incident or failover signal.
@@ -1201,6 +1209,7 @@ Side effects:
 - backend copies a shipping snapshot into the order from `addressId` or `newAddress`
 - backend increases `inventory.reserved_qty`
 - backend creates an `inventory_transactions` record with type `RESERVE`
+- inventory lifecycle writes are duplicate-protected by transaction reference
 
 Response `400`:
 
@@ -1491,6 +1500,8 @@ Side effects:
   - `type = ORDER_FAILED`
   - `severity = high`
   - `status = open`
+- when status changes to `completed`, backend records `SALE` inventory transactions once
+- when status changes to `cancelled` or `failed`, backend rolls back reserved inventory once with `EXPIRED_CANCEL`
 
 Response `200`:
 
