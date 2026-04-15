@@ -27,8 +27,9 @@ The backend schema now includes new persistence for the next n8n-focused phase:
 - `delivery_events`
 - `payment_logs`
 - `system_config`
+- `refund_requests`
 
-These fields are added for workflow support, even if the public API does not expose them yet.
+These fields are added for workflow support. Some of them are already exposed through the current API, while the remaining ones support the next internal/admin workflows.
 
 ## Already Implemented
 
@@ -53,17 +54,13 @@ These fields are added for workflow support, even if the public API does not exp
 - Address change APIs
   - `POST /orders/:id/address-change-request`
   - `POST /admin/orders/:id/address-change-decision`
+- Refund request APIs
+  - `POST /refund-requests`
+  - `GET /admin/refund-requests`
+  - `GET /admin/refund-requests/:id`
+  - `PATCH /admin/refund-requests/:id/status`
 
 ## Next Backend Endpoints
-
-### Refund Flow
-
-- `POST /refund-requests`
-  - authenticated customer
-  - payload: `{ orderId, imageUrl }`
-  - backend should use authenticated customer, not `user_phone`
-  - create issue or refund record
-  - update abuse metrics or pass enough data for n8n scoring
 
 ### Payment Failover Control Flow
 
@@ -101,6 +98,9 @@ These fields are added for workflow support, even if the public API does not exp
 - `GET /admin/issues`
 - `GET /admin/issues/:id`
 - `PATCH /admin/issues/:id/status`
+- `GET /admin/refund-requests`
+- `GET /admin/refund-requests/:id`
+- `PATCH /admin/refund-requests/:id/status`
 - `GET /admin/system-config`
 - `PATCH /admin/system-config`
 
@@ -119,5 +119,4 @@ These fields are added for workflow support, even if the public API does not exp
 
 1. Keep the current customer-facing and admin contract stable for web/mobile.
 2. Implement system-config admin APIs.
-3. Implement refund request APIs.
-4. Add payment incident read/control APIs.
+3. Add payment incident read/control APIs.

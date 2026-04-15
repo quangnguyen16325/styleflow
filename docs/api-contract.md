@@ -169,6 +169,22 @@ Common error codes:
 }
 ```
 
+## Refund Request Model
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "customerId": 4,
+  "imageUrl": "https://example.com/evidence.jpg",
+  "status": "pending",
+  "abuseScoreSnapshot": 1,
+  "reviewNote": null,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
 ## Auth Response Model
 
 ```json
@@ -679,6 +695,56 @@ Response `409`:
 }
 ```
 
+### `GET /admin/refund-requests`
+
+Get refund request list.
+
+Query params:
+- `status` optional
+- allowed values: `pending`, `manual_review_required`, `approved`, `rejected`, `refunded`
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+- array of `Refund Request Model`
+
+### `GET /admin/refund-requests/:id`
+
+Get one refund request by id.
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+- `Refund Request Model`
+
+### `PATCH /admin/refund-requests/:id/status`
+
+Update refund request status.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "status": "approved",
+  "reviewNote": "Approved after manual image verification"
+}
+```
+
+Allowed `status` values:
+- `pending`
+- `manual_review_required`
+- `approved`
+- `rejected`
+- `refunded`
+
+Response `200`:
+- `Refund Request Model`
+
 ### `GET /admin/issues`
 
 Get issue list for admin or staff.
@@ -1053,6 +1119,57 @@ Response `409`:
   "error": {
     "code": "CONFLICT",
     "message": "An address change request is already pending"
+  }
+}
+```
+
+### `POST /refund-requests`
+
+Create a refund request for an existing order.
+
+Access rules:
+- authenticated customer only
+- customer can create a refund request only for own order
+
+Request body:
+
+```json
+{
+  "orderId": 12,
+  "imageUrl": "https://example.com/evidence.jpg"
+}
+```
+
+Rules:
+- `orderId` must be a positive integer
+- `imageUrl` is required
+- an order cannot have more than one active refund request at the same time
+- backend uses the authenticated customer from JWT, not any client-provided phone
+- if the customer's abuse score is high, the request starts as `manual_review_required`
+
+Response `201`:
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "customerId": 4,
+  "imageUrl": "https://example.com/evidence.jpg",
+  "status": "pending",
+  "abuseScoreSnapshot": 1,
+  "reviewNote": null,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "A refund request is already active for this order"
   }
 }
 ```

@@ -170,6 +170,26 @@ CREATE TABLE IF NOT EXISTS system_config (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS refund_requests (
+  id BIGSERIAL PRIMARY KEY,
+  order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
+    status IN (
+      'pending',
+      'manual_review_required',
+      'approved',
+      'rejected',
+      'refunded'
+    )
+  ),
+  abuse_score_snapshot INTEGER NOT NULL DEFAULT 0 CHECK (abuse_score_snapshot >= 0),
+  review_note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS issues (
   id BIGSERIAL PRIMARY KEY,
   order_id BIGINT REFERENCES orders(id) ON DELETE SET NULL,
@@ -385,6 +405,36 @@ ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(120) NOT NULL DEFAULT 'Vietnam
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_postal_code VARCHAR(30);
 
+ALTER TABLE refund_requests
+ADD COLUMN IF NOT EXISTS review_note TEXT;
+
+ALTER TABLE refund_requests
+ADD COLUMN IF NOT EXISTS abuse_score_snapshot INTEGER DEFAULT 0;
+
+UPDATE refund_requests
+SET abuse_score_snapshot = 0
+WHERE abuse_score_snapshot IS NULL;
+
+ALTER TABLE refund_requests
+ALTER COLUMN abuse_score_snapshot SET DEFAULT 0;
+
+ALTER TABLE refund_requests
+ALTER COLUMN abuse_score_snapshot SET NOT NULL;
+
+ALTER TABLE refund_requests
+DROP CONSTRAINT IF EXISTS refund_requests_status_check;
+
+ALTER TABLE refund_requests
+ADD CONSTRAINT refund_requests_status_check CHECK (
+  status IN (
+    'pending',
+    'manual_review_required',
+    'approved',
+    'rejected',
+    'refunded'
+  )
+);
+
 UPDATE orders
 SET
   shipping_receiver_name = COALESCE(shipping_receiver_name, ''),
@@ -428,3 +478,6 @@ CREATE INDEX IF NOT EXISTS idx_payment_logs_order_id ON payment_logs(order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_gateway_name ON payment_logs(gateway_name);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_transaction_ref ON payment_logs(transaction_ref);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_incident_id ON payment_logs(incident_id);
+CREATE INDEX IF NOT EXISTS idx_refund_requests_order_id ON refund_requests(order_id);
+CREATE INDEX IF NOT EXISTS idx_refund_requests_customer_id ON refund_requests(customer_id);
+CREATE INDEX IF NOT EXISTS idx_refund_requests_status ON refund_requests(status);
