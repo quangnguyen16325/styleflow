@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
+import { applyOrderLifecycleTransition, applyOrderReturn } from "./order-lifecycle.js";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.post("/delivery-callback", async (req, res) => {
 
     const orderResult = await client.query(
       `
-        SELECT id, status, delivery_fail_count
+        SELECT id, status, delivery_fail_count, delivery_status
         FROM orders
         WHERE id = $1
         LIMIT 1
@@ -59,7 +60,26 @@ router.post("/delivery-callback", async (req, res) => {
         `,
         [orderId],
       );
+      await applyOrderLifecycleTransition(client, orderId, order.status, "completed");
       action = "delivered";
+    } else if (status === "RETURNED") {
+      if (order.status === "completed" && order.delivery_status !== "returned") {
+        await applyOrderReturn(client, orderId);
+      }
+
+      await client.query(
+        `
+          UPDATE orders
+          SET
+            status = CASE WHEN status = 'completed' THEN 'failed' ELSE status END,
+            delivery_status = 'returned',
+            delivery_partner = COALESCE($2, delivery_partner),
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [orderId, partner],
+      );
+      action = "returned";
     } else if (status === "FAILED") {
       const nextFailCount = Number(order.delivery_fail_count) + 1;
       const nextDeliveryStatus = nextFailCount >= 3 ? "returning" : "retry_pending";
@@ -79,6 +99,8 @@ router.post("/delivery-callback", async (req, res) => {
         `,
         [orderId, nextOrderStatus, nextDeliveryStatus, partner, nextFailCount, reason],
       );
+
+      await applyOrderLifecycleTransition(client, orderId, order.status, nextOrderStatus);
 
       if (nextFailCount >= 3) {
         await client.query(
@@ -145,7 +167,7 @@ function validateDeliveryPayload(body) {
   }
 
   const status = typeof body.status === "string" ? body.status.trim().toUpperCase() : "";
-  if (!["FAILED", "DELIVERED", "IN_TRANSIT", "HANDOVER"].includes(status)) {
+  if (!["FAILED", "DELIVERED", "IN_TRANSIT", "HANDOVER", "RETURNED"].includes(status)) {
     return "status is invalid";
   }
 
@@ -176,6 +198,8 @@ function mapCallbackStatusToDeliveryStatus(status) {
       return "in_transit";
     case "HANDOVER":
       return "handover";
+    case "RETURNED":
+      return "returned";
     default:
       return "pending";
   }

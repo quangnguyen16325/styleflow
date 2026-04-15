@@ -11,6 +11,24 @@ Content-Type:
 Authorization:
 - Authenticated endpoints require `Authorization: Bearer <token>`
 
+## Client Compatibility Policy
+
+The `Customer-Facing` and `Admin` sections below are the active contract for the current web admin and mobile work.
+
+Until both clients finish the tasks already assigned:
+
+- do not remove existing endpoints from these sections
+- do not rename existing request fields
+- do not rename existing response fields
+- do not change field types
+- do not move customer-facing behavior into different paths
+- future backend work must be additive:
+  - add new optional fields only
+  - add new endpoints under `/admin/*` or internal webhook paths
+  - use new endpoints for new workflows instead of breaking current ones
+
+If a breaking change is ever required later, it must go through a new path or an explicit versioned contract.
+
 ## Response Rules
 
 ### Success
@@ -131,6 +149,42 @@ Common error codes:
 }
 ```
 
+## Delivery Event Model
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "partner": "GHN",
+  "externalEventId": "ev_001",
+  "status": "FAILED",
+  "reason": "CUSTOMER_UNREACHABLE",
+  "payload": {
+    "orderId": 12,
+    "status": "FAILED",
+    "reason": "CUSTOMER_UNREACHABLE",
+    "partner": "GHN"
+  },
+  "createdAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+## Refund Request Model
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "customerId": 4,
+  "imageUrl": "https://example.com/evidence.jpg",
+  "status": "pending",
+  "abuseScoreSnapshot": 1,
+  "reviewNote": null,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
 ## Auth Response Model
 
 ```json
@@ -194,6 +248,8 @@ Common error codes:
 ```
 
 ## Endpoints
+
+### Customer-Facing
 
 ### `GET /health`
 
@@ -384,45 +440,470 @@ Delete one address of the authenticated customer.
 Response `204`:
 - empty body
 
-### `POST /delivery-callback`
+### Admin
 
-Process delivery partner callback.
+Preferred admin order routes:
+- `GET /admin/orders`
+- `GET /admin/orders/:id`
+- `PATCH /admin/orders/:id/status`
+- `GET /admin/orders/:id/delivery-events`
+
+Compatibility note:
+- existing admin clients may continue using `PATCH /orders/:id/status`
+- new admin work should prefer the `/admin/orders/*` routes
+
+### `GET /admin/orders`
+
+Get admin order list.
+
+Query params:
+- `status` optional
+- allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 1,
+    "status": "pending",
+    "totalAmount": 418000,
+    "shippingFee": 20000,
+    "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+    "failCount": 0,
+    "customerAddressId": 1,
+    "shippingAddress": "123 Nguyen Trai, HCMC",
+    "city": "Ho Chi Minh City",
+    "shipping": {
+      "receiverName": "Nguyen Van A",
+      "receiverPhone": "0901234567",
+      "addressLine": "123 Nguyen Trai",
+      "ward": "Ward 2",
+      "district": "District 5",
+      "city": "Ho Chi Minh City",
+      "country": "Vietnam",
+      "postalCode": "700000",
+      "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+    },
+    "customer": {
+      "id": 1,
+      "fullName": "Nguyen Van A",
+      "phone": "0901234567",
+      "email": "nguyenvana@example.com"
+    },
+    "items": [
+      {
+        "id": 1,
+        "productId": 1,
+        "quantity": 2,
+        "priceAtPurchase": 199000
+      }
+    ],
+    "createdAt": "2026-04-02T10:15:00.000Z",
+    "updatedAt": "2026-04-02T10:15:00.000Z"
+  }
+]
+```
+
+### `GET /admin/orders/:id`
+
+Get one order by id for admin/staff.
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "status": "pending",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "customerAddressId": 1,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "shipping": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+  },
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "quantity": 2,
+      "priceAtPurchase": 199000
+    }
+  ],
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:15:00.000Z"
+}
+```
+
+### `PATCH /admin/orders/:id/status`
+
+Update order status through the admin-specific path.
+
+Access rules:
+- admin/staff only
 
 Request body:
 
 ```json
 {
-  "orderId": 12,
-  "status": "FAILED",
-  "reason": "CUSTOMER_UNREACHABLE",
-  "partner": "GHN",
-  "externalEventId": "ev_123"
+  "status": "processing"
 }
 ```
 
-Allowed `status`:
-- `FAILED`
-- `DELIVERED`
-- `IN_TRANSIT`
-- `HANDOVER`
+Allowed status values:
+- `pending`
+- `awaiting_payment`
+- `paid`
+- `processing`
+- `shipping`
+- `completed`
+- `cancelled`
+- `failed`
+
+Side effects:
+- when status changes to `failed`, backend automatically creates an `issue` record with:
+  - `type = ORDER_FAILED`
+  - `severity = high`
+  - `status = open`
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "status": "processing",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "customerAddressId": 1,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "quantity": 2,
+      "priceAtPurchase": 199000
+    }
+  ],
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:20:00.000Z"
+}
+```
+
+### `GET /admin/orders/:id/delivery-events`
+
+Get delivery callback history for one order.
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 1,
+    "orderId": 12,
+    "partner": "GHN",
+    "externalEventId": "ev_001",
+    "status": "FAILED",
+    "reason": "CUSTOMER_UNREACHABLE",
+    "payload": {
+      "orderId": 12,
+      "status": "FAILED",
+      "reason": "CUSTOMER_UNREACHABLE",
+      "partner": "GHN"
+    },
+    "createdAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
+
+### `POST /admin/orders/:id/address-change-decision`
+
+Approve or reject a pending address change request.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "decision": "approved",
+  "approvedShippingFee": 50000
+}
+```
+
+Allowed `decision` values:
+- `approved`
+- `rejected`
+- `rejected_timeout`
 
 Rules:
-- `orderId`: required, positive integer
-- `reason`: required when `status = FAILED`
+- order must currently have `address_change_status = requested`
+- `approvedShippingFee` is optional and only used when `decision = approved`
 
 Response `200`:
 
 ```json
 {
   "success": true,
-  "action": "retry_pending"
+  "action": "approved"
 }
 ```
 
-Other possible `action` values:
-- `delivered`
-- `returning`
-- `updated`
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "Order does not have a pending address change request"
+  }
+}
+```
+
+### `GET /admin/refund-requests`
+
+Get refund request list.
+
+Query params:
+- `status` optional
+- allowed values: `pending`, `manual_review_required`, `approved`, `rejected`, `refunded`
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+- array of `Refund Request Model`
+
+### `GET /admin/refund-requests/:id`
+
+Get one refund request by id.
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+- `Refund Request Model`
+
+### `PATCH /admin/refund-requests/:id/status`
+
+Update refund request status.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "status": "approved",
+  "reviewNote": "Approved after manual image verification"
+}
+```
+
+Allowed `status` values:
+- `pending`
+- `manual_review_required`
+- `approved`
+- `rejected`
+- `refunded`
+
+Response `200`:
+- `Refund Request Model`
+
+### `GET /admin/system-config`
+
+Get the current admin-editable system configuration.
+
+Access rules:
+- admin/staff only
+
+Current keys:
+- `payment.active_gateway`
+- `payment.maintenance_mode`
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 1,
+    "configGroup": "payment",
+    "configKey": "payment.active_gateway",
+    "configValue": "PAYPAL",
+    "configType": "string",
+    "description": "Currently active payment gateway for checkout",
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "configGroup": "payment",
+    "configKey": "payment.maintenance_mode",
+    "configValue": false,
+    "configType": "boolean",
+    "description": "Whether payment maintenance mode is enabled",
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
+
+### `PATCH /admin/system-config`
+
+Update allowed system configuration keys.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "items": [
+    {
+      "configKey": "payment.active_gateway",
+      "configValue": "BANK_TRANSFER",
+      "configType": "string",
+      "description": "Currently active payment gateway for checkout"
+    },
+    {
+      "configKey": "payment.maintenance_mode",
+      "configValue": true,
+      "configType": "boolean",
+      "description": "Whether payment maintenance mode is enabled"
+    }
+  ]
+}
+```
+
+Rules:
+- only whitelisted keys are accepted
+- `items` must be a non-empty array
+- supported `configType` values:
+  - `string`
+  - `boolean`
+  - `number`
+
+Response `200`:
+- array of updated system config records in the same shape as `GET /admin/system-config`
+
+### `GET /admin/payment-incidents/active`
+
+Get the current active payment incident summary.
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+
+```json
+{
+  "active": true,
+  "activeGateway": "BANK_TRANSFER",
+  "maintenanceMode": true,
+  "pendingCount": 12,
+  "outageSignalCount": 4,
+  "recentSignals": [
+    {
+      "id": 10,
+      "orderId": 12,
+      "incidentId": "incident_001",
+      "gatewayName": "PAYPAL",
+      "transactionRef": "txn_123",
+      "source": "payment_service",
+      "httpStatus": 503,
+      "errorCode": "SERVICE_UNAVAILABLE",
+      "paymentStatus": "payment_unknown",
+      "rawResponse": {
+        "source": "payment_service",
+        "gateway": "PAYPAL",
+        "httpStatus": 503,
+        "errorCode": "SERVICE_UNAVAILABLE",
+        "orderId": 12,
+        "transactionRef": "txn_123"
+      },
+      "createdAt": "2026-04-02T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `GET /admin/payment-logs`
+
+Get raw payment log history for investigation.
+
+Access rules:
+- admin/staff only
+
+Query params:
+- `gateway` optional
+- `orderId` optional
+- `transactionRef` optional
+- `incidentId` optional
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 10,
+    "orderId": 12,
+    "incidentId": "incident_001",
+    "externalEventId": "evt_001",
+    "gatewayName": "PAYPAL",
+    "transactionRef": "txn_123",
+    "source": "payment_service",
+    "httpStatus": 503,
+    "errorCode": "SERVICE_UNAVAILABLE",
+    "paymentStatus": "payment_unknown",
+    "rawResponse": {
+      "source": "payment_service",
+      "gateway": "PAYPAL",
+      "httpStatus": 503,
+      "errorCode": "SERVICE_UNAVAILABLE",
+      "orderId": 12,
+      "transactionRef": "txn_123",
+      "externalEventId": "evt_001"
+    },
+    "createdAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
 
 ### `GET /admin/issues`
 
@@ -464,6 +945,50 @@ Allowed `status`:
 Response `200`:
 - `Issue Model`
 
+### Internal / Integration
+
+### `POST /delivery-callback`
+
+Process delivery partner callback.
+
+Request body:
+
+```json
+{
+  "orderId": 12,
+  "status": "FAILED",
+  "reason": "CUSTOMER_UNREACHABLE",
+  "partner": "GHN",
+  "externalEventId": "ev_123"
+}
+```
+
+Allowed `status`:
+- `FAILED`
+- `DELIVERED`
+- `IN_TRANSIT`
+- `HANDOVER`
+- `RETURNED`
+
+Rules:
+- `orderId`: required, positive integer
+- `reason`: required when `status = FAILED`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "action": "retry_pending"
+}
+```
+
+Other possible `action` values:
+- `delivered`
+- `returning`
+- `returned`
+- `updated`
+
 ### `POST /payment-events`
 
 Process payment incident or failover signal.
@@ -477,7 +1002,8 @@ Request body:
   "httpStatus": 503,
   "errorCode": "SERVICE_UNAVAILABLE",
   "orderId": 12,
-  "transactionRef": "txn_123"
+  "transactionRef": "txn_123",
+  "externalEventId": "evt_001"
 }
 ```
 
@@ -485,6 +1011,10 @@ Allowed `source`:
 - `payment_service`
 - `app_client`
 - `schedule`
+
+Rules:
+- `externalEventId` is optional
+- when `externalEventId` is provided, repeated events with the same value are ignored idempotently
 
 Response `200`:
 
@@ -496,243 +1026,8 @@ Response `200`:
 }
 ```
 
-### `GET /customers/:customerId/addresses`
-
-Get all addresses for one customer.
-
-Response `200`:
-
-```json
-[
-  {
-    "id": 1,
-    "customerId": 1,
-    "label": "home",
-    "receiverName": "Nguyen Van A",
-    "receiverPhone": "0901234567",
-    "addressLine": "123 Nguyen Trai",
-    "ward": "Ward 2",
-    "district": "District 5",
-    "city": "Ho Chi Minh City",
-    "country": "Vietnam",
-    "postalCode": "700000",
-    "isDefault": true,
-    "createdAt": "2026-04-02T10:00:00.000Z",
-    "updatedAt": "2026-04-02T10:00:00.000Z"
-  }
-]
-```
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Customer id must be a positive integer"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Customer not found"
-  }
-}
-```
-
-### `GET /customers/:customerId/addresses/:addressId`
-
-Get one address by id for one customer.
-
-Response `200`:
-
-```json
-{
-  "id": 1,
-  "customerId": 1,
-  "label": "home",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0901234567",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true,
-  "createdAt": "2026-04-02T10:00:00.000Z",
-  "updatedAt": "2026-04-02T10:00:00.000Z"
-}
-```
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Address id must be a positive integer"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Address not found"
-  }
-}
-```
-
-### `POST /customers/:customerId/addresses`
-
-Create a new address for one customer.
-
-Request body:
-
-```json
-{
-  "label": "home",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0901234567",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true
-}
-```
-
-Rules:
-- `receiverName`: required
-- `receiverPhone`: required
-- `addressLine`: required
-- `city`: required
-- `label`: optional, defaults to `home`
-- `country`: optional, defaults to `Vietnam`
-- `isDefault`: optional boolean
-
-Response `201`:
-
-```json
-{
-  "id": 1,
-  "customerId": 1,
-  "label": "home",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0901234567",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true,
-  "createdAt": "2026-04-02T10:00:00.000Z",
-  "updatedAt": "2026-04-02T10:00:00.000Z"
-}
-```
-
-### `PATCH /customers/:customerId/addresses/:addressId`
-
-Update one address for one customer.
-
-Request body:
-
-```json
-{
-  "label": "office",
-  "receiverPhone": "0911111111",
-  "isDefault": true
-}
-```
-
-Rules:
-- request body must include at least one address field
-- `isDefault = true` will unset other default addresses of the same customer
-- if the current default address is deleted or unset, backend assigns another existing address as default when possible
-
-Response `200`:
-
-```json
-{
-  "id": 1,
-  "customerId": 1,
-  "label": "office",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0911111111",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true,
-  "createdAt": "2026-04-02T10:00:00.000Z",
-  "updatedAt": "2026-04-02T10:05:00.000Z"
-}
-```
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "At least one address field is required"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Address not found"
-  }
-}
-```
-
-### `DELETE /customers/:customerId/addresses/:addressId`
-
-Delete one address for one customer.
-
-Response `204`:
-- empty body
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Address id must be a positive integer"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Address not found"
-  }
-}
-```
+Other possible `action` values:
+- `duplicate_ignored`
 
 ### `GET /products`
 
@@ -929,6 +1224,126 @@ Response `401`:
 }
 ```
 
+### `POST /orders/:id/address-change-request`
+
+Create an address change request for an existing order.
+
+Access rules:
+- authenticated customer only
+- customer can request change only for own order
+
+Request body using a saved address:
+
+```json
+{
+  "addressId": 2
+}
+```
+
+Request body using a new address:
+
+```json
+{
+  "newAddress": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "200 Dien Bien Phu",
+    "ward": "Ward 15",
+    "district": "Binh Thanh",
+    "city": "Da Nang",
+    "country": "Vietnam",
+    "postalCode": "550000"
+  },
+  "requestedShippingFee": 50000
+}
+```
+
+Rules:
+- use either `addressId` or `newAddress`, not both
+- same-city change is applied immediately
+- cross-city change is stored as pending approval for admin/n8n flow
+- order must still be in an address-change-eligible delivery stage
+
+Response `200` immediate update:
+
+```json
+{
+  "success": true,
+  "action": "updated_same_city"
+}
+```
+
+Response `200` pending approval:
+
+```json
+{
+  "success": true,
+  "action": "pending_approval"
+}
+```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "An address change request is already pending"
+  }
+}
+```
+
+### `POST /refund-requests`
+
+Create a refund request for an existing order.
+
+Access rules:
+- authenticated customer only
+- customer can create a refund request only for own order
+
+Request body:
+
+```json
+{
+  "orderId": 12,
+  "imageUrl": "https://example.com/evidence.jpg"
+}
+```
+
+Rules:
+- `orderId` must be a positive integer
+- `imageUrl` is required
+- an order cannot have more than one active refund request at the same time
+- backend uses the authenticated customer from JWT, not any client-provided phone
+- if the customer's abuse score is high, the request starts as `manual_review_required`
+
+Response `201`:
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "customerId": 4,
+  "imageUrl": "https://example.com/evidence.jpg",
+  "status": "pending",
+  "abuseScoreSnapshot": 1,
+  "reviewNote": null,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "A refund request is already active for this order"
+  }
+}
+```
+
 ### `GET /orders`
 
 Get order list.
@@ -936,6 +1351,10 @@ Get order list.
 Query params:
 - `status` optional
 - allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
+Access rules:
+- customer: only sees own orders
+- admin/staff: sees all orders
 
 Response `400`:
 
@@ -984,6 +1403,10 @@ Response `200`:
 ### `GET /orders/:id`
 
 Get one order by id.
+
+Access rules:
+- customer: only own order
+- admin/staff: any order
 
 Response `200`:
 
@@ -1041,6 +1464,9 @@ Response `400`:
 ### `PATCH /orders/:id/status`
 
 Update order status.
+
+Access rules:
+- admin/staff only
 
 Request body:
 
@@ -1132,8 +1558,7 @@ Response `404`:
 ## Planned Next Scope
 
 The following backend capabilities are planned for the next phase and are not implemented yet:
-- delivery callback webhook
 - address change request workflow
 - refund request workflow
-- payment failover and incident tracking APIs
-- admin issue management APIs
+- system-config admin APIs
+- payment failover control APIs
