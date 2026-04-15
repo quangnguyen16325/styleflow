@@ -41,7 +41,7 @@ client.interceptors.response.use(
 
 class ApiService {
   // PRODUCTS
-  
+
   static async getProducts() {
     return client.get('/products');
   }
