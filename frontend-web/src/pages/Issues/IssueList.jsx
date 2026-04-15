@@ -40,21 +40,36 @@ export default function IssueList() {
   const [severityFilter, setSeverityFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
 
-  const fetchIssues = () => {
+  const handleFilterChange = (setFilter, value) => {
     setLoading(true);
     setError(null);
+    setFilter(value);
+  };
+
+  useEffect(() => {
+    let isActive = true;
+
     ApiService.getIssues({
       status: statusFilter !== 'ALL' ? statusFilter : undefined,
       severity: severityFilter !== 'ALL' ? severityFilter : undefined,
       type: typeFilter !== 'ALL' ? typeFilter : undefined,
     })
-      .then((data) => setIssues(Array.isArray(data) ? data : []))
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
-  };
+      .then((data) => {
+        if (!isActive) return;
+        setIssues(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!isActive) return;
+        setError(err);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setLoading(false);
+      });
 
-  useEffect(() => {
-    fetchIssues();
+    return () => {
+      isActive = false;
+    };
   }, [statusFilter, severityFilter, typeFilter]);
 
   if (loading) return <LoadingSpinner message="Loading issues..." />;
@@ -71,7 +86,7 @@ export default function IssueList() {
       <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
         >
@@ -81,7 +96,7 @@ export default function IssueList() {
         </select>
         <select
           value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value)}
+          onChange={(e) => handleFilterChange(setSeverityFilter, e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
         >
@@ -91,7 +106,7 @@ export default function IssueList() {
         </select>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}
           className="form-select"
           style={{ width: '200px' }}
         >

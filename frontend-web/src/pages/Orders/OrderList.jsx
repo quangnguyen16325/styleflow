@@ -25,19 +25,26 @@ export default function OrderList() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchOrders = (status) => {
-    setLoading(true);
-    setError(null);
-    ApiService.getOrders(status)
+  useEffect(() => {
+    let isActive = true;
+
+    ApiService.getOrders(statusFilter)
       .then((data) => {
+        if (!isActive) return;
         setOrders(Array.isArray(data) ? data : []);
       })
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
-  };
+      .catch((err) => {
+        if (!isActive) return;
+        setError(err);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setLoading(false);
+      });
 
-  useEffect(() => {
-    fetchOrders(statusFilter);
+    return () => {
+      isActive = false;
+    };
   }, [statusFilter]);
 
   // Client-side search within server-filtered results
@@ -73,7 +80,11 @@ export default function OrderList() {
         />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setLoading(true);
+            setError(null);
+            setStatusFilter(e.target.value);
+          }}
           className="form-select"
           style={{ width: '200px' }}
         >
