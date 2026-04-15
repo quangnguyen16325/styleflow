@@ -16,6 +16,18 @@ export async function applyOrderLifecycleTransition(client, orderId, previousSta
 export async function applyOrderReturn(client, orderId) {
   const items = await getInventoryItemsForOrder(client, orderId);
   for (const item of items) {
+    const inserted = await insertInventoryTransactionOnce(client, {
+      inventoryId: item.inventory_id,
+      changeAmount: item.quantity,
+      type: "RETURN",
+      orderId,
+      referenceId: `ORDER_${orderId}_RETURN`,
+    });
+
+    if (!inserted) {
+      continue;
+    }
+
     await client.query(
       `
         UPDATE inventory
@@ -26,27 +38,24 @@ export async function applyOrderReturn(client, orderId) {
       `,
       [item.quantity, item.inventory_id],
     );
-
-    await client.query(
-      `
-        INSERT INTO inventory_transactions (
-          inventory_id,
-          change_amount,
-          type,
-          order_id,
-          created_by,
-          reference_id
-        )
-        VALUES ($1, $2, 'RETURN', $3, 'SYSTEM', $4)
-      `,
-      [item.inventory_id, item.quantity, orderId, `ORDER_${orderId}_RETURN`],
-    );
   }
 }
 
 async function finalizeOrderSale(client, orderId) {
   const items = await getInventoryItemsForOrder(client, orderId);
   for (const item of items) {
+    const inserted = await insertInventoryTransactionOnce(client, {
+      inventoryId: item.inventory_id,
+      changeAmount: -item.quantity,
+      type: "SALE",
+      orderId,
+      referenceId: `ORDER_${orderId}_SALE`,
+    });
+
+    if (!inserted) {
+      continue;
+    }
+
     await client.query(
       `
         UPDATE inventory
@@ -58,27 +67,24 @@ async function finalizeOrderSale(client, orderId) {
       `,
       [item.quantity, item.inventory_id],
     );
-
-    await client.query(
-      `
-        INSERT INTO inventory_transactions (
-          inventory_id,
-          change_amount,
-          type,
-          order_id,
-          created_by,
-          reference_id
-        )
-        VALUES ($1, $2, 'SALE', $3, 'SYSTEM', $4)
-      `,
-      [item.inventory_id, -item.quantity, orderId, `ORDER_${orderId}_SALE`],
-    );
   }
 }
 
 async function rollbackReservedInventory(client, orderId) {
   const items = await getInventoryItemsForOrder(client, orderId);
   for (const item of items) {
+    const inserted = await insertInventoryTransactionOnce(client, {
+      inventoryId: item.inventory_id,
+      changeAmount: item.quantity,
+      type: "EXPIRED_CANCEL",
+      orderId,
+      referenceId: `ORDER_${orderId}_ROLLBACK`,
+    });
+
+    if (!inserted) {
+      continue;
+    }
+
     await client.query(
       `
         UPDATE inventory
@@ -89,22 +95,31 @@ async function rollbackReservedInventory(client, orderId) {
       `,
       [item.quantity, item.inventory_id],
     );
-
-    await client.query(
-      `
-        INSERT INTO inventory_transactions (
-          inventory_id,
-          change_amount,
-          type,
-          order_id,
-          created_by,
-          reference_id
-        )
-        VALUES ($1, $2, 'EXPIRED_CANCEL', $3, 'SYSTEM', $4)
-      `,
-      [item.inventory_id, item.quantity, orderId, `ORDER_${orderId}_ROLLBACK`],
-    );
   }
+}
+
+export async function insertInventoryTransactionOnce(
+  client,
+  { inventoryId, changeAmount, type, orderId, referenceId },
+) {
+  const { rows } = await client.query(
+    `
+      INSERT INTO inventory_transactions (
+        inventory_id,
+        change_amount,
+        type,
+        order_id,
+        created_by,
+        reference_id
+      )
+      VALUES ($1, $2, $3, $4, 'SYSTEM', $5)
+      ON CONFLICT (inventory_id, type, order_id, reference_id) DO NOTHING
+      RETURNING id
+    `,
+    [inventoryId, changeAmount, type, orderId, referenceId],
+  );
+
+  return rows.length > 0;
 }
 
 async function getInventoryItemsForOrder(client, orderId) {
