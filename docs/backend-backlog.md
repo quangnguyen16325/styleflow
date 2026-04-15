@@ -59,20 +59,23 @@ These fields are added for workflow support. Some of them are already exposed th
   - `GET /admin/refund-requests`
   - `GET /admin/refund-requests/:id`
   - `PATCH /admin/refund-requests/:id/status`
+- System config APIs
+  - `GET /admin/system-config`
+  - `PATCH /admin/system-config`
+- Payment incident summary API
+  - `GET /admin/payment-incidents/active`
 
 ## Next Backend Endpoints
 
-### Payment Failover Control Flow
+### Payment Failover Control Follow-ups
 
-- `GET /admin/payment-incidents/active`
+- `GET /admin/payment-logs`
   - admin-only
-  - summary of active outage state
+  - filter by `gateway`, `orderId`, `transactionRef`, `incidentId`
 
-- `PATCH /admin/system-config`
-  - admin-only
-  - update keys like:
-    - `payment.active_gateway`
-    - `payment.maintenance_mode`
+- idempotent `POST /payment-events`
+  - support `externalEventId`
+  - avoid duplicated logs for repeated callbacks
 
 ## Role and Access Backlog
 
@@ -103,6 +106,7 @@ These fields are added for workflow support. Some of them are already exposed th
 - `PATCH /admin/refund-requests/:id/status`
 - `GET /admin/system-config`
 - `PATCH /admin/system-config`
+- `GET /admin/payment-incidents/active`
 
 ## Business Rules To Lock Next
 
@@ -118,5 +122,5 @@ These fields are added for workflow support. Some of them are already exposed th
 ## Suggested Implementation Order
 
 1. Keep the current customer-facing and admin contract stable for web/mobile.
-2. Implement system-config admin APIs.
-3. Add payment incident read/control APIs.
+2. Add `GET /admin/payment-logs`.
+3. Make `POST /payment-events` idempotent.

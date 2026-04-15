@@ -745,6 +745,124 @@ Allowed `status` values:
 Response `200`:
 - `Refund Request Model`
 
+### `GET /admin/system-config`
+
+Get the current admin-editable system configuration.
+
+Access rules:
+- admin/staff only
+
+Current keys:
+- `payment.active_gateway`
+- `payment.maintenance_mode`
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 1,
+    "configGroup": "payment",
+    "configKey": "payment.active_gateway",
+    "configValue": "PAYPAL",
+    "configType": "string",
+    "description": "Currently active payment gateway for checkout",
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "configGroup": "payment",
+    "configKey": "payment.maintenance_mode",
+    "configValue": false,
+    "configType": "boolean",
+    "description": "Whether payment maintenance mode is enabled",
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
+
+### `PATCH /admin/system-config`
+
+Update allowed system configuration keys.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "items": [
+    {
+      "configKey": "payment.active_gateway",
+      "configValue": "BANK_TRANSFER",
+      "configType": "string",
+      "description": "Currently active payment gateway for checkout"
+    },
+    {
+      "configKey": "payment.maintenance_mode",
+      "configValue": true,
+      "configType": "boolean",
+      "description": "Whether payment maintenance mode is enabled"
+    }
+  ]
+}
+```
+
+Rules:
+- only whitelisted keys are accepted
+- `items` must be a non-empty array
+- supported `configType` values:
+  - `string`
+  - `boolean`
+  - `number`
+
+Response `200`:
+- array of updated system config records in the same shape as `GET /admin/system-config`
+
+### `GET /admin/payment-incidents/active`
+
+Get the current active payment incident summary.
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+
+```json
+{
+  "active": true,
+  "activeGateway": "BANK_TRANSFER",
+  "maintenanceMode": true,
+  "pendingCount": 12,
+  "outageSignalCount": 4,
+  "recentSignals": [
+    {
+      "id": 10,
+      "orderId": 12,
+      "incidentId": "incident_001",
+      "gatewayName": "PAYPAL",
+      "transactionRef": "txn_123",
+      "source": "payment_service",
+      "httpStatus": 503,
+      "errorCode": "SERVICE_UNAVAILABLE",
+      "paymentStatus": "payment_unknown",
+      "rawResponse": {
+        "source": "payment_service",
+        "gateway": "PAYPAL",
+        "httpStatus": 503,
+        "errorCode": "SERVICE_UNAVAILABLE",
+        "orderId": 12,
+        "transactionRef": "txn_123"
+      },
+      "createdAt": "2026-04-02T10:00:00.000Z"
+    }
+  ]
+}
+```
+
 ### `GET /admin/issues`
 
 Get issue list for admin or staff.
