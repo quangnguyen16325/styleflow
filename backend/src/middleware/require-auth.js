@@ -89,3 +89,27 @@ export function attachAuthCustomerId(req, _res, next) {
   req.params.customerId = String(req.authCustomer.id);
   next();
 }
+
+export function requireRole(...allowedRoles) {
+  return (req, res, next) => {
+    if (!req.authCustomer) {
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authorization token is required",
+        },
+      });
+    }
+
+    if (!allowedRoles.includes(req.authCustomer.role)) {
+      return res.status(403).json({
+        error: {
+          code: "FORBIDDEN",
+          message: "Insufficient permissions",
+        },
+      });
+    }
+
+    return next();
+  };
+}

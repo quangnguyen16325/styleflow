@@ -115,6 +115,22 @@ Common error codes:
 }
 ```
 
+## Issue Model
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "productId": null,
+  "type": "PAYMENT_ERROR",
+  "severity": "high",
+  "status": "open",
+  "logHistory": [],
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
 ## Auth Response Model
 
 ```json
@@ -367,6 +383,118 @@ Delete one address of the authenticated customer.
 
 Response `204`:
 - empty body
+
+### `POST /delivery-callback`
+
+Process delivery partner callback.
+
+Request body:
+
+```json
+{
+  "orderId": 12,
+  "status": "FAILED",
+  "reason": "CUSTOMER_UNREACHABLE",
+  "partner": "GHN",
+  "externalEventId": "ev_123"
+}
+```
+
+Allowed `status`:
+- `FAILED`
+- `DELIVERED`
+- `IN_TRANSIT`
+- `HANDOVER`
+
+Rules:
+- `orderId`: required, positive integer
+- `reason`: required when `status = FAILED`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "action": "retry_pending"
+}
+```
+
+Other possible `action` values:
+- `delivered`
+- `returning`
+- `updated`
+
+### `GET /admin/issues`
+
+Get issue list for admin or staff.
+
+Query params:
+- `status` optional
+- `severity` optional
+- `type` optional
+
+Response `200`:
+- array of `Issue Model`
+
+### `GET /admin/issues/:id`
+
+Get one issue by id for admin or staff.
+
+Response `200`:
+- `Issue Model`
+
+### `PATCH /admin/issues/:id/status`
+
+Update issue status for admin or staff.
+
+Request body:
+
+```json
+{
+  "status": "investigating"
+}
+```
+
+Allowed `status`:
+- `open`
+- `investigating`
+- `resolved`
+- `ignored`
+
+Response `200`:
+- `Issue Model`
+
+### `POST /payment-events`
+
+Process payment incident or failover signal.
+
+Request body:
+
+```json
+{
+  "source": "payment_service",
+  "gateway": "PAYPAL",
+  "httpStatus": 503,
+  "errorCode": "SERVICE_UNAVAILABLE",
+  "orderId": 12,
+  "transactionRef": "txn_123"
+}
+```
+
+Allowed `source`:
+- `payment_service`
+- `app_client`
+- `schedule`
+
+Response `200`:
+
+```json
+{
+  "status": "outage_suspected",
+  "action": "logged",
+  "paymentStatus": "payment_unknown"
+}
+```
 
 ### `GET /customers/:customerId/addresses`
 

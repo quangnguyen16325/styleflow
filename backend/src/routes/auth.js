@@ -220,7 +220,7 @@ export function getJwtSecret() {
 
 export function mapCustomer(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     fullName: row.full_name,
     phone: row.phone,
     email: row.email,

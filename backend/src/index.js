@@ -2,10 +2,13 @@ import express from "express";
 import cors from "cors";
 
 import { migrate } from "./db/migrate.js";
-import { attachAuthCustomerId, requireAuth } from "./middleware/require-auth.js";
+import { attachAuthCustomerId, requireAuth, requireRole } from "./middleware/require-auth.js";
 import authRouter from "./routes/auth.js";
 import addressesRouter from "./routes/addresses.js";
+import deliveryRouter from "./routes/delivery.js";
+import issuesRouter from "./routes/issues.js";
 import meRouter from "./routes/me.js";
+import paymentsRouter from "./routes/payments.js";
 import productsRouter from "./routes/products.js";
 import ordersRouter from "./routes/orders.js";
 
@@ -25,6 +28,9 @@ app.get("/health", (_req, res) => {
 app.use("/auth", authRouter);
 app.use("/me", requireAuth, meRouter);
 app.use("/me/addresses", requireAuth, attachAuthCustomerId, addressesRouter);
+app.use("/", deliveryRouter);
+app.use("/", paymentsRouter);
+app.use("/admin/issues", requireAuth, requireRole("admin", "staff"), issuesRouter);
 app.use("/customers/:customerId/addresses", addressesRouter);
 app.use("/products", productsRouter);
 app.use("/orders", ordersRouter);

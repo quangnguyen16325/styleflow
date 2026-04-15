@@ -321,20 +321,21 @@ router.post("/", requireAuth, async (req, res) => {
     await client.query("COMMIT");
 
     return res.status(201).json({
-      id: orderRow.id,
+      id: Number(orderRow.id),
       status: orderRow.status,
       totalAmount: Number(orderRow.total_amount),
       shippingFee: Number(orderRow.shipping_fee),
       paymentExpiresAt: orderRow.payment_expires_at,
       failCount: orderRow.fail_count,
-      customerAddressId: orderRow.customer_address_id,
+      customerAddressId:
+        orderRow.customer_address_id == null ? null : Number(orderRow.customer_address_id),
       shippingAddress: orderRow.shipping_address,
       city: orderRow.city,
       shipping: mapShippingRow(orderRow),
       createdAt: orderRow.created_at,
       updatedAt: orderRow.updated_at,
       customer: {
-        id: customerRow.id,
+        id: Number(customerRow.id),
         fullName: customerRow.full_name,
         phone: customerRow.phone,
         email: customerRow.email,
@@ -463,20 +464,20 @@ function validateOrderPayload(body) {
 
 function mapOrderRow(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     status: row.status,
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
-    customerAddressId: row.customer_address_id,
+    customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
     shippingAddress: row.shipping_address,
     city: row.city,
     shipping: mapShippingRow(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     customer: {
-      id: row.customer_id,
+      id: Number(row.customer_id),
       fullName: row.full_name,
       phone: row.phone,
       email: row.email,

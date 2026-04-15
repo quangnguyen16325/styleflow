@@ -508,8 +508,8 @@ function getTrimmedString(value) {
 
 function mapAddressRow(row) {
   return {
-    id: row.id,
-    customerId: row.customer_id,
+    id: Number(row.id),
+    customerId: Number(row.customer_id),
     label: row.label,
     receiverName: row.receiver_name,
     receiverPhone: row.receiver_phone,
