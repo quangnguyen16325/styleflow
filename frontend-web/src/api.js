@@ -1,7 +1,5 @@
 import axios from 'axios';
 
-// The baseUrl is defined via vite proxy or directly via VITE_API_BASE_URL env.
-// Example uses Vite's env vars.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const client = axios.create({
@@ -11,66 +9,76 @@ const client = axios.create({
   },
 });
 
-// Response Interceptor to uniformly handle errors 
+// Request Interceptor: Attach Bearer Token
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('admin_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response Interceptor: Uniform error handling & 401/403 rules
 client.interceptors.response.use(
   (response) => response.data,
   (error) => {
     console.error('API call failed:', error.response?.data || error.message);
-    const errPayload = error.response?.data?.error || {
-      code: 'UNKNOWN_ERROR',
-      message: 'Unknown error occurred',
-    };
-    return Promise.reject(errPayload);
+    const code = error.response?.data?.error?.code || 'UNKNOWN_ERROR';
+    const message = error.response?.data?.error?.message || 'Unknown error occurred';
+    
+    // Auth redirection for Unauthorized
+    if (error.response?.status === 401) {
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
+      window.location.href = '/login';
+    } 
+    // Alert for Forbidden
+    else if (error.response?.status === 403) {
+      alert(`Access Denied: ${message}`);
+    }
+    
+    return Promise.reject({ code, message });
   }
 );
 
-// JSDoc typing representation for Frontend usage based on Contract
-
-/**
- * @typedef {Object} Customer
- * @property {string} fullName
- * @property {string} phone
- * @property {string} email
- */
-
-/**
- * @typedef {Object} OrderItemPayload
- * @property {number} productId
- * @property {number} quantity
- */
-
 class ApiService {
-  // PRODUCTS
+  // AUTH
+  static async login(email, password) {
+    return client.post('/auth/login', { email, password });
+  }
 
+  // PRODUCTS
   static async getProducts() {
     return client.get('/products');
   }
-
   static async getProduct(id) {
     return client.get(`/products/${id}`);
   }
 
   // ORDERS
-
-  static async getOrders() {
-    return client.get('/orders');
+  static async getOrders(status = null) {
+    const params = {};
+    if (status && status !== 'ALL') {
+      params.status = status.toLowerCase();
+    }
+    return client.get('/orders', { params });
   }
-
   static async getOrder(id) {
     return client.get(`/orders/${id}`);
   }
+  static async updateOrderStatus(id, status) {
+    return client.patch(`/orders/${id}/status`, { status });
+  }
 
-  /**
-   * Create an order
-   * @param {Object} payload 
-   * @param {Customer} payload.customer
-   * @param {string} payload.shippingAddress
-   * @param {string} payload.city
-   * @param {number} [payload.shippingFee]
-   * @param {OrderItemPayload[]} payload.items
-   */
-  static async createOrder(payload) {
-    return client.post('/orders', payload);
+  // ISSUES
+  static async getIssues(params = {}) {
+    return client.get('/admin/issues', { params });
+  }
+  static async getIssue(id) {
+    return client.get(`/admin/issues/${id}`);
+  }
+  static async updateIssueStatus(id, status) {
+    return client.patch(`/admin/issues/${id}/status`, { status });
   }
 }
 

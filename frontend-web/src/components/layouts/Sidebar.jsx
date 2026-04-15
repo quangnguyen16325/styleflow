@@ -38,10 +38,13 @@ export default function Sidebar() {
         <NavLink to="/orders" style={linkStyle}>
           Order Management
         </NavLink>
+        <NavLink to="/issues" style={linkStyle}>
+          Issues Tracking
+        </NavLink>
       </nav>
 
       <div style={{ padding: '20px', fontSize: '12px', color: '#5f6368', textAlign: 'center' }}>
-        v0.1.0-alpha
+        v0.5.0-alpha
       </div>
     </aside>
   );
