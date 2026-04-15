@@ -209,7 +209,7 @@ function validateLoginPayload(body) {
   return null;
 }
 
-function getJwtSecret() {
+export function getJwtSecret() {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error("Missing JWT_SECRET env");
@@ -218,9 +218,9 @@ function getJwtSecret() {
   return jwtSecret;
 }
 
-function mapCustomer(row) {
+export function mapCustomer(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     fullName: row.full_name,
     phone: row.phone,
     email: row.email,
