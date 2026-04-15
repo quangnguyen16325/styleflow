@@ -9,7 +9,7 @@ export default function AdminLayout() {
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         <Header />
         <main style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ padding: '28px 32px', maxWidth: '1280px', margin: '0 auto' }}>
             <Outlet />
           </div>
         </main>
