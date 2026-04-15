@@ -50,24 +50,11 @@ These fields are added for workflow support, even if the public API does not exp
   - `GET /admin/orders/:id`
   - `PATCH /admin/orders/:id/status`
   - `GET /admin/orders/:id/delivery-events`
+- Address change APIs
+  - `POST /orders/:id/address-change-request`
+  - `POST /admin/orders/:id/address-change-decision`
 
 ## Next Backend Endpoints
-
-### Address Change Flow
-
-- `POST /orders/:id/address-change-request`
-  - customer-authenticated
-  - create request state in `orders.address_change_status`
-  - set `address_change_requested_at`
-  - if same city and allowed by current delivery status:
-    - update shipping snapshot directly
-  - if cross-city:
-    - mark request pending approval for n8n/admin flow
-
-- `POST /orders/:id/address-change-decision`
-  - admin-only
-  - approve / reject / reject_timeout
-  - update shipping snapshot and shipping fee if approved
 
 ### Refund Flow
 
@@ -132,6 +119,5 @@ These fields are added for workflow support, even if the public API does not exp
 
 1. Keep the current customer-facing and admin contract stable for web/mobile.
 2. Implement system-config admin APIs.
-3. Implement address-change request APIs.
-4. Implement refund request APIs.
-5. Add payment incident read/control APIs.
+3. Implement refund request APIs.
+4. Add payment incident read/control APIs.

@@ -634,6 +634,51 @@ Response `200`:
 ]
 ```
 
+### `POST /admin/orders/:id/address-change-decision`
+
+Approve or reject a pending address change request.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "decision": "approved",
+  "approvedShippingFee": 50000
+}
+```
+
+Allowed `decision` values:
+- `approved`
+- `rejected`
+- `rejected_timeout`
+
+Rules:
+- order must currently have `address_change_status = requested`
+- `approvedShippingFee` is optional and only used when `decision = approved`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "action": "approved"
+}
+```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "Order does not have a pending address change request"
+  }
+}
+```
+
 ### `GET /admin/issues`
 
 Get issue list for admin or staff.
@@ -939,6 +984,75 @@ Response `401`:
   "error": {
     "code": "UNAUTHORIZED",
     "message": "Authorization token is required"
+  }
+}
+```
+
+### `POST /orders/:id/address-change-request`
+
+Create an address change request for an existing order.
+
+Access rules:
+- authenticated customer only
+- customer can request change only for own order
+
+Request body using a saved address:
+
+```json
+{
+  "addressId": 2
+}
+```
+
+Request body using a new address:
+
+```json
+{
+  "newAddress": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "200 Dien Bien Phu",
+    "ward": "Ward 15",
+    "district": "Binh Thanh",
+    "city": "Da Nang",
+    "country": "Vietnam",
+    "postalCode": "550000"
+  },
+  "requestedShippingFee": 50000
+}
+```
+
+Rules:
+- use either `addressId` or `newAddress`, not both
+- same-city change is applied immediately
+- cross-city change is stored as pending approval for admin/n8n flow
+- order must still be in an address-change-eligible delivery stage
+
+Response `200` immediate update:
+
+```json
+{
+  "success": true,
+  "action": "updated_same_city"
+}
+```
+
+Response `200` pending approval:
+
+```json
+{
+  "success": true,
+  "action": "pending_approval"
+}
+```
+
+Response `409`:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "An address change request is already pending"
   }
 }
 ```

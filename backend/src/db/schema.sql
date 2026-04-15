@@ -114,6 +114,8 @@ CREATE TABLE IF NOT EXISTS orders (
     )
   ),
   address_change_requested_at TIMESTAMPTZ,
+  address_change_payload JSONB,
+  address_change_fee_delta NUMERIC(10, 2),
   shipping_fee_approved BOOLEAN NOT NULL DEFAULT FALSE,
   total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
   shipping_fee NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (shipping_fee >= 0),
@@ -352,6 +354,12 @@ ADD CONSTRAINT orders_address_change_status_check CHECK (
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS address_change_requested_at TIMESTAMPTZ;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS address_change_payload JSONB;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS address_change_fee_delta NUMERIC(10, 2);
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_fee_approved BOOLEAN NOT NULL DEFAULT FALSE;

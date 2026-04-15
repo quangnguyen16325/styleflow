@@ -385,6 +385,191 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/:id/address-change-request", requireAuth, async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const validationError = validateAddressChangePayload(req.body);
+  if (validationError) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: validationError,
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const orderResult = await client.query(
+      `
+        SELECT
+          id,
+          customer_id,
+          city,
+          delivery_status,
+          address_change_status,
+          shipping_fee
+        FROM orders
+        WHERE id = $1 AND customer_id = $2
+        LIMIT 1
+      `,
+      [orderId, req.authCustomer.id],
+    );
+
+    if (orderResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const orderRow = orderResult.rows[0];
+    if (!ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES.includes(orderRow.delivery_status)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Order is no longer eligible for address change",
+        },
+      });
+    }
+
+    if (orderRow.address_change_status === "requested") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: {
+          code: "CONFLICT",
+          message: "An address change request is already pending",
+        },
+      });
+    }
+
+    const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
+    const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
+    const isSameCity =
+      normalizeCityName(shippingSnapshot.city) === normalizeCityName(orderRow.city);
+
+    if (isSameCity) {
+      await client.query(
+        `
+          UPDATE orders
+          SET
+            customer_address_id = $2,
+            shipping_receiver_name = $3,
+            shipping_receiver_phone = $4,
+            shipping_address_line = $5,
+            shipping_ward = $6,
+            shipping_district = $7,
+            shipping_address = $8,
+            city = $9,
+            shipping_country = $10,
+            shipping_postal_code = $11,
+            address_change_status = 'approved',
+            address_change_requested_at = NOW(),
+            address_change_payload = NULL,
+            address_change_fee_delta = NULL,
+            shipping_fee_approved = TRUE,
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [
+          orderId,
+          shippingSnapshot.customerAddressId,
+          shippingSnapshot.receiverName,
+          shippingSnapshot.receiverPhone,
+          shippingSnapshot.addressLine,
+          shippingSnapshot.ward,
+          shippingSnapshot.district,
+          shippingSnapshot.fullAddress,
+          shippingSnapshot.city,
+          shippingSnapshot.country,
+          shippingSnapshot.postalCode,
+        ],
+      );
+
+      await client.query("COMMIT");
+      return res.json({
+        success: true,
+        action: "updated_same_city",
+      });
+    }
+
+    const requestedShippingFee =
+      req.body.requestedShippingFee == null ? null : Number(req.body.requestedShippingFee);
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          address_change_status = 'requested',
+          address_change_requested_at = NOW(),
+          address_change_payload = $2::jsonb,
+          address_change_fee_delta = $3,
+          shipping_fee_approved = FALSE,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [
+        orderId,
+        JSON.stringify({
+          customerAddressId: shippingSnapshot.customerAddressId,
+          receiverName: shippingSnapshot.receiverName,
+          receiverPhone: shippingSnapshot.receiverPhone,
+          addressLine: shippingSnapshot.addressLine,
+          ward: shippingSnapshot.ward,
+          district: shippingSnapshot.district,
+          city: shippingSnapshot.city,
+          country: shippingSnapshot.country,
+          postalCode: shippingSnapshot.postalCode,
+          fullAddress: shippingSnapshot.fullAddress,
+          requestedShippingFee,
+          currentShippingFee: Number(orderRow.shipping_fee),
+        }),
+        requestedShippingFee == null ? null : requestedShippingFee - Number(orderRow.shipping_fee),
+      ],
+    );
+
+    await client.query("COMMIT");
+    return res.json({
+      success: true,
+      action: "pending_approval",
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error(`POST /orders/${orderId}/address-change-request failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create address change request",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
 
 const listOrdersBaseQuery = `
@@ -476,6 +661,43 @@ function validateOrderPayload(body) {
     (Number.isNaN(Number(body.shippingFee)) || Number(body.shippingFee) < 0)
   ) {
     return "Shipping fee must be a non-negative number";
+  }
+
+  return null;
+}
+
+function validateAddressChangePayload(body) {
+  if (!body || typeof body !== "object") {
+    return "Request body is required";
+  }
+
+  const hasAddressId = body.addressId != null;
+  const hasNewAddress = body.newAddress != null;
+
+  if (hasAddressId && hasNewAddress) {
+    return "Use either addressId or newAddress, not both";
+  }
+
+  if (!hasAddressId && !hasNewAddress) {
+    return "addressId or newAddress is required";
+  }
+
+  if (hasAddressId && (!Number.isInteger(body.addressId) || body.addressId <= 0)) {
+    return "addressId must be a positive integer";
+  }
+
+  if (hasNewAddress) {
+    const addressError = validateShippingAddressPayload(body.newAddress);
+    if (addressError) {
+      return addressError;
+    }
+  }
+
+  if (
+    body.requestedShippingFee != null &&
+    (Number.isNaN(Number(body.requestedShippingFee)) || Number(body.requestedShippingFee) < 0)
+  ) {
+    return "requestedShippingFee must be a non-negative number";
   }
 
   return null;
@@ -618,6 +840,12 @@ function mapShippingAddressRecord(row) {
   };
 }
 
+function normalizeCityName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 function validateShippingAddressPayload(address) {
   if (!address || typeof address !== "object") {
     return "newAddress is invalid";
@@ -652,6 +880,8 @@ const ORDER_STATUSES = [
   "cancelled",
   "failed",
 ];
+
+const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = ["pending", "ready_to_ship", "retry_pending"];
 
 function isPrivilegedRole(role) {
   return role === "admin" || role === "staff";

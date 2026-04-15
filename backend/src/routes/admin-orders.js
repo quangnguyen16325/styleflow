@@ -254,6 +254,167 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
+router.post("/:id/address-change-decision", async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const decision = normalizeAddressChangeDecision(req.body?.decision);
+  if (!decision) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "A valid address change decision is required",
+      },
+    });
+  }
+
+  if (
+    req.body?.approvedShippingFee != null &&
+    (Number.isNaN(Number(req.body.approvedShippingFee)) || Number(req.body.approvedShippingFee) < 0)
+  ) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "approvedShippingFee must be a non-negative number",
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const orderResult = await client.query(
+      `
+        SELECT
+          id,
+          address_change_status,
+          address_change_payload,
+          shipping_fee
+        FROM orders
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [orderId],
+    );
+
+    if (orderResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const orderRow = orderResult.rows[0];
+    if (orderRow.address_change_status !== "requested") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: {
+          code: "CONFLICT",
+          message: "Order does not have a pending address change request",
+        },
+      });
+    }
+
+    if (decision === "approved") {
+      const payload = orderRow.address_change_payload;
+      if (!payload || typeof payload !== "object") {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          error: {
+            code: "CONFLICT",
+            message: "Pending address change payload is missing",
+          },
+        });
+      }
+
+      const approvedShippingFee =
+        req.body?.approvedShippingFee == null
+          ? Number(payload.requestedShippingFee ?? orderRow.shipping_fee)
+          : Number(req.body.approvedShippingFee);
+
+      await client.query(
+        `
+          UPDATE orders
+          SET
+            customer_address_id = $2,
+            shipping_receiver_name = $3,
+            shipping_receiver_phone = $4,
+            shipping_address_line = $5,
+            shipping_ward = $6,
+            shipping_district = $7,
+            shipping_address = $8,
+            city = $9,
+            shipping_country = $10,
+            shipping_postal_code = $11,
+            shipping_fee = $12,
+            address_change_status = 'approved',
+            address_change_payload = NULL,
+            address_change_fee_delta = NULL,
+            shipping_fee_approved = TRUE,
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [
+          orderId,
+          payload.customerAddressId,
+          payload.receiverName,
+          payload.receiverPhone,
+          payload.addressLine,
+          payload.ward,
+          payload.district,
+          payload.fullAddress,
+          payload.city,
+          payload.country,
+          payload.postalCode,
+          approvedShippingFee,
+        ],
+      );
+
+      await client.query("COMMIT");
+      return res.json({ success: true, action: "approved" });
+    }
+
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          address_change_status = $2,
+          address_change_payload = NULL,
+          address_change_fee_delta = NULL,
+          shipping_fee_approved = FALSE,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, decision],
+    );
+
+    await client.query("COMMIT");
+    return res.json({ success: true, action: decision });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`POST /admin/orders/${orderId}/address-change-decision failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to process address change decision",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
 
 const listOrdersBaseQuery = `
@@ -304,6 +465,15 @@ function normalizeStatusFilter(value) {
 
   const normalizedValue = value.trim().toLowerCase();
   return ORDER_STATUSES.includes(normalizedValue) ? normalizedValue : null;
+}
+
+function normalizeAddressChangeDecision(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return ADDRESS_CHANGE_DECISIONS.includes(normalizedValue) ? normalizedValue : null;
 }
 
 function mapOrderRow(row) {
@@ -363,3 +533,5 @@ const ORDER_STATUSES = [
   "cancelled",
   "failed",
 ];
+
+const ADDRESS_CHANGE_DECISIONS = ["approved", "rejected", "rejected_timeout"];
