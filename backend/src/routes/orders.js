@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuth } from "../middleware/require-auth.js";
 import { pool } from "../db/pool.js";
 
 const router = Router();
@@ -178,7 +179,7 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const validationError = validateOrderPayload(req.body);
   if (validationError) {
     return res.status(400).json({
@@ -189,27 +190,15 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const { customer, shippingAddress, city, items } = req.body;
+  const { items } = req.body;
   const shippingFee = Number(req.body.shippingFee ?? 0);
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    const customerResult = await client.query(
-      `
-        INSERT INTO customers (full_name, phone, email)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (phone) DO UPDATE
-        SET
-          full_name = EXCLUDED.full_name,
-          email = EXCLUDED.email,
-          updated_at = NOW()
-        RETURNING id, full_name, phone, email
-      `,
-      [customer.fullName.trim(), customer.phone.trim(), customer.email.trim().toLowerCase()],
-    );
-    const customerRow = customerResult.rows[0];
+    const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
+    const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
 
     const productIds = items.map((item) => item.productId);
     const productResult = await client.query(
@@ -249,17 +238,41 @@ router.post("/", async (req, res) => {
       `
         INSERT INTO orders (
           customer_id,
+          customer_address_id,
           status,
           total_amount,
           shipping_fee,
+          shipping_receiver_name,
+          shipping_receiver_phone,
+          shipping_address_line,
+          shipping_ward,
+          shipping_district,
           shipping_address,
           city,
+          shipping_country,
+          shipping_postal_code,
           payment_expires_at
         )
-        VALUES ($1, 'pending', $2, $3, $4, $5, NOW() + INTERVAL '24 hours')
+        VALUES (
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW() + INTERVAL '24 hours'
+        )
         RETURNING *
       `,
-      [customerRow.id, totalAmount, shippingFee, shippingAddress.trim(), city.trim()],
+      [
+        customerRow.id,
+        shippingSnapshot.customerAddressId,
+        totalAmount,
+        shippingFee,
+        shippingSnapshot.receiverName,
+        shippingSnapshot.receiverPhone,
+        shippingSnapshot.addressLine,
+        shippingSnapshot.ward,
+        shippingSnapshot.district,
+        shippingSnapshot.fullAddress,
+        shippingSnapshot.city,
+        shippingSnapshot.country,
+        shippingSnapshot.postalCode,
+      ],
     );
     const orderRow = orderResult.rows[0];
 
@@ -308,18 +321,21 @@ router.post("/", async (req, res) => {
     await client.query("COMMIT");
 
     return res.status(201).json({
-      id: orderRow.id,
+      id: Number(orderRow.id),
       status: orderRow.status,
       totalAmount: Number(orderRow.total_amount),
       shippingFee: Number(orderRow.shipping_fee),
       paymentExpiresAt: orderRow.payment_expires_at,
       failCount: orderRow.fail_count,
+      customerAddressId:
+        orderRow.customer_address_id == null ? null : Number(orderRow.customer_address_id),
       shippingAddress: orderRow.shipping_address,
       city: orderRow.city,
+      shipping: mapShippingRow(orderRow),
       createdAt: orderRow.created_at,
       updatedAt: orderRow.updated_at,
       customer: {
-        id: customerRow.id,
+        id: Number(customerRow.id),
         fullName: customerRow.full_name,
         phone: customerRow.phone,
         email: customerRow.email,
@@ -360,8 +376,16 @@ const listOrdersBaseQuery = `
     o.shipping_fee,
     o.payment_expires_at,
     o.fail_count,
+    o.customer_address_id,
+    o.shipping_receiver_name,
+    o.shipping_receiver_phone,
+    o.shipping_address_line,
+    o.shipping_ward,
+    o.shipping_district,
     o.shipping_address,
     o.city,
+    o.shipping_country,
+    o.shipping_postal_code,
     o.created_at,
     o.updated_at,
     c.id AS customer_id,
@@ -390,28 +414,28 @@ function validateOrderPayload(body) {
     return "Request body is required";
   }
 
-  if (!body.customer || typeof body.customer !== "object") {
-    return "Customer information is required";
+  const hasAddressId = body.addressId != null;
+  const hasNewAddress = body.newAddress != null;
+
+  if (hasAddressId && hasNewAddress) {
+    return "Use either addressId or newAddress, not both";
   }
 
-  if (!body.customer.fullName?.trim()) {
-    return "Customer fullName is required";
+  if (hasAddressId) {
+    if (!Number.isInteger(body.addressId) || body.addressId <= 0) {
+      return "addressId must be a positive integer";
+    }
   }
 
-  if (!body.customer.phone?.trim()) {
-    return "Customer phone is required";
+  if (hasNewAddress) {
+    const addressError = validateShippingAddressPayload(body.newAddress);
+    if (addressError) {
+      return addressError;
+    }
   }
 
-  if (!body.customer.email?.trim()) {
-    return "Customer email is required";
-  }
-
-  if (!body.shippingAddress?.trim()) {
-    return "Shipping address is required";
-  }
-
-  if (!body.city?.trim()) {
-    return "City is required";
+  if (!hasAddressId && !hasNewAddress) {
+    return "Shipping information is required";
   }
 
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -440,18 +464,20 @@ function validateOrderPayload(body) {
 
 function mapOrderRow(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     status: row.status,
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
+    customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
     shippingAddress: row.shipping_address,
     city: row.city,
+    shipping: mapShippingRow(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     customer: {
-      id: row.customer_id,
+      id: Number(row.customer_id),
       fullName: row.full_name,
       phone: row.phone,
       email: row.email,
@@ -478,7 +504,124 @@ function mapOrderItemRow(item) {
   };
 }
 
+function mapShippingRow(row) {
+  return {
+    receiverName: row.shipping_receiver_name,
+    receiverPhone: row.shipping_receiver_phone,
+    addressLine: row.shipping_address_line,
+    ward: row.shipping_ward,
+    district: row.shipping_district,
+    city: row.city,
+    country: row.shipping_country,
+    postalCode: row.shipping_postal_code,
+    fullAddress: row.shipping_address,
+  };
+}
+
 class ValidationError extends Error {}
+
+async function resolveAuthenticatedCustomerForOrder(client, customerId) {
+  const { rows } = await client.query(
+    `
+      SELECT id, full_name, phone, email
+      FROM customers
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [customerId],
+  );
+
+  if (rows.length === 0) {
+    throw new ValidationError("Customer not found");
+  }
+
+  return rows[0];
+}
+
+async function resolveShippingSnapshot(client, body, customerRow) {
+  if (body.addressId != null) {
+    const { rows } = await client.query(
+      `
+        SELECT
+          id,
+          customer_id,
+          receiver_name,
+          receiver_phone,
+          address_line,
+          ward,
+          district,
+          city,
+          country,
+          postal_code
+        FROM customer_addresses
+        WHERE id = $1 AND customer_id = $2
+        LIMIT 1
+      `,
+      [body.addressId, customerRow.id],
+    );
+
+    if (rows.length === 0) {
+      throw new ValidationError("Address not found for customer");
+    }
+
+    return mapShippingAddressRecord(rows[0]);
+  }
+
+  if (body.newAddress) {
+    return mapShippingAddressRecord({
+      id: null,
+      receiver_name: body.newAddress.receiverName.trim(),
+      receiver_phone: body.newAddress.receiverPhone.trim(),
+      address_line: body.newAddress.addressLine.trim(),
+      ward: body.newAddress.ward?.trim() || null,
+      district: body.newAddress.district?.trim() || null,
+      city: body.newAddress.city.trim(),
+      country: body.newAddress.country?.trim() || "Vietnam",
+      postal_code: body.newAddress.postalCode?.trim() || null,
+    });
+  }
+}
+
+function mapShippingAddressRecord(row) {
+  const parts = [row.address_line, row.ward, row.district, row.city, row.country].filter(Boolean);
+
+  return {
+    customerAddressId: row.id,
+    receiverName: row.receiver_name,
+    receiverPhone: row.receiver_phone,
+    addressLine: row.address_line,
+    ward: row.ward,
+    district: row.district,
+    city: row.city,
+    country: row.country,
+    postalCode: row.postal_code,
+    fullAddress: parts.join(", "),
+  };
+}
+
+function validateShippingAddressPayload(address) {
+  if (!address || typeof address !== "object") {
+    return "newAddress is invalid";
+  }
+
+  if (!address.receiverName?.trim()) {
+    return "newAddress.receiverName is required";
+  }
+
+  if (!address.receiverPhone?.trim()) {
+    return "newAddress.receiverPhone is required";
+  }
+
+  if (!address.addressLine?.trim()) {
+    return "newAddress.addressLine is required";
+  }
+
+  if (!address.city?.trim()) {
+    return "newAddress.city is required";
+  }
+
+  return null;
+}
 
 const ORDER_STATUSES = [
   "pending",

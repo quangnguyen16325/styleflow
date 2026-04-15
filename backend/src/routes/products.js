@@ -91,7 +91,7 @@ export default router;
 
 function mapProductRow(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     sku: row.sku,
     name: row.name,
     basePrice: Number(row.base_price),

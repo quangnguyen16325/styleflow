@@ -1,4 +1,4 @@
-# API Contract v0.3
+# API Contract v0.5
 
 Base URL:
 - Production: `https://api.ecloria.co.uk`
@@ -7,6 +7,9 @@ Base URL:
 Content-Type:
 - Request: `application/json`
 - Response: `application/json`
+
+Authorization:
+- Authenticated endpoints require `Authorization: Bearer <token>`
 
 ## Response Rules
 
@@ -75,6 +78,59 @@ Common error codes:
 }
 ```
 
+## Customer Address Model
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+## Shipping Snapshot Model
+
+```json
+{
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+}
+```
+
+## Issue Model
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "productId": null,
+  "type": "PAYMENT_ERROR",
+  "severity": "high",
+  "status": "open",
+  "logHistory": [],
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
 ## Auth Response Model
 
 ```json
@@ -104,8 +160,20 @@ Common error codes:
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
+  "customerAddressId": 1,
   "shippingAddress": "123 Nguyen Trai, HCMC",
   "city": "Ho Chi Minh City",
+  "shipping": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+  },
   "customer": {
     "id": 1,
     "fullName": "Nguyen Van A",
@@ -266,6 +334,406 @@ Response `400`:
 }
 ```
 
+### `GET /me`
+
+Get the authenticated customer profile.
+
+Response `200`:
+
+```json
+{
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com",
+    "role": "customer",
+    "abuseScore": 0,
+    "isBlacklisted": false,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+}
+```
+
+### `GET /me/addresses`
+
+Get all addresses of the authenticated customer.
+
+Response `200`:
+- array of `Customer Address Model`
+
+### `POST /me/addresses`
+
+Create a new address for the authenticated customer.
+
+Response `201`:
+- `Customer Address Model`
+
+### `PATCH /me/addresses/:addressId`
+
+Update one address of the authenticated customer.
+
+Response `200`:
+- `Customer Address Model`
+
+### `DELETE /me/addresses/:addressId`
+
+Delete one address of the authenticated customer.
+
+Response `204`:
+- empty body
+
+### `POST /delivery-callback`
+
+Process delivery partner callback.
+
+Request body:
+
+```json
+{
+  "orderId": 12,
+  "status": "FAILED",
+  "reason": "CUSTOMER_UNREACHABLE",
+  "partner": "GHN",
+  "externalEventId": "ev_123"
+}
+```
+
+Allowed `status`:
+- `FAILED`
+- `DELIVERED`
+- `IN_TRANSIT`
+- `HANDOVER`
+
+Rules:
+- `orderId`: required, positive integer
+- `reason`: required when `status = FAILED`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "action": "retry_pending"
+}
+```
+
+Other possible `action` values:
+- `delivered`
+- `returning`
+- `updated`
+
+### `GET /admin/issues`
+
+Get issue list for admin or staff.
+
+Query params:
+- `status` optional
+- `severity` optional
+- `type` optional
+
+Response `200`:
+- array of `Issue Model`
+
+### `GET /admin/issues/:id`
+
+Get one issue by id for admin or staff.
+
+Response `200`:
+- `Issue Model`
+
+### `PATCH /admin/issues/:id/status`
+
+Update issue status for admin or staff.
+
+Request body:
+
+```json
+{
+  "status": "investigating"
+}
+```
+
+Allowed `status`:
+- `open`
+- `investigating`
+- `resolved`
+- `ignored`
+
+Response `200`:
+- `Issue Model`
+
+### `POST /payment-events`
+
+Process payment incident or failover signal.
+
+Request body:
+
+```json
+{
+  "source": "payment_service",
+  "gateway": "PAYPAL",
+  "httpStatus": 503,
+  "errorCode": "SERVICE_UNAVAILABLE",
+  "orderId": 12,
+  "transactionRef": "txn_123"
+}
+```
+
+Allowed `source`:
+- `payment_service`
+- `app_client`
+- `schedule`
+
+Response `200`:
+
+```json
+{
+  "status": "outage_suspected",
+  "action": "logged",
+  "paymentStatus": "payment_unknown"
+}
+```
+
+### `GET /customers/:customerId/addresses`
+
+Get all addresses for one customer.
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 1,
+    "customerId": 1,
+    "label": "home",
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "isDefault": true,
+    "createdAt": "2026-04-02T10:00:00.000Z",
+    "updatedAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Customer id must be a positive integer"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Customer not found"
+  }
+}
+```
+
+### `GET /customers/:customerId/addresses/:addressId`
+
+Get one address by id for one customer.
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Address id must be a positive integer"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Address not found"
+  }
+}
+```
+
+### `POST /customers/:customerId/addresses`
+
+Create a new address for one customer.
+
+Request body:
+
+```json
+{
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true
+}
+```
+
+Rules:
+- `receiverName`: required
+- `receiverPhone`: required
+- `addressLine`: required
+- `city`: required
+- `label`: optional, defaults to `home`
+- `country`: optional, defaults to `Vietnam`
+- `isDefault`: optional boolean
+
+Response `201`:
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
+### `PATCH /customers/:customerId/addresses/:addressId`
+
+Update one address for one customer.
+
+Request body:
+
+```json
+{
+  "label": "office",
+  "receiverPhone": "0911111111",
+  "isDefault": true
+}
+```
+
+Rules:
+- request body must include at least one address field
+- `isDefault = true` will unset other default addresses of the same customer
+- if the current default address is deleted or unset, backend assigns another existing address as default when possible
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "customerId": 1,
+  "label": "office",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0911111111",
+  "addressLine": "123 Nguyen Trai",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": "2026-04-02T10:05:00.000Z"
+}
+```
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "At least one address field is required"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Address not found"
+  }
+}
+```
+
+### `DELETE /customers/:customerId/addresses/:addressId`
+
+Delete one address for one customer.
+
+Response `204`:
+- empty body
+
+Response `400`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Address id must be a positive integer"
+  }
+}
+```
+
+Response `404`:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Address not found"
+  }
+}
+```
+
 ### `GET /products`
 
 Get the product list.
@@ -334,19 +802,37 @@ Response `400`:
 
 ### `POST /orders`
 
-Create a new order.
+Create a new order for the authenticated customer.
 
-Request body:
+Request body using a saved address:
 
 ```json
 {
-  "customer": {
-    "fullName": "Nguyen Van A",
-    "phone": "0901234567",
-    "email": "nguyenvana@example.com"
+  "addressId": 1,
+  "shippingFee": 20000,
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2
+    }
+  ]
+}
+```
+
+Request body using a new address:
+
+```json
+{
+  "newAddress": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000"
   },
-  "shippingAddress": "123 Nguyen Trai, HCMC",
-  "city": "Ho Chi Minh City",
   "shippingFee": 20000,
   "items": [
     {
@@ -358,17 +844,20 @@ Request body:
 ```
 
 Rules:
-- `customer.fullName`: required, string
-- `customer.phone`: required, string
-- `customer.email`: required, string
-- `shippingAddress`: required, string
-- `city`: required, string
+- authenticated endpoint only
+- customer identity is taken from the JWT token
+- use either `addressId` or `newAddress`
+- do not send both `addressId` and `newAddress`
+- `newAddress.receiverName`: required
+- `newAddress.receiverPhone`: required
+- `newAddress.addressLine`: required
+- `newAddress.city`: required
 - `shippingFee`: optional, non-negative number
 - `items`: required, array, minimum 1 item
 - `productId`: required
 - `quantity`: required, integer, greater than 0
 - `priceAtPurchase` and `totalAmount` are computed by the backend
-- backend creates or updates the customer by phone
+- when `addressId` is used, it must belong to the authenticated customer
 
 Response `201`:
 
@@ -380,8 +869,20 @@ Response `201`:
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
+  "customerAddressId": 1,
   "shippingAddress": "123 Nguyen Trai, HCMC",
   "city": "Ho Chi Minh City",
+  "shipping": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+  },
   "customer": {
     "id": 1,
     "fullName": "Nguyen Van A",
@@ -402,7 +903,7 @@ Response `201`:
 ```
 
 Side effects:
-- backend creates or updates the customer by phone
+- backend copies a shipping snapshot into the order from `addressId` or `newAddress`
 - backend increases `inventory.reserved_qty`
 - backend creates an `inventory_transactions` record with type `RESERVE`
 
@@ -413,6 +914,17 @@ Response `400`:
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "Items must not be empty"
+  }
+}
+```
+
+Response `401`:
+
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authorization token is required"
   }
 }
 ```
@@ -616,3 +1128,12 @@ Response `404`:
 - `GET /products/:id` and `GET /orders/:id` require a positive integer id
 - `GET /orders` supports optional `status` filtering
 - Changing an order status to `failed` automatically creates an `issue` record for issue tracking and n8n automation
+
+## Planned Next Scope
+
+The following backend capabilities are planned for the next phase and are not implemented yet:
+- delivery callback webhook
+- address change request workflow
+- refund request workflow
+- payment failover and incident tracking APIs
+- admin issue management APIs
