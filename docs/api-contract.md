@@ -11,6 +11,24 @@ Content-Type:
 Authorization:
 - Authenticated endpoints require `Authorization: Bearer <token>`
 
+## Client Compatibility Policy
+
+The `Customer-Facing` and `Admin` sections below are the active contract for the current web admin and mobile work.
+
+Until both clients finish the tasks already assigned:
+
+- do not remove existing endpoints from these sections
+- do not rename existing request fields
+- do not rename existing response fields
+- do not change field types
+- do not move customer-facing behavior into different paths
+- future backend work must be additive:
+  - add new optional fields only
+  - add new endpoints under `/admin/*` or internal webhook paths
+  - use new endpoints for new workflows instead of breaking current ones
+
+If a breaking change is ever required later, it must go through a new path or an explicit versioned contract.
+
 ## Response Rules
 
 ### Success
@@ -131,6 +149,26 @@ Common error codes:
 }
 ```
 
+## Delivery Event Model
+
+```json
+{
+  "id": 1,
+  "orderId": 12,
+  "partner": "GHN",
+  "externalEventId": "ev_001",
+  "status": "FAILED",
+  "reason": "CUSTOMER_UNREACHABLE",
+  "payload": {
+    "orderId": 12,
+    "status": "FAILED",
+    "reason": "CUSTOMER_UNREACHABLE",
+    "partner": "GHN"
+  },
+  "createdAt": "2026-04-02T10:00:00.000Z"
+}
+```
+
 ## Auth Response Model
 
 ```json
@@ -194,6 +232,8 @@ Common error codes:
 ```
 
 ## Endpoints
+
+### Customer-Facing
 
 ### `GET /health`
 
@@ -384,45 +424,215 @@ Delete one address of the authenticated customer.
 Response `204`:
 - empty body
 
-### `POST /delivery-callback`
+### Admin
 
-Process delivery partner callback.
+Preferred admin order routes:
+- `GET /admin/orders`
+- `GET /admin/orders/:id`
+- `PATCH /admin/orders/:id/status`
+- `GET /admin/orders/:id/delivery-events`
 
-Request body:
+Compatibility note:
+- existing admin clients may continue using `PATCH /orders/:id/status`
+- new admin work should prefer the `/admin/orders/*` routes
+
+### `GET /admin/orders`
+
+Get admin order list.
+
+Query params:
+- `status` optional
+- allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
+Access rules:
+- admin/staff only
+
+Response `200`:
 
 ```json
-{
-  "orderId": 12,
-  "status": "FAILED",
-  "reason": "CUSTOMER_UNREACHABLE",
-  "partner": "GHN",
-  "externalEventId": "ev_123"
-}
+[
+  {
+    "id": 1,
+    "status": "pending",
+    "totalAmount": 418000,
+    "shippingFee": 20000,
+    "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+    "failCount": 0,
+    "customerAddressId": 1,
+    "shippingAddress": "123 Nguyen Trai, HCMC",
+    "city": "Ho Chi Minh City",
+    "shipping": {
+      "receiverName": "Nguyen Van A",
+      "receiverPhone": "0901234567",
+      "addressLine": "123 Nguyen Trai",
+      "ward": "Ward 2",
+      "district": "District 5",
+      "city": "Ho Chi Minh City",
+      "country": "Vietnam",
+      "postalCode": "700000",
+      "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+    },
+    "customer": {
+      "id": 1,
+      "fullName": "Nguyen Van A",
+      "phone": "0901234567",
+      "email": "nguyenvana@example.com"
+    },
+    "items": [
+      {
+        "id": 1,
+        "productId": 1,
+        "quantity": 2,
+        "priceAtPurchase": 199000
+      }
+    ],
+    "createdAt": "2026-04-02T10:15:00.000Z",
+    "updatedAt": "2026-04-02T10:15:00.000Z"
+  }
+]
 ```
 
-Allowed `status`:
-- `FAILED`
-- `DELIVERED`
-- `IN_TRANSIT`
-- `HANDOVER`
+### `GET /admin/orders/:id`
 
-Rules:
-- `orderId`: required, positive integer
-- `reason`: required when `status = FAILED`
+Get one order by id for admin/staff.
+
+Access rules:
+- admin/staff only
 
 Response `200`:
 
 ```json
 {
-  "success": true,
-  "action": "retry_pending"
+  "id": 1,
+  "status": "pending",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "customerAddressId": 1,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "shipping": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "123 Nguyen Trai",
+    "ward": "Ward 2",
+    "district": "District 5",
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "postalCode": "700000",
+    "fullAddress": "123 Nguyen Trai, Ward 2, District 5, Ho Chi Minh City, Vietnam"
+  },
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "quantity": 2,
+      "priceAtPurchase": 199000
+    }
+  ],
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:15:00.000Z"
 }
 ```
 
-Other possible `action` values:
-- `delivered`
-- `returning`
-- `updated`
+### `PATCH /admin/orders/:id/status`
+
+Update order status through the admin-specific path.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "status": "processing"
+}
+```
+
+Allowed status values:
+- `pending`
+- `awaiting_payment`
+- `paid`
+- `processing`
+- `shipping`
+- `completed`
+- `cancelled`
+- `failed`
+
+Side effects:
+- when status changes to `failed`, backend automatically creates an `issue` record with:
+  - `type = ORDER_FAILED`
+  - `severity = high`
+  - `status = open`
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "status": "processing",
+  "totalAmount": 418000,
+  "shippingFee": 20000,
+  "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
+  "failCount": 0,
+  "customerAddressId": 1,
+  "shippingAddress": "123 Nguyen Trai, HCMC",
+  "city": "Ho Chi Minh City",
+  "customer": {
+    "id": 1,
+    "fullName": "Nguyen Van A",
+    "phone": "0901234567",
+    "email": "nguyenvana@example.com"
+  },
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "quantity": 2,
+      "priceAtPurchase": 199000
+    }
+  ],
+  "createdAt": "2026-04-02T10:15:00.000Z",
+  "updatedAt": "2026-04-02T10:20:00.000Z"
+}
+```
+
+### `GET /admin/orders/:id/delivery-events`
+
+Get delivery callback history for one order.
+
+Access rules:
+- admin/staff only
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 1,
+    "orderId": 12,
+    "partner": "GHN",
+    "externalEventId": "ev_001",
+    "status": "FAILED",
+    "reason": "CUSTOMER_UNREACHABLE",
+    "payload": {
+      "orderId": 12,
+      "status": "FAILED",
+      "reason": "CUSTOMER_UNREACHABLE",
+      "partner": "GHN"
+    },
+    "createdAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
 
 ### `GET /admin/issues`
 
@@ -464,6 +674,48 @@ Allowed `status`:
 Response `200`:
 - `Issue Model`
 
+### Internal / Integration
+
+### `POST /delivery-callback`
+
+Process delivery partner callback.
+
+Request body:
+
+```json
+{
+  "orderId": 12,
+  "status": "FAILED",
+  "reason": "CUSTOMER_UNREACHABLE",
+  "partner": "GHN",
+  "externalEventId": "ev_123"
+}
+```
+
+Allowed `status`:
+- `FAILED`
+- `DELIVERED`
+- `IN_TRANSIT`
+- `HANDOVER`
+
+Rules:
+- `orderId`: required, positive integer
+- `reason`: required when `status = FAILED`
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "action": "retry_pending"
+}
+```
+
+Other possible `action` values:
+- `delivered`
+- `returning`
+- `updated`
+
 ### `POST /payment-events`
 
 Process payment incident or failover signal.
@@ -493,244 +745,6 @@ Response `200`:
   "status": "outage_suspected",
   "action": "logged",
   "paymentStatus": "payment_unknown"
-}
-```
-
-### `GET /customers/:customerId/addresses`
-
-Get all addresses for one customer.
-
-Response `200`:
-
-```json
-[
-  {
-    "id": 1,
-    "customerId": 1,
-    "label": "home",
-    "receiverName": "Nguyen Van A",
-    "receiverPhone": "0901234567",
-    "addressLine": "123 Nguyen Trai",
-    "ward": "Ward 2",
-    "district": "District 5",
-    "city": "Ho Chi Minh City",
-    "country": "Vietnam",
-    "postalCode": "700000",
-    "isDefault": true,
-    "createdAt": "2026-04-02T10:00:00.000Z",
-    "updatedAt": "2026-04-02T10:00:00.000Z"
-  }
-]
-```
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Customer id must be a positive integer"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Customer not found"
-  }
-}
-```
-
-### `GET /customers/:customerId/addresses/:addressId`
-
-Get one address by id for one customer.
-
-Response `200`:
-
-```json
-{
-  "id": 1,
-  "customerId": 1,
-  "label": "home",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0901234567",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true,
-  "createdAt": "2026-04-02T10:00:00.000Z",
-  "updatedAt": "2026-04-02T10:00:00.000Z"
-}
-```
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Address id must be a positive integer"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Address not found"
-  }
-}
-```
-
-### `POST /customers/:customerId/addresses`
-
-Create a new address for one customer.
-
-Request body:
-
-```json
-{
-  "label": "home",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0901234567",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true
-}
-```
-
-Rules:
-- `receiverName`: required
-- `receiverPhone`: required
-- `addressLine`: required
-- `city`: required
-- `label`: optional, defaults to `home`
-- `country`: optional, defaults to `Vietnam`
-- `isDefault`: optional boolean
-
-Response `201`:
-
-```json
-{
-  "id": 1,
-  "customerId": 1,
-  "label": "home",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0901234567",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true,
-  "createdAt": "2026-04-02T10:00:00.000Z",
-  "updatedAt": "2026-04-02T10:00:00.000Z"
-}
-```
-
-### `PATCH /customers/:customerId/addresses/:addressId`
-
-Update one address for one customer.
-
-Request body:
-
-```json
-{
-  "label": "office",
-  "receiverPhone": "0911111111",
-  "isDefault": true
-}
-```
-
-Rules:
-- request body must include at least one address field
-- `isDefault = true` will unset other default addresses of the same customer
-- if the current default address is deleted or unset, backend assigns another existing address as default when possible
-
-Response `200`:
-
-```json
-{
-  "id": 1,
-  "customerId": 1,
-  "label": "office",
-  "receiverName": "Nguyen Van A",
-  "receiverPhone": "0911111111",
-  "addressLine": "123 Nguyen Trai",
-  "ward": "Ward 2",
-  "district": "District 5",
-  "city": "Ho Chi Minh City",
-  "country": "Vietnam",
-  "postalCode": "700000",
-  "isDefault": true,
-  "createdAt": "2026-04-02T10:00:00.000Z",
-  "updatedAt": "2026-04-02T10:05:00.000Z"
-}
-```
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "At least one address field is required"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Address not found"
-  }
-}
-```
-
-### `DELETE /customers/:customerId/addresses/:addressId`
-
-Delete one address for one customer.
-
-Response `204`:
-- empty body
-
-Response `400`:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Address id must be a positive integer"
-  }
-}
-```
-
-Response `404`:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Address not found"
-  }
 }
 ```
 
@@ -937,6 +951,10 @@ Query params:
 - `status` optional
 - allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
 
+Access rules:
+- customer: only sees own orders
+- admin/staff: sees all orders
+
 Response `400`:
 
 ```json
@@ -984,6 +1002,10 @@ Response `200`:
 ### `GET /orders/:id`
 
 Get one order by id.
+
+Access rules:
+- customer: only own order
+- admin/staff: any order
 
 Response `200`:
 
@@ -1041,6 +1063,9 @@ Response `400`:
 ### `PATCH /orders/:id/status`
 
 Update order status.
+
+Access rules:
+- admin/staff only
 
 Request body:
 
@@ -1132,8 +1157,7 @@ Response `404`:
 ## Planned Next Scope
 
 The following backend capabilities are planned for the next phase and are not implemented yet:
-- delivery callback webhook
 - address change request workflow
 - refund request workflow
-- payment failover and incident tracking APIs
-- admin issue management APIs
+- system-config admin APIs
+- payment failover control APIs

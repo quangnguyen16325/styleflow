@@ -3,6 +3,7 @@ import cors from "cors";
 
 import { migrate } from "./db/migrate.js";
 import { attachAuthCustomerId, requireAuth, requireRole } from "./middleware/require-auth.js";
+import adminOrdersRouter from "./routes/admin-orders.js";
 import authRouter from "./routes/auth.js";
 import addressesRouter from "./routes/addresses.js";
 import deliveryRouter from "./routes/delivery.js";
@@ -30,6 +31,7 @@ app.use("/me", requireAuth, meRouter);
 app.use("/me/addresses", requireAuth, attachAuthCustomerId, addressesRouter);
 app.use("/", deliveryRouter);
 app.use("/", paymentsRouter);
+app.use("/admin/orders", requireAuth, requireRole("admin", "staff"), adminOrdersRouter);
 app.use("/admin/issues", requireAuth, requireRole("admin", "staff"), issuesRouter);
 app.use("/customers/:customerId/addresses", addressesRouter);
 app.use("/products", productsRouter);

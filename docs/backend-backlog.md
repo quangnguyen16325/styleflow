@@ -30,22 +30,28 @@ The backend schema now includes new persistence for the next n8n-focused phase:
 
 These fields are added for workflow support, even if the public API does not expose them yet.
 
-## Next Backend Endpoints
-
-### Delivery Failed Flow
+## Already Implemented
 
 - `POST /delivery-callback`
-  - payload: `{ orderId, status, reason, partner, externalEventId? }`
-  - validate order existence
-  - append `delivery_events`
-  - update `orders.delivery_status`
-  - increment `orders.delivery_fail_count`
-  - update `orders.last_delivery_failed_reason`
-  - if fail count < 3:
-    - set `orders.delivery_status = 'retry_pending'`
-  - if fail count >= 3:
-    - set `orders.delivery_status = 'returning'`
-    - create `issues` record with type `DELIVERY_FAILED`
+  - validates order existence
+  - appends `delivery_events`
+  - updates `orders.delivery_status`
+  - increments `orders.delivery_fail_count`
+  - updates `orders.last_delivery_failed_reason`
+- `POST /payment-events`
+  - appends `payment_logs`
+  - updates order payment fields when `orderId` is present
+- Admin issue APIs
+  - `GET /admin/issues`
+  - `GET /admin/issues/:id`
+  - `PATCH /admin/issues/:id/status`
+- Admin order APIs
+  - `GET /admin/orders`
+  - `GET /admin/orders/:id`
+  - `PATCH /admin/orders/:id/status`
+  - `GET /admin/orders/:id/delivery-events`
+
+## Next Backend Endpoints
 
 ### Address Change Flow
 
@@ -72,12 +78,7 @@ These fields are added for workflow support, even if the public API does not exp
   - create issue or refund record
   - update abuse metrics or pass enough data for n8n scoring
 
-### Payment Failover Flow
-
-- `POST /payment-events`
-  - normalized payment service error event intake
-  - append `payment_logs`
-  - update `orders.payment_status` if order-specific
+### Payment Failover Control Flow
 
 - `GET /admin/payment-incidents/active`
   - admin-only
@@ -100,15 +101,16 @@ These fields are added for workflow support, even if the public API does not exp
 - `DELETE /me/addresses/:id`
 - `POST /orders`
 - `GET /orders`
-  - should eventually return only the authenticated customer's orders
+  - returns only the authenticated customer's orders
 - `GET /orders/:id`
-  - should eventually allow only own order access
+  - allows only own order access
 
 ### Admin / Staff
 
 - `GET /admin/orders`
 - `GET /admin/orders/:id`
 - `PATCH /admin/orders/:id/status`
+- `GET /admin/orders/:id/delivery-events`
 - `GET /admin/issues`
 - `GET /admin/issues/:id`
 - `PATCH /admin/issues/:id/status`
@@ -119,6 +121,8 @@ These fields are added for workflow support, even if the public API does not exp
 
 - customer checkout is authenticated-only
 - every order must belong to one registered customer
+- the current `Customer-Facing` and `Admin` sections in `docs/api-contract.md` are frozen for the ongoing web/mobile work
+- future backend work must be additive and must not break the active client contract
 - shipping snapshot on `orders` is immutable history after creation, except through explicit address-change flow
 - `customer_addresses` is only an address book, not order history
 - payment gateway failover state should live in `system_config`
@@ -126,11 +130,8 @@ These fields are added for workflow support, even if the public API does not exp
 
 ## Suggested Implementation Order
 
-1. Add role-based authorization for customer/admin/staff.
-2. Restrict customer order queries to own orders.
-3. Implement `POST /delivery-callback`.
-4. Implement admin issue APIs.
-5. Implement `POST /payment-events`.
-6. Implement system-config admin APIs.
-7. Implement address-change request APIs.
-8. Implement refund request APIs.
+1. Keep the current customer-facing and admin contract stable for web/mobile.
+2. Implement system-config admin APIs.
+3. Implement address-change request APIs.
+4. Implement refund request APIs.
+5. Add payment incident read/control APIs.

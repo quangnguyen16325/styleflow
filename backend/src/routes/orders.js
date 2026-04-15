@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/require-auth.js";
+import { requireAuth, requireRole } from "../middleware/require-auth.js";
 import { pool } from "../db/pool.js";
 
 const router = Router();
 
-router.get("/", async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   const normalizedStatus = normalizeStatusFilter(req.query.status);
   if (req.query.status != null && !normalizedStatus) {
     return res.status(400).json({
@@ -16,8 +16,20 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    const whereClause = normalizedStatus ? " WHERE o.status = $1" : "";
-    const params = normalizedStatus ? [normalizedStatus] : [];
+    const conditions = [];
+    const params = [];
+
+    if (!isPrivilegedRole(req.authCustomer.role)) {
+      params.push(req.authCustomer.id);
+      conditions.push(`o.customer_id = $${params.length}`);
+    }
+
+    if (normalizedStatus) {
+      params.push(normalizedStatus);
+      conditions.push(`o.status = $${params.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await pool.query(
       `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
       params,
@@ -35,7 +47,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireAuth, async (req, res) => {
   const orderId = Number(req.params.id);
   if (!Number.isInteger(orderId) || orderId <= 0) {
     return res.status(400).json({
@@ -47,9 +59,16 @@ router.get("/:id", async (req, res) => {
   }
 
   try {
+    const params = [orderId];
+    let accessClause = "";
+    if (!isPrivilegedRole(req.authCustomer.role)) {
+      params.push(req.authCustomer.id);
+      accessClause = ` AND o.customer_id = $${params.length}`;
+    }
+
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
-      [orderId],
+      `${listOrdersBaseQuery} WHERE o.id = $1${accessClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      params,
     );
 
     if (rows.length === 0) {
@@ -73,7 +92,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", requireAuth, requireRole("admin", "staff"), async (req, res) => {
   const orderId = Number(req.params.id);
   if (!Number.isInteger(orderId) || orderId <= 0) {
     return res.status(400).json({
@@ -633,3 +652,7 @@ const ORDER_STATUSES = [
   "cancelled",
   "failed",
 ];
+
+function isPrivilegedRole(role) {
+  return role === "admin" || role === "staff";
+}
