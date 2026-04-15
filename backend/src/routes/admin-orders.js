@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
+import { applyOrderLifecycleTransition } from "./order-lifecycle.js";
 
 const router = Router();
 
@@ -204,6 +205,8 @@ router.patch("/:id/status", async (req, res) => {
       `,
       [orderId, nextStatus],
     );
+
+    await applyOrderLifecycleTransition(client, orderId, previousStatus, nextStatus);
 
     if (previousStatus !== "failed" && nextStatus === "failed") {
       await client.query(

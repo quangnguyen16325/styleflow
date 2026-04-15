@@ -64,18 +64,15 @@ These fields are added for workflow support. Some of them are already exposed th
   - `PATCH /admin/system-config`
 - Payment incident summary API
   - `GET /admin/payment-incidents/active`
+- Payment log APIs
+  - `GET /admin/payment-logs`
 
 ## Next Backend Endpoints
 
-### Payment Failover Control Follow-ups
+### Inventory Lifecycle Follow-ups
 
-- `GET /admin/payment-logs`
-  - admin-only
-  - filter by `gateway`, `orderId`, `transactionRef`, `incidentId`
-
-- idempotent `POST /payment-events`
-  - support `externalEventId`
-  - avoid duplicated logs for repeated callbacks
+- reconcile lifecycle rules for more delivery/payment edge cases
+- tighten duplicate protection for `SALE`, `EXPIRED_CANCEL`, and `RETURN`
 
 ## Role and Access Backlog
 
@@ -107,6 +104,7 @@ These fields are added for workflow support. Some of them are already exposed th
 - `GET /admin/system-config`
 - `PATCH /admin/system-config`
 - `GET /admin/payment-incidents/active`
+- `GET /admin/payment-logs`
 
 ## Business Rules To Lock Next
 
@@ -122,5 +120,5 @@ These fields are added for workflow support. Some of them are already exposed th
 ## Suggested Implementation Order
 
 1. Keep the current customer-facing and admin contract stable for web/mobile.
-2. Add `GET /admin/payment-logs`.
-3. Make `POST /payment-events` idempotent.
+2. Tighten duplicate protection for inventory lifecycle transitions.
+3. Normalize delivery issue type from `MANUAL_REVIEW` to `DELIVERY_FAILED`.

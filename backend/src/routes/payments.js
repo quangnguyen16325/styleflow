@@ -35,11 +35,12 @@ router.post("/payment-events", async (req, res) => {
       orderExists = true;
     }
 
-    await client.query(
+    const insertedLogResult = await client.query(
       `
         INSERT INTO payment_logs (
           order_id,
           incident_id,
+          external_event_id,
           gateway_name,
           transaction_ref,
           source,
@@ -48,11 +49,14 @@ router.post("/payment-events", async (req, res) => {
           payment_status,
           raw_response
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+        ON CONFLICT (external_event_id) DO NOTHING
+        RETURNING id
       `,
       [
         event.orderId,
         event.incidentId,
+        event.externalEventId,
         event.gateway,
         event.transactionRef,
         event.source,
@@ -62,6 +66,15 @@ router.post("/payment-events", async (req, res) => {
         JSON.stringify(req.body),
       ],
     );
+
+    if (event.externalEventId && insertedLogResult.rows.length === 0) {
+      await client.query("COMMIT");
+      return res.json({
+        status: inferOutageStatus(event),
+        action: "duplicate_ignored",
+        paymentStatus: inferPaymentStatus(event),
+      });
+    }
 
     if (orderExists) {
       const nextPaymentStatus = inferPaymentStatus(event);
@@ -156,6 +169,7 @@ function normalizePaymentEvent(body) {
     orderId: body.orderId ?? null,
     transactionRef: String(body.transactionRef ?? "").trim() || null,
     incidentId: String(body.incidentId ?? "").trim() || null,
+    externalEventId: String(body.externalEventId ?? "").trim() || null,
     paymentStatus:
       String(body.paymentStatus ?? "")
         .trim()

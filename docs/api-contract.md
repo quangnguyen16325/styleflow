@@ -863,6 +863,48 @@ Response `200`:
 }
 ```
 
+### `GET /admin/payment-logs`
+
+Get raw payment log history for investigation.
+
+Access rules:
+- admin/staff only
+
+Query params:
+- `gateway` optional
+- `orderId` optional
+- `transactionRef` optional
+- `incidentId` optional
+
+Response `200`:
+
+```json
+[
+  {
+    "id": 10,
+    "orderId": 12,
+    "incidentId": "incident_001",
+    "externalEventId": "evt_001",
+    "gatewayName": "PAYPAL",
+    "transactionRef": "txn_123",
+    "source": "payment_service",
+    "httpStatus": 503,
+    "errorCode": "SERVICE_UNAVAILABLE",
+    "paymentStatus": "payment_unknown",
+    "rawResponse": {
+      "source": "payment_service",
+      "gateway": "PAYPAL",
+      "httpStatus": 503,
+      "errorCode": "SERVICE_UNAVAILABLE",
+      "orderId": 12,
+      "transactionRef": "txn_123",
+      "externalEventId": "evt_001"
+    },
+    "createdAt": "2026-04-02T10:00:00.000Z"
+  }
+]
+```
+
 ### `GET /admin/issues`
 
 Get issue list for admin or staff.
@@ -926,6 +968,7 @@ Allowed `status`:
 - `DELIVERED`
 - `IN_TRANSIT`
 - `HANDOVER`
+- `RETURNED`
 
 Rules:
 - `orderId`: required, positive integer
@@ -943,6 +986,7 @@ Response `200`:
 Other possible `action` values:
 - `delivered`
 - `returning`
+- `returned`
 - `updated`
 
 ### `POST /payment-events`
@@ -958,7 +1002,8 @@ Request body:
   "httpStatus": 503,
   "errorCode": "SERVICE_UNAVAILABLE",
   "orderId": 12,
-  "transactionRef": "txn_123"
+  "transactionRef": "txn_123",
+  "externalEventId": "evt_001"
 }
 ```
 
@@ -966,6 +1011,10 @@ Allowed `source`:
 - `payment_service`
 - `app_client`
 - `schedule`
+
+Rules:
+- `externalEventId` is optional
+- when `externalEventId` is provided, repeated events with the same value are ignored idempotently
 
 Response `200`:
 
@@ -976,6 +1025,9 @@ Response `200`:
   "paymentStatus": "payment_unknown"
 }
 ```
+
+Other possible `action` values:
+- `duplicate_ignored`
 
 ### `GET /products`
 

@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS payment_logs (
   id BIGSERIAL PRIMARY KEY,
   order_id BIGINT REFERENCES orders(id) ON DELETE SET NULL,
   incident_id VARCHAR(120),
+  external_event_id VARCHAR(120),
   gateway_name VARCHAR(50) NOT NULL,
   transaction_ref VARCHAR(120),
   source VARCHAR(50) NOT NULL,
@@ -405,6 +406,9 @@ ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(120) NOT NULL DEFAULT 'Vietnam
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_postal_code VARCHAR(30);
 
+ALTER TABLE payment_logs
+ADD COLUMN IF NOT EXISTS external_event_id VARCHAR(120);
+
 ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS review_note TEXT;
 
@@ -478,6 +482,9 @@ CREATE INDEX IF NOT EXISTS idx_payment_logs_order_id ON payment_logs(order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_gateway_name ON payment_logs(gateway_name);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_transaction_ref ON payment_logs(transaction_ref);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_incident_id ON payment_logs(incident_id);
+DROP INDEX IF EXISTS uniq_payment_logs_external_event_id;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_payment_logs_external_event_id
+ON payment_logs(external_event_id);
 CREATE INDEX IF NOT EXISTS idx_refund_requests_order_id ON refund_requests(order_id);
 CREATE INDEX IF NOT EXISTS idx_refund_requests_customer_id ON refund_requests(customer_id);
 CREATE INDEX IF NOT EXISTS idx_refund_requests_status ON refund_requests(status);

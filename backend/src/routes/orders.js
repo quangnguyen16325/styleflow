@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/require-auth.js";
 import { pool } from "../db/pool.js";
+import { applyOrderLifecycleTransition } from "./order-lifecycle.js";
 
 const router = Router();
 
@@ -148,6 +149,8 @@ router.patch("/:id/status", requireAuth, requireRole("admin", "staff"), async (r
       `,
       [orderId, nextStatus],
     );
+
+    await applyOrderLifecycleTransition(client, orderId, previousStatus, nextStatus);
 
     if (previousStatus !== "failed" && nextStatus === "failed") {
       await client.query(
