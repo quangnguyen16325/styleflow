@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS issues (
   order_id BIGINT REFERENCES orders(id) ON DELETE SET NULL,
   product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
   type VARCHAR(50) NOT NULL CHECK (
-    type IN ('ORDER_FAILED', 'LOW_STOCK', 'PAYMENT_ERROR', 'ABUSE_RISK', 'MANUAL_REVIEW')
+    type IN ('ORDER_FAILED', 'DELIVERY_FAILED', 'LOW_STOCK', 'PAYMENT_ERROR', 'ABUSE_RISK', 'MANUAL_REVIEW')
   ),
   severity VARCHAR(20) NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (
@@ -439,6 +439,14 @@ ADD CONSTRAINT refund_requests_status_check CHECK (
   )
 );
 
+ALTER TABLE issues
+DROP CONSTRAINT IF EXISTS issues_type_check;
+
+ALTER TABLE issues
+ADD CONSTRAINT issues_type_check CHECK (
+  type IN ('ORDER_FAILED', 'DELIVERY_FAILED', 'LOW_STOCK', 'PAYMENT_ERROR', 'ABUSE_RISK', 'MANUAL_REVIEW')
+);
+
 UPDATE orders
 SET
   shipping_receiver_name = COALESCE(shipping_receiver_name, ''),
@@ -461,6 +469,8 @@ CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_inventory_id ON inventory_transactions(inventory_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_order_id ON inventory_transactions(order_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_type ON inventory_transactions(type);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_inventory_transactions_dedupe
+ON inventory_transactions(inventory_id, type, order_id, reference_id);
 CREATE INDEX IF NOT EXISTS idx_issues_order_id ON issues(order_id);
 CREATE INDEX IF NOT EXISTS idx_issues_product_id ON issues(product_id);
 CREATE INDEX IF NOT EXISTS idx_issues_type ON issues(type);

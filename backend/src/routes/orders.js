@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/require-auth.js";
 import { pool } from "../db/pool.js";
-import { applyOrderLifecycleTransition } from "./order-lifecycle.js";
+import {
+  applyOrderLifecycleTransition,
+  insertInventoryTransactionOnce,
+} from "./order-lifecycle.js";
 
 const router = Router();
 
@@ -313,31 +316,26 @@ router.post("/", requireAuth, async (req, res) => {
       );
       orderItems.push(orderItemResult.rows[0]);
 
-      await client.query(
-        `
-          UPDATE inventory
-          SET
-            reserved_qty = reserved_qty + $1,
-            updated_at = NOW()
-          WHERE product_id = $2
-        `,
-        [item.quantity, item.productId],
-      );
+      const inserted = await insertInventoryTransactionOnce(client, {
+        inventoryId: Number(product.inventory_id),
+        changeAmount: -item.quantity,
+        type: "RESERVE",
+        orderId: Number(orderRow.id),
+        referenceId: `ORDER_${orderRow.id}_RESERVE`,
+      });
 
-      await client.query(
-        `
-          INSERT INTO inventory_transactions (
-            inventory_id,
-            change_amount,
-            type,
-            order_id,
-            created_by,
-            reference_id
-          )
-          VALUES ($1, $2, 'RESERVE', $3, 'SYSTEM', $4)
-        `,
-        [product.inventory_id, -item.quantity, orderRow.id, `ORDER_${orderRow.id}`],
-      );
+      if (inserted) {
+        await client.query(
+          `
+            UPDATE inventory
+            SET
+              reserved_qty = reserved_qty + $1,
+              updated_at = NOW()
+            WHERE product_id = $2
+          `,
+          [item.quantity, item.productId],
+        );
+      }
     }
 
     await client.query("COMMIT");
