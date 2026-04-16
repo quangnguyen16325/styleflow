@@ -59,6 +59,13 @@ export function CartProvider({ children }) {
   // Tổng tiền sản phẩm (UI preview — backend là source of truth)
   const subtotal = items.reduce((sum, i) => sum + i.basePrice * i.quantity, 0);
 
+  // Phí vận chuyển mặc định (Standard 6-7 days)
+  const SHIPPING_FEE = 3.0;
+  const shippingFee = items.length > 0 ? SHIPPING_FEE : 0;
+
+  // Tổng thanh toán = subtotal + shipping
+  const totalAmount = subtotal + shippingFee;
+
   /**
    * Tạo payload cho POST /orders theo đúng API contract
    * Không gửi priceAtPurchase hay totalAmount
@@ -73,6 +80,8 @@ export function CartProvider({ children }) {
         items,
         totalCount,
         subtotal,
+        shippingFee,
+        totalAmount,
         addToCart,
         removeFromCart,
         updateQuantity,
