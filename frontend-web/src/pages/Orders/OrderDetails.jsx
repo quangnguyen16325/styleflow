@@ -214,7 +214,7 @@ export default function OrderDetails() {
             <StatusBadge value={addressChangeStatus} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '14px' }}>
             <div style={{ padding: '14px', border: '1px solid #e0e0e0', borderRadius: '8px', background: '#fafafa' }}>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#202124' }}>Current Shipping Snapshot</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
@@ -291,7 +291,7 @@ export default function OrderDetails() {
       )}
 
       {/* Information Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
         {/* Customer Block */}
         <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px', fontSize: '15px' }}>Customer Information</h3>

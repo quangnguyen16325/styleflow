@@ -111,7 +111,7 @@ export default function IssueDetails() {
       </div>
 
       {/* Issue Details Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
         {/* Issue Info */}
         <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px', fontSize: '15px' }}>Issue Information</h3>

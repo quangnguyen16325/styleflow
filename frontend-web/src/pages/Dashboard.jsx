@@ -14,12 +14,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isActive = true;
+
     Promise.allSettled([
       ApiService.getProducts(),
       ApiService.getOrders(),
       ApiService.getIssues(),
       ApiService.getRefundRequests(),
     ]).then(([productsRes, ordersRes, issuesRes, refundsRes]) => {
+      if (!isActive) return;
       const products = productsRes.status === 'fulfilled' ? productsRes.value : [];
       const orders = ordersRes.status === 'fulfilled' ? ordersRes.value : [];
       const issues = issuesRes.status === 'fulfilled' ? issuesRes.value : [];
@@ -73,7 +76,14 @@ export default function Dashboard() {
           returningOrFailed: returningOrFailedOrders,
         },
       });
-    }).finally(() => setLoading(false));
+    }).finally(() => {
+      if (!isActive) return;
+      setLoading(false);
+    });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   if (loading) return <LoadingSpinner message="Loading dashboard..." />;
@@ -113,7 +123,7 @@ export default function Dashboard() {
       </p>
 
       {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
         {cards.map((card) => (
           <Link
             key={card.title}

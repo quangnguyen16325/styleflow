@@ -68,7 +68,7 @@ export default function ProductDetails() {
 
       {/* Inventory Metrics */}
       <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#202124' }}>Inventory Metrics</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '16px' }}>
         {metricCards.map((card) => (
           <div key={card.label} className="card" style={{ padding: '20px', background: card.bg, borderColor: card.border }}>
             <div style={{ color: '#5f6368', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.4px' }}>
