@@ -21,29 +21,29 @@ export default function LoginScreen({ navigation }) {
   const { login, isLoading } = useAuth();
 
   const [form, setForm] = useState({
-    fullName: "",
-    phone: "",
-    email: "",
+    email: "nguyenvana@example.com",
+    password: "secret123",
   });
   const [errors, setErrors] = useState({});
 
   const validate = () => {
     const newErrors = {};
-    if (!form.fullName.trim()) newErrors.fullName = "Vui lòng nhập họ tên";
-    if (!form.phone.trim()) newErrors.phone = "Vui lòng nhập số điện thoại";
     if (!form.email.trim()) newErrors.email = "Vui lòng nhập email";
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = "Email không hợp lệ";
+    if (!form.password.trim()) newErrors.password = "Vui lòng nhập mật khẩu";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async () => {
     if (!validate()) return;
-    const result = await login(form);
-    if (result.success) {
-      navigation.replace("MainApp");
-    } else {
-      Alert.alert("Lỗi", "Đăng nhập thất bại. Vui lòng thử lại.");
+    try {
+      const result = await login(form);
+      if (result.success) {
+        navigation.replace("MainApp");
+      }
+    } catch (err) {
+      Alert.alert("Lỗi", err.message || "Đăng nhập thất bại. Vui lòng thử lại.");
     }
   };
 
@@ -66,26 +66,11 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.logoText}>E</Text>
             </View>
             <Text style={styles.title}>Xin chào! 👋</Text>
-            <Text style={styles.subtitle}>Đăng nhập để tiếp tục mua sắm</Text>
+            <Text style={styles.subtitle}>Đăng nhập để vào tài khoản của bạn</Text>
           </View>
 
           {/* Form */}
           <View style={styles.formCard}>
-            <InputField
-              label="Họ và tên"
-              placeholder="Nguyễn Văn A"
-              value={form.fullName}
-              onChangeText={(v) => setField("fullName", v)}
-              error={errors.fullName}
-            />
-            <InputField
-              label="Số điện thoại"
-              placeholder="0901234567"
-              value={form.phone}
-              onChangeText={(v) => setField("phone", v)}
-              error={errors.phone}
-              keyboardType="phone-pad"
-            />
             <InputField
               label="Email"
               placeholder="example@gmail.com"
@@ -93,6 +78,15 @@ export default function LoginScreen({ navigation }) {
               onChangeText={(v) => setField("email", v)}
               error={errors.email}
               keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <InputField
+              label="Mật khẩu"
+              placeholder="••••••••"
+              value={form.password}
+              onChangeText={(v) => setField("password", v)}
+              error={errors.password}
+              secureTextEntry
               autoCapitalize="none"
             />
 

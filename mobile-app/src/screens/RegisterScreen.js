@@ -24,6 +24,7 @@ export default function RegisterScreen({ navigation }) {
     fullName: "",
     phone: "",
     email: "",
+    password: "",
   });
   const [errors, setErrors] = useState({});
 
@@ -36,6 +37,8 @@ export default function RegisterScreen({ navigation }) {
       newErrors.phone = "Số điện thoại không hợp lệ (VD: 0901234567)";
     if (!form.email.trim()) newErrors.email = "Vui lòng nhập email";
     else if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = "Email không hợp lệ";
+    if (!form.password.trim()) newErrors.password = "Vui lòng nhập mật khẩu";
+    else if (form.password.length < 8) newErrors.password = "Mật khẩu tối thiểu 8 ký tự";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -98,6 +101,15 @@ export default function RegisterScreen({ navigation }) {
               onChangeText={(v) => setField("email", v)}
               error={errors.email}
               keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <InputField
+              label="Mật khẩu *"
+              placeholder="Tối thiểu 8 ký tự"
+              value={form.password}
+              onChangeText={(v) => setField("password", v)}
+              error={errors.password}
+              secureTextEntry
               autoCapitalize="none"
             />
 

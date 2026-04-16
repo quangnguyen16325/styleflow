@@ -1,70 +1,103 @@
 /* eslint-disable react/prop-types */
-import React, { createContext, useContext, useState, useCallback } from "react";
-
-// ── Context ──────────────────────────────────────────────────────────────────
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loginApi, registerApi, getMeApi } from "../services/api";
 
 const AuthContext = createContext(null);
 
-// ── Provider ─────────────────────────────────────────────────────────────────
-
 export function AuthProvider({ children }) {
-  // user: { fullName, phone, email } | null
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [token, setToken] = useState(null);
+  const [isLoading, setIsLoading] = useState(true); // Loading on mount
 
-  /**
-   * Register — lưu thông tin người dùng vào state
-   * Không có backend auth — dùng thông tin này khi tạo order
-   */
-  const register = useCallback(async ({ fullName, phone, email }) => {
+  // Check auth state on mount
+  useEffect(() => {
+    const bootstrapAsync = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem("authToken");
+        if (storedToken) {
+          setToken(storedToken);
+          // Get /me if token exists
+          try {
+            const data = await getMeApi();
+            setUser(data.customer || data);
+          } catch (e) {
+            console.warn("Mã thông báo không hợp lệ hoặc hết hạn", e);
+            await AsyncStorage.removeItem("authToken");
+            setToken(null);
+            setUser(null);
+          }
+        }
+      } catch (e) {
+        console.warn("Restoring token failed", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    bootstrapAsync();
+  }, []);
+
+  const login = useCallback(async ({ email, password }) => {
     setIsLoading(true);
     try {
-      // Simulate a brief delay (UX feedback)
-      await new Promise((r) => setTimeout(r, 500));
-      setUser({ fullName: fullName.trim(), phone: phone.trim(), email: email.trim() });
+      const data = await loginApi(email, password);
+      const jwt = data.token;
+      const customer = data.customer;
+
+      if (jwt) {
+        await AsyncStorage.setItem("authToken", jwt);
+        setToken(jwt);
+      }
+      setUser(customer);
       return { success: true };
+    } catch (err) {
+      console.warn("Login failed:", err);
+      // throw error to let UI catch it
+      throw err;
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  /**
-   * Login — đơn giản: hỏi tên + phone, lưu state
-   */
-  const login = useCallback(async ({ fullName, phone, email }) => {
+  const register = useCallback(async ({ fullName, phone, email, password }) => {
     setIsLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 500));
-      setUser({
-        fullName: fullName?.trim() || "Quang Anh",
-        phone: phone?.trim() || "",
-        email: email?.trim() || "",
-      });
+      const data = await registerApi(fullName, phone, email, password);
+      // Backend /auth/register might not return token implicitly in contract v0.3
+      // We might want to auto login afterwards or redirect to login.
+      // Let's assume user needs to login after register, or we just set user.
+      if (data.token) {
+        await AsyncStorage.setItem("authToken", data.token);
+        setToken(data.token);
+      }
+      setUser(data.customer);
       return { success: true };
+    } catch (err) {
+      console.warn("Register failed:", err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
+  const logout = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem("authToken");
+      setToken(null);
+      setUser(null);
+    } catch (e) {
+      console.warn("Logout failed", e);
+    }
   }, []);
 
-  /**
-   * Lấy tên hiển thị:
-   * - Nếu đã đăng nhập → tên từ form
-   * - Nếu chưa → mặc định "Quang Anh"
-   */
-  const displayName = user?.fullName || "Quang Anh";
+  const displayName = user?.fullName || "Khách";
 
   return (
-    <AuthContext.Provider value={{ user, displayName, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, displayName, isLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
-// ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

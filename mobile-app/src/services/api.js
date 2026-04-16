@@ -1,128 +1,134 @@
-// API Client — Mobile App
-// Contract: https://github.com/quangnguyen16325/styleflow (docs/api-contract.md)
-// Production: https://api.ecloria.co.uk
-//
-// RULES (from contract):
-// - Do NOT send priceAtPurchase or totalAmount from client
-// - Do NOT rename fields from contract
-// - Backend computes totalAmount and priceAtPurchase
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const BASE_URL = "https://api.ecloria.co.uk";
+// Contract: Base URL — dùng IP máy Mac khi test thật trên iPhone
+const BASE_URL = "http://192.168.1.6:5000";
 
-// ── Generic fetch wrapper ────────────────────────────────────────────────────
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
-async function request(path, options = {}) {
-  const url = `${BASE_URL}${path}`;
-  const config = {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  };
-
-  try {
-    const response = await fetch(url, config);
-    const data = await response.json();
-
-    if (!response.ok) {
-      // Chuẩn hóa error theo contract: { error: { code, message } }
-      const err = data?.error || { code: "UNKNOWN_ERROR", message: "Something went wrong" };
-      throw { ...err, status: response.status };
+// Request Interceptor: Attach Token
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const token = await AsyncStorage.getItem("authToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.warn("Failed to get token from storage", error);
     }
-
-    return data;
-  } catch (error) {
-    // Network error (no internet)
-    if (error instanceof TypeError) {
-      throw { code: "NETWORK_ERROR", message: "Không thể kết nối đến máy chủ", status: 0 };
-    }
-    throw error;
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
+);
+
+// Response Interceptor: Error Handling
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    if (error.response) {
+      const { status, data } = error.response;
+      let errorMessage = data?.error?.message || "An unexpected error occurred.";
+
+      switch (status) {
+        case 400:
+          console.warn("Validation Error: 400", errorMessage);
+          break;
+        case 401:
+          console.warn("Unauthorized: 401", errorMessage);
+          // logout() logic should be handled in AuthContext or Navigation integration
+          // to redirect to Login
+          break;
+        case 403:
+          console.warn("Forbidden: 403", errorMessage);
+          break;
+        case 404:
+          console.warn("Not Found: 404", errorMessage);
+          break;
+        default:
+          console.warn(`Error: ${status}`, errorMessage);
+      }
+      
+      return Promise.reject(data?.error || { message: errorMessage, code: status });
+    }
+    
+    return Promise.reject({ message: "Network error or server is down", code: "NETWORK_ERROR" });
+  }
+);
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+
+export async function loginApi(email, password) {
+  const res = await api.post("/auth/login", { email, password });
+  return res.data;
 }
 
-// ── Health ───────────────────────────────────────────────────────────────────
+export async function registerApi(fullName, phone, email, password) {
+  const res = await api.post("/auth/register", { fullName, phone, email, password });
+  return res.data;
+}
 
-export async function checkHealth() {
-  return request("/health");
+export async function getMeApi() {
+  const res = await api.get("/me"); // Required by Checklist
+  return res.data;
 }
 
 // ── Products ─────────────────────────────────────────────────────────────────
 
-/**
- * GET /products
- * @returns {Promise<Array<Product>>}
- */
 export async function getProducts() {
-  return request("/products");
+  const res = await api.get("/products");
+  return res.data;
 }
 
-/**
- * GET /products/:id
- * @param {number|string} id
- * @returns {Promise<Product>}
- */
 export async function getProductById(id) {
-  return request(`/products/${id}`);
+  const res = await api.get(`/products/${id}`);
+  return res.data;
 }
 
 // ── Orders ───────────────────────────────────────────────────────────────────
 
-/**
- * POST /orders
- * @param {{
- *   customer: { fullName: string, phone: string, email: string },
- *   shippingAddress: string,
- *   city: string,
- *   shippingFee?: number,
- *   items: Array<{ productId: number, quantity: number }>
- * }} orderPayload
- * @returns {Promise<Order>}
- */
 export async function createOrder(orderPayload) {
-  // Safety: strip any client-side computed fields before sending
   const { items, ...rest } = orderPayload;
   const cleanItems = items.map(({ productId, quantity }) => ({ productId, quantity }));
-  return request("/orders", {
-    method: "POST",
-    body: JSON.stringify({ ...rest, items: cleanItems }),
-  });
+  const res = await api.post("/orders", { ...rest, items: cleanItems });
+  return res.data;
 }
 
-/**
- * GET /orders
- * @returns {Promise<Array<Order>>}
- */
 export async function getOrders() {
-  return request("/orders");
+  const res = await api.get("/orders");
+  return res.data;
 }
 
-/**
- * GET /orders/:id
- * @param {number|string} id
- * @returns {Promise<Order>}
- */
 export async function getOrderById(id) {
-  return request(`/orders/${id}`);
+  const res = await api.get(`/orders/${id}`);
+  return res.data;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Format price in VND (e.g. 199000 → "199.000đ")
- */
 export function formatPrice(amount) {
   if (!amount && amount !== 0) return "—";
   return amount.toLocaleString("vi-VN") + "đ";
 }
 
-/**
- * Map order status to Vietnamese display
- */
 export const ORDER_STATUS_LABEL = {
   pending: "Chờ xác nhận",
   confirmed: "Đã xác nhận",
+  processing: "Đang xử lý",
   shipping: "Đang giao",
   delivered: "Đã giao",
+  completed: "Hoàn tất",
   cancelled: "Đã hủy",
+  failed: "Thất bại"
 };
+
+export default api;
