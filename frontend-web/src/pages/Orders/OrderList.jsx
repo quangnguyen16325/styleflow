@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import ErrorMessage from '../../components/ui/ErrorMessage';
@@ -19,11 +19,23 @@ const ORDER_STATUSES = [
 ];
 
 export default function OrderList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const allowedStatuses = ORDER_STATUSES.map((status) => status.value);
+  const statusFromQuery = normalizeFilterValue(searchParams.get('status'), allowedStatuses);
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState(statusFromQuery);
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (statusFromQuery !== statusFilter) {
+      setStatusFilter(statusFromQuery);
+      setLoading(true);
+      setError(null);
+    }
+  }, [statusFromQuery, statusFilter]);
 
   useEffect(() => {
     let isActive = true;
@@ -46,6 +58,20 @@ export default function OrderList() {
       isActive = false;
     };
   }, [statusFilter]);
+
+  const handleStatusChange = (nextStatus) => {
+    setLoading(true);
+    setError(null);
+    setStatusFilter(nextStatus);
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextStatus === 'ALL') {
+      nextParams.delete('status');
+    } else {
+      nextParams.set('status', nextStatus);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
 
   // Client-side search within server-filtered results
   const filteredOrders = orders.filter((order) => {
@@ -80,11 +106,7 @@ export default function OrderList() {
         />
         <select
           value={statusFilter}
-          onChange={(e) => {
-            setLoading(true);
-            setError(null);
-            setStatusFilter(e.target.value);
-          }}
+          onChange={(e) => handleStatusChange(e.target.value)}
           className="form-select"
           style={{ width: '200px' }}
         >
@@ -138,4 +160,13 @@ export default function OrderList() {
       )}
     </div>
   );
+}
+
+function normalizeFilterValue(value, allowedValues) {
+  if (!value) {
+    return 'ALL';
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return allowedValues.includes(normalized) ? normalized : 'ALL';
 }

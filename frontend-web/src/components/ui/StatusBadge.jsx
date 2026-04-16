@@ -8,6 +8,14 @@ const STATUS_COLORS = {
   completed:        { color: '#2e7d32', bg: '#e8f5e9' },
   cancelled:        { color: '#c62828', bg: '#ffebee' },
   failed:           { color: '#b71c1c', bg: '#ffcdd2' },
+  returning:        { color: '#6d4c41', bg: '#efebe9' },
+  returned:         { color: '#5d4037', bg: '#d7ccc8' },
+  delivery_failed:  { color: '#bf360c', bg: '#fbe9e7' },
+  retry_pending:    { color: '#ef6c00', bg: '#fff3e0' },
+  ready_to_ship:    { color: '#1565c0', bg: '#e3f2fd' },
+  handover:         { color: '#00838f', bg: '#e0f7fa' },
+  in_transit:       { color: '#0277bd', bg: '#e1f5fe' },
+  delivered:        { color: '#2e7d32', bg: '#e8f5e9' },
 
   // Issue statuses
   open:             { color: '#d84315', bg: '#fbe9e7' },
@@ -27,6 +35,24 @@ const STATUS_COLORS = {
   ORDER_FAILED:     { color: '#b71c1c', bg: '#ffcdd2' },
   LOW_STOCK:        { color: '#e65100', bg: '#fff3e0' },
   DELIVERY_FAILED:  { color: '#d84315', bg: '#fbe9e7' },
+
+  // Refund statuses
+  manual_review_required: { color: '#6a1b9a', bg: '#f3e5f5' },
+  approved:               { color: '#2e7d32', bg: '#e8f5e9' },
+  rejected:               { color: '#c62828', bg: '#ffebee' },
+  refunded:               { color: '#00695c', bg: '#e0f2f1' },
+
+  // Address change statuses
+  requested:        { color: '#ef6c00', bg: '#fff3e0' },
+  pending_approval: { color: '#ef6c00', bg: '#fff3e0' },
+  rejected_timeout: { color: '#6d4c41', bg: '#efebe9' },
+
+  // Delivery events (uppercase payloads)
+  FAILED:           { color: '#b71c1c', bg: '#ffcdd2' },
+  DELIVERED:        { color: '#2e7d32', bg: '#e8f5e9' },
+  IN_TRANSIT:       { color: '#0277bd', bg: '#e1f5fe' },
+  HANDOVER:         { color: '#00838f', bg: '#e0f7fa' },
+  RETURNED:         { color: '#5d4037', bg: '#d7ccc8' },
 };
 
 const DEFAULT = { color: '#616161', bg: '#eeeeee' };

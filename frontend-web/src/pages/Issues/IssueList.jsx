@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import ErrorMessage from '../../components/ui/ErrorMessage';
@@ -31,19 +31,55 @@ const ISSUE_TYPES = [
   { value: 'DELIVERY_FAILED', label: 'Delivery Failed' },
 ];
 
+const ISSUE_STATUS_VALUES = ISSUE_STATUSES.map((item) => item.value);
+const ISSUE_SEVERITY_VALUES = ISSUE_SEVERITIES.map((item) => item.value);
+const ISSUE_TYPE_VALUES = ISSUE_TYPES.map((item) => item.value);
+
 export default function IssueList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [severityFilter, setSeverityFilter] = useState('ALL');
-  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState(() => normalizeFilterValue(searchParams.get('status'), ISSUE_STATUS_VALUES));
+  const [severityFilter, setSeverityFilter] = useState(() => normalizeFilterValue(searchParams.get('severity'), ISSUE_SEVERITY_VALUES));
+  const [typeFilter, setTypeFilter] = useState(() => normalizeFilterValue(searchParams.get('type'), ISSUE_TYPE_VALUES));
 
-  const handleFilterChange = (setFilter, value) => {
+  useEffect(() => {
+    const nextStatus = normalizeFilterValue(searchParams.get('status'), ISSUE_STATUS_VALUES);
+    const nextSeverity = normalizeFilterValue(searchParams.get('severity'), ISSUE_SEVERITY_VALUES);
+    const nextType = normalizeFilterValue(searchParams.get('type'), ISSUE_TYPE_VALUES);
+
+    if (nextStatus !== statusFilter) {
+      setStatusFilter(nextStatus);
+      setLoading(true);
+      setError(null);
+    }
+    if (nextSeverity !== severityFilter) {
+      setSeverityFilter(nextSeverity);
+      setLoading(true);
+      setError(null);
+    }
+    if (nextType !== typeFilter) {
+      setTypeFilter(nextType);
+      setLoading(true);
+      setError(null);
+    }
+  }, [searchParams, statusFilter, severityFilter, typeFilter]);
+
+  const handleFilterChange = (key, setFilter, value) => {
     setLoading(true);
     setError(null);
     setFilter(value);
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (value === 'ALL') {
+      nextParams.delete(key);
+    } else {
+      nextParams.set(key, value);
+    }
+    setSearchParams(nextParams, { replace: true });
   };
 
   useEffect(() => {
@@ -86,7 +122,7 @@ export default function IssueList() {
       <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
         <select
           value={statusFilter}
-          onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
+          onChange={(e) => handleFilterChange('status', setStatusFilter, e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
         >
@@ -96,7 +132,7 @@ export default function IssueList() {
         </select>
         <select
           value={severityFilter}
-          onChange={(e) => handleFilterChange(setSeverityFilter, e.target.value)}
+          onChange={(e) => handleFilterChange('severity', setSeverityFilter, e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
         >
@@ -106,7 +142,7 @@ export default function IssueList() {
         </select>
         <select
           value={typeFilter}
-          onChange={(e) => handleFilterChange(setTypeFilter, e.target.value)}
+          onChange={(e) => handleFilterChange('type', setTypeFilter, e.target.value)}
           className="form-select"
           style={{ width: '200px' }}
         >
@@ -170,4 +206,14 @@ export default function IssueList() {
       )}
     </div>
   );
+}
+
+function normalizeFilterValue(value, allowedValues) {
+  if (!value) {
+    return 'ALL';
+  }
+
+  const normalized = value.trim().toLowerCase();
+  const matchedValue = allowedValues.find((allowed) => allowed.toLowerCase() === normalized);
+  return matchedValue || 'ALL';
 }
