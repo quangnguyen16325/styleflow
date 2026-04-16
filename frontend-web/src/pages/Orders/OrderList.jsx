@@ -22,20 +22,12 @@ export default function OrderList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const allowedStatuses = ORDER_STATUSES.map((status) => status.value);
   const statusFromQuery = normalizeFilterValue(searchParams.get('status'), allowedStatuses);
+  const statusFilter = statusFromQuery;
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [statusFilter, setStatusFilter] = useState(statusFromQuery);
   const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    if (statusFromQuery !== statusFilter) {
-      setStatusFilter(statusFromQuery);
-      setLoading(true);
-      setError(null);
-    }
-  }, [statusFromQuery, statusFilter]);
 
   useEffect(() => {
     let isActive = true;
@@ -62,7 +54,6 @@ export default function OrderList() {
   const handleStatusChange = (nextStatus) => {
     setLoading(true);
     setError(null);
-    setStatusFilter(nextStatus);
 
     const nextParams = new URLSearchParams(searchParams);
     if (nextStatus === 'ALL') {

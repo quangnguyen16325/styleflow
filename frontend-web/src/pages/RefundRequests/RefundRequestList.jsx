@@ -19,19 +19,11 @@ export default function RefundRequestList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const allowedStatuses = REFUND_STATUSES.map((item) => item.value);
   const statusFromQuery = normalizeFilterValue(searchParams.get('status'), allowedStatuses);
+  const statusFilter = statusFromQuery;
 
   const [refundRequests, setRefundRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [statusFilter, setStatusFilter] = useState(statusFromQuery);
-
-  useEffect(() => {
-    if (statusFromQuery !== statusFilter) {
-      setStatusFilter(statusFromQuery);
-      setLoading(true);
-      setError(null);
-    }
-  }, [statusFromQuery, statusFilter]);
 
   useEffect(() => {
     let isActive = true;
@@ -58,7 +50,6 @@ export default function RefundRequestList() {
   const handleStatusChange = (nextStatus) => {
     setLoading(true);
     setError(null);
-    setStatusFilter(nextStatus);
 
     const nextParams = new URLSearchParams(searchParams);
     if (nextStatus === 'ALL') {

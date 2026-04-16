@@ -37,41 +37,17 @@ const ISSUE_TYPE_VALUES = ISSUE_TYPES.map((item) => item.value);
 
 export default function IssueList() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const statusFilter = normalizeFilterValue(searchParams.get('status'), ISSUE_STATUS_VALUES);
+  const severityFilter = normalizeFilterValue(searchParams.get('severity'), ISSUE_SEVERITY_VALUES);
+  const typeFilter = normalizeFilterValue(searchParams.get('type'), ISSUE_TYPE_VALUES);
 
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [statusFilter, setStatusFilter] = useState(() => normalizeFilterValue(searchParams.get('status'), ISSUE_STATUS_VALUES));
-  const [severityFilter, setSeverityFilter] = useState(() => normalizeFilterValue(searchParams.get('severity'), ISSUE_SEVERITY_VALUES));
-  const [typeFilter, setTypeFilter] = useState(() => normalizeFilterValue(searchParams.get('type'), ISSUE_TYPE_VALUES));
-
-  useEffect(() => {
-    const nextStatus = normalizeFilterValue(searchParams.get('status'), ISSUE_STATUS_VALUES);
-    const nextSeverity = normalizeFilterValue(searchParams.get('severity'), ISSUE_SEVERITY_VALUES);
-    const nextType = normalizeFilterValue(searchParams.get('type'), ISSUE_TYPE_VALUES);
-
-    if (nextStatus !== statusFilter) {
-      setStatusFilter(nextStatus);
-      setLoading(true);
-      setError(null);
-    }
-    if (nextSeverity !== severityFilter) {
-      setSeverityFilter(nextSeverity);
-      setLoading(true);
-      setError(null);
-    }
-    if (nextType !== typeFilter) {
-      setTypeFilter(nextType);
-      setLoading(true);
-      setError(null);
-    }
-  }, [searchParams, statusFilter, severityFilter, typeFilter]);
-
-  const handleFilterChange = (key, setFilter, value) => {
+  const handleFilterChange = (key, value) => {
     setLoading(true);
     setError(null);
-    setFilter(value);
 
     const nextParams = new URLSearchParams(searchParams);
     if (value === 'ALL') {
@@ -122,7 +98,7 @@ export default function IssueList() {
       <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
         <select
           value={statusFilter}
-          onChange={(e) => handleFilterChange('status', setStatusFilter, e.target.value)}
+          onChange={(e) => handleFilterChange('status', e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
         >
@@ -132,7 +108,7 @@ export default function IssueList() {
         </select>
         <select
           value={severityFilter}
-          onChange={(e) => handleFilterChange('severity', setSeverityFilter, e.target.value)}
+          onChange={(e) => handleFilterChange('severity', e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
         >
@@ -142,7 +118,7 @@ export default function IssueList() {
         </select>
         <select
           value={typeFilter}
-          onChange={(e) => handleFilterChange('type', setTypeFilter, e.target.value)}
+          onChange={(e) => handleFilterChange('type', e.target.value)}
           className="form-select"
           style={{ width: '200px' }}
         >
