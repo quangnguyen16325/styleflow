@@ -59,6 +59,54 @@ nano .env.prod
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
+## GitHub Actions CD
+
+The repository now supports a minimal CD flow on `push` to `main`.
+
+How it works:
+
+1. CI jobs must pass:
+   - backend
+   - frontend
+   - mobile
+   - docker compose validation
+2. If all pass, GitHub Actions SSHes into the server.
+3. The server runs:
+   - `git fetch origin`
+   - `git checkout <branch>`
+   - `git pull --ff-only origin <branch>`
+   - `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build`
+   - `docker image prune -f`
+
+Required GitHub repository secrets:
+
+- `DEPLOY_HOST`
+  - example: `15.134.229.29`
+- `DEPLOY_USER`
+  - example: `ubuntu`
+- `DEPLOY_PATH`
+  - example: `/home/ubuntu/styleflow`
+- `DEPLOY_SSH_PRIVATE_KEY`
+  - private key that can SSH into the server
+- `DEPLOY_BRANCH`
+  - recommended: `main`
+
+Important assumptions:
+
+- the repository is already cloned on the server at `DEPLOY_PATH`
+- `.env.prod` already exists on the server
+- the server user can run Docker Compose without interactive sudo
+- the checked-out branch on the server tracks the same Git remote
+
+Recommended first test:
+
+1. add the required repository secrets
+2. merge a small change into `main`
+3. watch the `deploy` job in GitHub Actions
+4. verify:
+   - `https://api.ecloria.co.uk/health`
+   - `https://ecloria.co.uk`
+
 ### Notes for production
 
 - `docker-compose.yml` is for local development.
