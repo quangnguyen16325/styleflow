@@ -1,9 +1,14 @@
 import { Router } from "express";
+import { requireAuth, requireRole } from "../middleware/require-auth.js";
 import { pool } from "../db/pool.js";
+import {
+  applyOrderLifecycleTransition,
+  insertInventoryTransactionOnce,
+} from "./order-lifecycle.js";
 
 const router = Router();
 
-router.get("/", async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   const normalizedStatus = normalizeStatusFilter(req.query.status);
   if (req.query.status != null && !normalizedStatus) {
     return res.status(400).json({
@@ -15,8 +20,20 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    const whereClause = normalizedStatus ? " WHERE o.status = $1" : "";
-    const params = normalizedStatus ? [normalizedStatus] : [];
+    const conditions = [];
+    const params = [];
+
+    if (!isPrivilegedRole(req.authCustomer.role)) {
+      params.push(req.authCustomer.id);
+      conditions.push(`o.customer_id = $${params.length}`);
+    }
+
+    if (normalizedStatus) {
+      params.push(normalizedStatus);
+      conditions.push(`o.status = $${params.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await pool.query(
       `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
       params,
@@ -34,7 +51,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireAuth, async (req, res) => {
   const orderId = Number(req.params.id);
   if (!Number.isInteger(orderId) || orderId <= 0) {
     return res.status(400).json({
@@ -46,9 +63,16 @@ router.get("/:id", async (req, res) => {
   }
 
   try {
+    const params = [orderId];
+    let accessClause = "";
+    if (!isPrivilegedRole(req.authCustomer.role)) {
+      params.push(req.authCustomer.id);
+      accessClause = ` AND o.customer_id = $${params.length}`;
+    }
+
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
-      [orderId],
+      `${listOrdersBaseQuery} WHERE o.id = $1${accessClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      params,
     );
 
     if (rows.length === 0) {
@@ -72,7 +96,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.patch("/:id/status", async (req, res) => {
+router.patch("/:id/status", requireAuth, requireRole("admin", "staff"), async (req, res) => {
   const orderId = Number(req.params.id);
   if (!Number.isInteger(orderId) || orderId <= 0) {
     return res.status(400).json({
@@ -129,6 +153,8 @@ router.patch("/:id/status", async (req, res) => {
       [orderId, nextStatus],
     );
 
+    await applyOrderLifecycleTransition(client, orderId, previousStatus, nextStatus);
+
     if (previousStatus !== "failed" && nextStatus === "failed") {
       await client.query(
         `
@@ -178,7 +204,7 @@ router.patch("/:id/status", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const validationError = validateOrderPayload(req.body);
   if (validationError) {
     return res.status(400).json({
@@ -189,27 +215,15 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const { customer, shippingAddress, city, items } = req.body;
+  const { items } = req.body;
   const shippingFee = Number(req.body.shippingFee ?? 0);
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    const customerResult = await client.query(
-      `
-        INSERT INTO customers (full_name, phone, email)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (phone) DO UPDATE
-        SET
-          full_name = EXCLUDED.full_name,
-          email = EXCLUDED.email,
-          updated_at = NOW()
-        RETURNING id, full_name, phone, email
-      `,
-      [customer.fullName.trim(), customer.phone.trim(), customer.email.trim().toLowerCase()],
-    );
-    const customerRow = customerResult.rows[0];
+    const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
+    const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
 
     const productIds = items.map((item) => item.productId);
     const productResult = await client.query(
@@ -249,17 +263,41 @@ router.post("/", async (req, res) => {
       `
         INSERT INTO orders (
           customer_id,
+          customer_address_id,
           status,
           total_amount,
           shipping_fee,
+          shipping_receiver_name,
+          shipping_receiver_phone,
+          shipping_address_line,
+          shipping_ward,
+          shipping_district,
           shipping_address,
           city,
+          shipping_country,
+          shipping_postal_code,
           payment_expires_at
         )
-        VALUES ($1, 'pending', $2, $3, $4, $5, NOW() + INTERVAL '24 hours')
+        VALUES (
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW() + INTERVAL '24 hours'
+        )
         RETURNING *
       `,
-      [customerRow.id, totalAmount, shippingFee, shippingAddress.trim(), city.trim()],
+      [
+        customerRow.id,
+        shippingSnapshot.customerAddressId,
+        totalAmount,
+        shippingFee,
+        shippingSnapshot.receiverName,
+        shippingSnapshot.receiverPhone,
+        shippingSnapshot.addressLine,
+        shippingSnapshot.ward,
+        shippingSnapshot.district,
+        shippingSnapshot.fullAddress,
+        shippingSnapshot.city,
+        shippingSnapshot.country,
+        shippingSnapshot.postalCode,
+      ],
     );
     const orderRow = orderResult.rows[0];
 
@@ -278,48 +316,46 @@ router.post("/", async (req, res) => {
       );
       orderItems.push(orderItemResult.rows[0]);
 
-      await client.query(
-        `
-          UPDATE inventory
-          SET
-            reserved_qty = reserved_qty + $1,
-            updated_at = NOW()
-          WHERE product_id = $2
-        `,
-        [item.quantity, item.productId],
-      );
+      const inserted = await insertInventoryTransactionOnce(client, {
+        inventoryId: Number(product.inventory_id),
+        changeAmount: -item.quantity,
+        type: "RESERVE",
+        orderId: Number(orderRow.id),
+        referenceId: `ORDER_${orderRow.id}_RESERVE`,
+      });
 
-      await client.query(
-        `
-          INSERT INTO inventory_transactions (
-            inventory_id,
-            change_amount,
-            type,
-            order_id,
-            created_by,
-            reference_id
-          )
-          VALUES ($1, $2, 'RESERVE', $3, 'SYSTEM', $4)
-        `,
-        [product.inventory_id, -item.quantity, orderRow.id, `ORDER_${orderRow.id}`],
-      );
+      if (inserted) {
+        await client.query(
+          `
+            UPDATE inventory
+            SET
+              reserved_qty = reserved_qty + $1,
+              updated_at = NOW()
+            WHERE product_id = $2
+          `,
+          [item.quantity, item.productId],
+        );
+      }
     }
 
     await client.query("COMMIT");
 
     return res.status(201).json({
-      id: orderRow.id,
+      id: Number(orderRow.id),
       status: orderRow.status,
       totalAmount: Number(orderRow.total_amount),
       shippingFee: Number(orderRow.shipping_fee),
       paymentExpiresAt: orderRow.payment_expires_at,
       failCount: orderRow.fail_count,
+      customerAddressId:
+        orderRow.customer_address_id == null ? null : Number(orderRow.customer_address_id),
       shippingAddress: orderRow.shipping_address,
       city: orderRow.city,
+      shipping: mapShippingRow(orderRow),
       createdAt: orderRow.created_at,
       updatedAt: orderRow.updated_at,
       customer: {
-        id: customerRow.id,
+        id: Number(customerRow.id),
         fullName: customerRow.full_name,
         phone: customerRow.phone,
         email: customerRow.email,
@@ -350,6 +386,191 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.post("/:id/address-change-request", requireAuth, async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const validationError = validateAddressChangePayload(req.body);
+  if (validationError) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: validationError,
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const orderResult = await client.query(
+      `
+        SELECT
+          id,
+          customer_id,
+          city,
+          delivery_status,
+          address_change_status,
+          shipping_fee
+        FROM orders
+        WHERE id = $1 AND customer_id = $2
+        LIMIT 1
+      `,
+      [orderId, req.authCustomer.id],
+    );
+
+    if (orderResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const orderRow = orderResult.rows[0];
+    if (!ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES.includes(orderRow.delivery_status)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Order is no longer eligible for address change",
+        },
+      });
+    }
+
+    if (orderRow.address_change_status === "requested") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        error: {
+          code: "CONFLICT",
+          message: "An address change request is already pending",
+        },
+      });
+    }
+
+    const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
+    const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
+    const isSameCity =
+      normalizeCityName(shippingSnapshot.city) === normalizeCityName(orderRow.city);
+
+    if (isSameCity) {
+      await client.query(
+        `
+          UPDATE orders
+          SET
+            customer_address_id = $2,
+            shipping_receiver_name = $3,
+            shipping_receiver_phone = $4,
+            shipping_address_line = $5,
+            shipping_ward = $6,
+            shipping_district = $7,
+            shipping_address = $8,
+            city = $9,
+            shipping_country = $10,
+            shipping_postal_code = $11,
+            address_change_status = 'approved',
+            address_change_requested_at = NOW(),
+            address_change_payload = NULL,
+            address_change_fee_delta = NULL,
+            shipping_fee_approved = TRUE,
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [
+          orderId,
+          shippingSnapshot.customerAddressId,
+          shippingSnapshot.receiverName,
+          shippingSnapshot.receiverPhone,
+          shippingSnapshot.addressLine,
+          shippingSnapshot.ward,
+          shippingSnapshot.district,
+          shippingSnapshot.fullAddress,
+          shippingSnapshot.city,
+          shippingSnapshot.country,
+          shippingSnapshot.postalCode,
+        ],
+      );
+
+      await client.query("COMMIT");
+      return res.json({
+        success: true,
+        action: "updated_same_city",
+      });
+    }
+
+    const requestedShippingFee =
+      req.body.requestedShippingFee == null ? null : Number(req.body.requestedShippingFee);
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          address_change_status = 'requested',
+          address_change_requested_at = NOW(),
+          address_change_payload = $2::jsonb,
+          address_change_fee_delta = $3,
+          shipping_fee_approved = FALSE,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [
+        orderId,
+        JSON.stringify({
+          customerAddressId: shippingSnapshot.customerAddressId,
+          receiverName: shippingSnapshot.receiverName,
+          receiverPhone: shippingSnapshot.receiverPhone,
+          addressLine: shippingSnapshot.addressLine,
+          ward: shippingSnapshot.ward,
+          district: shippingSnapshot.district,
+          city: shippingSnapshot.city,
+          country: shippingSnapshot.country,
+          postalCode: shippingSnapshot.postalCode,
+          fullAddress: shippingSnapshot.fullAddress,
+          requestedShippingFee,
+          currentShippingFee: Number(orderRow.shipping_fee),
+        }),
+        requestedShippingFee == null ? null : requestedShippingFee - Number(orderRow.shipping_fee),
+      ],
+    );
+
+    await client.query("COMMIT");
+    return res.json({
+      success: true,
+      action: "pending_approval",
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error(`POST /orders/${orderId}/address-change-request failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create address change request",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
 
 const listOrdersBaseQuery = `
@@ -360,8 +581,16 @@ const listOrdersBaseQuery = `
     o.shipping_fee,
     o.payment_expires_at,
     o.fail_count,
+    o.customer_address_id,
+    o.shipping_receiver_name,
+    o.shipping_receiver_phone,
+    o.shipping_address_line,
+    o.shipping_ward,
+    o.shipping_district,
     o.shipping_address,
     o.city,
+    o.shipping_country,
+    o.shipping_postal_code,
     o.created_at,
     o.updated_at,
     c.id AS customer_id,
@@ -390,28 +619,28 @@ function validateOrderPayload(body) {
     return "Request body is required";
   }
 
-  if (!body.customer || typeof body.customer !== "object") {
-    return "Customer information is required";
+  const hasAddressId = body.addressId != null;
+  const hasNewAddress = body.newAddress != null;
+
+  if (hasAddressId && hasNewAddress) {
+    return "Use either addressId or newAddress, not both";
   }
 
-  if (!body.customer.fullName?.trim()) {
-    return "Customer fullName is required";
+  if (hasAddressId) {
+    if (!Number.isInteger(body.addressId) || body.addressId <= 0) {
+      return "addressId must be a positive integer";
+    }
   }
 
-  if (!body.customer.phone?.trim()) {
-    return "Customer phone is required";
+  if (hasNewAddress) {
+    const addressError = validateShippingAddressPayload(body.newAddress);
+    if (addressError) {
+      return addressError;
+    }
   }
 
-  if (!body.customer.email?.trim()) {
-    return "Customer email is required";
-  }
-
-  if (!body.shippingAddress?.trim()) {
-    return "Shipping address is required";
-  }
-
-  if (!body.city?.trim()) {
-    return "City is required";
+  if (!hasAddressId && !hasNewAddress) {
+    return "Shipping information is required";
   }
 
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -438,20 +667,59 @@ function validateOrderPayload(body) {
   return null;
 }
 
+function validateAddressChangePayload(body) {
+  if (!body || typeof body !== "object") {
+    return "Request body is required";
+  }
+
+  const hasAddressId = body.addressId != null;
+  const hasNewAddress = body.newAddress != null;
+
+  if (hasAddressId && hasNewAddress) {
+    return "Use either addressId or newAddress, not both";
+  }
+
+  if (!hasAddressId && !hasNewAddress) {
+    return "addressId or newAddress is required";
+  }
+
+  if (hasAddressId && (!Number.isInteger(body.addressId) || body.addressId <= 0)) {
+    return "addressId must be a positive integer";
+  }
+
+  if (hasNewAddress) {
+    const addressError = validateShippingAddressPayload(body.newAddress);
+    if (addressError) {
+      return addressError;
+    }
+  }
+
+  if (
+    body.requestedShippingFee != null &&
+    (Number.isNaN(Number(body.requestedShippingFee)) || Number(body.requestedShippingFee) < 0)
+  ) {
+    return "requestedShippingFee must be a non-negative number";
+  }
+
+  return null;
+}
+
 function mapOrderRow(row) {
   return {
-    id: row.id,
+    id: Number(row.id),
     status: row.status,
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
+    customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
     shippingAddress: row.shipping_address,
     city: row.city,
+    shipping: mapShippingRow(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     customer: {
-      id: row.customer_id,
+      id: Number(row.customer_id),
       fullName: row.full_name,
       phone: row.phone,
       email: row.email,
@@ -478,7 +746,130 @@ function mapOrderItemRow(item) {
   };
 }
 
+function mapShippingRow(row) {
+  return {
+    receiverName: row.shipping_receiver_name,
+    receiverPhone: row.shipping_receiver_phone,
+    addressLine: row.shipping_address_line,
+    ward: row.shipping_ward,
+    district: row.shipping_district,
+    city: row.city,
+    country: row.shipping_country,
+    postalCode: row.shipping_postal_code,
+    fullAddress: row.shipping_address,
+  };
+}
+
 class ValidationError extends Error {}
+
+async function resolveAuthenticatedCustomerForOrder(client, customerId) {
+  const { rows } = await client.query(
+    `
+      SELECT id, full_name, phone, email
+      FROM customers
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [customerId],
+  );
+
+  if (rows.length === 0) {
+    throw new ValidationError("Customer not found");
+  }
+
+  return rows[0];
+}
+
+async function resolveShippingSnapshot(client, body, customerRow) {
+  if (body.addressId != null) {
+    const { rows } = await client.query(
+      `
+        SELECT
+          id,
+          customer_id,
+          receiver_name,
+          receiver_phone,
+          address_line,
+          ward,
+          district,
+          city,
+          country,
+          postal_code
+        FROM customer_addresses
+        WHERE id = $1 AND customer_id = $2
+        LIMIT 1
+      `,
+      [body.addressId, customerRow.id],
+    );
+
+    if (rows.length === 0) {
+      throw new ValidationError("Address not found for customer");
+    }
+
+    return mapShippingAddressRecord(rows[0]);
+  }
+
+  if (body.newAddress) {
+    return mapShippingAddressRecord({
+      id: null,
+      receiver_name: body.newAddress.receiverName.trim(),
+      receiver_phone: body.newAddress.receiverPhone.trim(),
+      address_line: body.newAddress.addressLine.trim(),
+      ward: body.newAddress.ward?.trim() || null,
+      district: body.newAddress.district?.trim() || null,
+      city: body.newAddress.city.trim(),
+      country: body.newAddress.country?.trim() || "Vietnam",
+      postal_code: body.newAddress.postalCode?.trim() || null,
+    });
+  }
+}
+
+function mapShippingAddressRecord(row) {
+  const parts = [row.address_line, row.ward, row.district, row.city, row.country].filter(Boolean);
+
+  return {
+    customerAddressId: row.id,
+    receiverName: row.receiver_name,
+    receiverPhone: row.receiver_phone,
+    addressLine: row.address_line,
+    ward: row.ward,
+    district: row.district,
+    city: row.city,
+    country: row.country,
+    postalCode: row.postal_code,
+    fullAddress: parts.join(", "),
+  };
+}
+
+function normalizeCityName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function validateShippingAddressPayload(address) {
+  if (!address || typeof address !== "object") {
+    return "newAddress is invalid";
+  }
+
+  if (!address.receiverName?.trim()) {
+    return "newAddress.receiverName is required";
+  }
+
+  if (!address.receiverPhone?.trim()) {
+    return "newAddress.receiverPhone is required";
+  }
+
+  if (!address.addressLine?.trim()) {
+    return "newAddress.addressLine is required";
+  }
+
+  if (!address.city?.trim()) {
+    return "newAddress.city is required";
+  }
+
+  return null;
+}
 
 const ORDER_STATUSES = [
   "pending",
@@ -490,3 +881,9 @@ const ORDER_STATUSES = [
   "cancelled",
   "failed",
 ];
+
+const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = ["pending", "ready_to_ship", "retry_pending"];
+
+function isPrivilegedRole(role) {
+  return role === "admin" || role === "staff";
+}
