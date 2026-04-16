@@ -5,6 +5,7 @@ const menuItems = [
   { to: '/products', label: 'Inventory Info', icon: '📦' },
   { to: '/orders', label: 'Order Management', icon: '🛒' },
   { to: '/issues', label: 'Issues Tracking', icon: '⚠️' },
+  { to: '/refund-requests', label: 'Refund Requests', icon: '💸' },
 ];
 
 export default function Sidebar() {

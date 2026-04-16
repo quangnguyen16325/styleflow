@@ -1,13 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import { clearAdminSession, getStoredAdminUser } from '../../utils/auth';
 
 export default function Header() {
   const navigate = useNavigate();
-  const userJson = localStorage.getItem('admin_user');
-  const user = userJson ? JSON.parse(userJson) : null;
+  const user = getStoredAdminUser();
 
   const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+    clearAdminSession();
     navigate('/login');
   };
 

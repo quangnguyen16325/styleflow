@@ -10,6 +10,8 @@ import OrderList from './pages/Orders/OrderList';
 import OrderDetails from './pages/Orders/OrderDetails';
 import IssueList from './pages/Issues/IssueList';
 import IssueDetails from './pages/Issues/IssueDetails';
+import RefundRequestList from './pages/RefundRequests/RefundRequestList';
+import RefundRequestDetails from './pages/RefundRequests/RefundRequestDetails';
 import NotFound from './pages/NotFound';
 import './App.css';
 
@@ -30,6 +32,8 @@ function App() {
             <Route path="orders/:id" element={<OrderDetails />} />
             <Route path="issues" element={<IssueList />} />
             <Route path="issues/:id" element={<IssueDetails />} />
+            <Route path="refund-requests" element={<RefundRequestList />} />
+            <Route path="refund-requests/:id" element={<RefundRequestDetails />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
