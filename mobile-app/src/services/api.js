@@ -26,7 +26,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response Interceptor: Error Handling
@@ -57,12 +57,12 @@ api.interceptors.response.use(
         default:
           console.warn(`Error: ${status}`, errorMessage);
       }
-      
+
       return Promise.reject(data?.error || { message: errorMessage, code: status });
     }
-    
+
     return Promise.reject({ message: "Network error or server is down", code: "NETWORK_ERROR" });
-  }
+  },
 );
 
 // ── Auth ───────────────────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ export const ORDER_STATUS_LABEL = {
   delivered: "Đã giao",
   completed: "Hoàn tất",
   cancelled: "Đã hủy",
-  failed: "Thất bại"
+  failed: "Thất bại",
 };
 
 export default api;
