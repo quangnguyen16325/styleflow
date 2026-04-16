@@ -66,6 +66,7 @@ Common error codes:
   "name": "Classic T-Shirt",
   "basePrice": 199000,
   "category": "apparel",
+  "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
   "stockQty": 20,
   "reservedQty": 0,
   "availableQty": 20,
@@ -447,6 +448,8 @@ Preferred admin order routes:
 - `GET /admin/orders/:id`
 - `PATCH /admin/orders/:id/status`
 - `GET /admin/orders/:id/delivery-events`
+- `POST /admin/uploads/presign`
+- `PATCH /admin/products/:id/image`
 
 Compatibility note:
 - existing admin clients may continue using `PATCH /orders/:id/status`
@@ -1051,6 +1054,7 @@ Response `200`:
     "name": "Classic T-Shirt",
     "basePrice": 199000,
     "category": "apparel",
+    "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
     "stockQty": 20,
     "reservedQty": 0,
     "availableQty": 20,
@@ -1073,6 +1077,7 @@ Response `200`:
   "name": "Classic T-Shirt",
   "basePrice": 199000,
   "category": "apparel",
+  "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
   "stockQty": 20,
   "reservedQty": 0,
   "availableQty": 20,
@@ -1100,6 +1105,69 @@ Response `400`:
     "code": "VALIDATION_ERROR",
     "message": "Product id must be a positive integer"
   }
+}
+```
+
+### `POST /admin/uploads/presign`
+
+Create a presigned R2 upload URL for a product image.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "productId": 1,
+  "fileName": "classic-tshirt.jpg",
+  "contentType": "image/jpeg"
+}
+```
+
+Allowed `contentType` values:
+- `image/jpeg`
+- `image/png`
+- `image/webp`
+- `image/gif`
+
+Response `201`:
+
+```json
+{
+  "uploadUrl": "https://<account_id>.r2.cloudflarestorage.com/styleflow-assets/products/1/main-1712736000000.jpeg?...",
+  "objectKey": "products/1/main-1712736000000.jpeg",
+  "publicUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
+  "expiresIn": 300
+}
+```
+
+### `PATCH /admin/products/:id/image`
+
+Save the uploaded product image URL.
+
+Access rules:
+- admin/staff only
+
+Request body:
+
+```json
+{
+  "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg"
+}
+```
+
+Response `200`:
+
+```json
+{
+  "id": 1,
+  "sku": "TSHIRT-001",
+  "name": "Classic T-Shirt",
+  "basePrice": 199000,
+  "category": "apparel",
+  "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
+  "createdAt": "2026-04-02T10:00:00.000Z"
 }
 ```
 

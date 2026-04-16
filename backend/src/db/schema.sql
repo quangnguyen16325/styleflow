@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS products (
   name VARCHAR(255) NOT NULL,
   base_price NUMERIC(12, 2) NOT NULL CHECK (base_price >= 0),
   category VARCHAR(100) NOT NULL DEFAULT 'general',
+  image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -405,6 +406,9 @@ ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(120) NOT NULL DEFAULT 'Vietnam
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_postal_code VARCHAR(30);
+
+ALTER TABLE products
+ADD COLUMN IF NOT EXISTS image_url TEXT;
 
 ALTER TABLE payment_logs
 ADD COLUMN IF NOT EXISTS external_event_id VARCHAR(120);
