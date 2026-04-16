@@ -50,6 +50,8 @@ const WISHLIST_ITEMS = [
 const POPULAR_ITEMS = [
   {
     id: "p1",
+    name: "Popular Outfit 1",
+    basePrice: 20.0,
     label: "New",
     likes: "1780",
     image:
@@ -57,6 +59,8 @@ const POPULAR_ITEMS = [
   },
   {
     id: "p2",
+    name: "Popular Outfit 2",
+    basePrice: 25.0,
     label: "Sale",
     likes: "1780",
     image:
@@ -64,6 +68,8 @@ const POPULAR_ITEMS = [
   },
   {
     id: "p3",
+    name: "Popular Outfit 3",
+    basePrice: 30.0,
     label: "Hot",
     likes: "1780",
     image:
@@ -71,6 +77,8 @@ const POPULAR_ITEMS = [
   },
   {
     id: "p4",
+    name: "Popular Outfit 4",
+    basePrice: 15.0,
     label: "New",
     likes: "1780",
     image:
@@ -86,7 +94,7 @@ function formatUSD(amount) {
 
 // ── Component: Shipping Address Card ────────────────────────────────────────
 
-function ShippingAddressCard() {
+function ShippingAddressCard({ onEditPress }) {
   return (
     <View style={styles.addressCard}>
       <View style={styles.addressContent}>
@@ -95,7 +103,7 @@ function ShippingAddressCard() {
           26, Duong So 2, Thao Dien Ward, An Phu, District 2, Ho Chi Minh city
         </Text>
       </View>
-      <TouchableOpacity style={styles.addressEditBtn}>
+      <TouchableOpacity style={styles.addressEditBtn} onPress={onEditPress}>
         <Text style={styles.addressEditIcon}>✎</Text>
       </TouchableOpacity>
     </View>
@@ -170,7 +178,7 @@ function EmptyCartIcon() {
 
 // ── Component: Wishlist Item (trạng thái giỏ trống #46) ─────────────────────
 
-function WishlistItem({ item }) {
+function WishlistItem({ item, onAddToCart }) {
   return (
     <View style={styles.wishlistRow}>
       <View style={styles.wishlistImageWrap}>
@@ -193,7 +201,7 @@ function WishlistItem({ item }) {
           </View>
         </View>
       </View>
-      <TouchableOpacity style={styles.addToCartMiniBtn}>
+      <TouchableOpacity style={styles.addToCartMiniBtn} onPress={() => onAddToCart(item)}>
         <Text style={styles.addToCartMiniIcon}>＋</Text>
       </TouchableOpacity>
     </View>
@@ -202,9 +210,13 @@ function WishlistItem({ item }) {
 
 // ── Component: Popular Item Card (trạng thái giỏ trống #47) ─────────────────
 
-function PopularCard({ item }) {
+function PopularCard({ item, onAddToCart }) {
   return (
-    <View style={styles.popularCard}>
+    <TouchableOpacity
+      style={styles.popularCard}
+      activeOpacity={0.8}
+      onPress={() => onAddToCart(item)}
+    >
       <Image source={{ uri: item.image }} style={styles.popularImage} resizeMode="cover" />
       <View style={styles.popularBottom}>
         <Text style={styles.popularLikes}>{item.likes}</Text>
@@ -213,14 +225,24 @@ function PopularCard({ item }) {
       <View style={styles.popularTag}>
         <Text style={styles.popularTagText}>{item.label}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 // ── Main Screen ─────────────────────────────────────────────────────────────
 
-export default function CartScreen() {
-  const { items, totalCount, totalAmount, removeFromCart, updateQuantity } = useCart();
+export default function CartScreen({ navigation }) {
+  const { items, totalCount, subtotal, removeFromCart, updateQuantity, addToCart } = useCart();
+
+  const handleAddToCart = (product) => {
+    addToCart({
+      id: product.id,
+      name: product.name,
+      basePrice: product.price || product.basePrice,
+      availableQty: 10, // Mock quantity for testing
+      image: product.image,
+    });
+  };
 
   const hasItems = items.length > 0;
 
@@ -242,7 +264,7 @@ export default function CartScreen() {
       {/* From Your Wishlist section */}
       <Text style={styles.sectionTitle}>From Your Wishlist</Text>
       {WISHLIST_ITEMS.map((item) => (
-        <WishlistItem key={item.id} item={item} />
+        <WishlistItem key={item.id} item={item} onAddToCart={handleAddToCart} />
       ))}
     </>
   );
@@ -257,13 +279,16 @@ export default function CartScreen() {
       {/* From Your Wishlist */}
       <Text style={styles.sectionTitle}>From Your Wishlist</Text>
       {WISHLIST_ITEMS.map((item) => (
-        <WishlistItem key={item.id} item={item} />
+        <WishlistItem key={item.id} item={item} onAddToCart={handleAddToCart} />
       ))}
 
       {/* Most Popular */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>Most Popular</Text>
-        <TouchableOpacity style={styles.seeAllBtn}>
+        <TouchableOpacity
+          style={styles.seeAllBtn}
+          onPress={() => navigation.navigate("ProductList")}
+        >
           <Text style={styles.seeAllText}>See All</Text>
           <View style={styles.seeAllCircle}>
             <Text style={styles.seeAllArrow}>→</Text>
@@ -272,7 +297,7 @@ export default function CartScreen() {
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.popularScroll}>
         {POPULAR_ITEMS.map((item) => (
-          <PopularCard key={item.id} item={item} />
+          <PopularCard key={item.id} item={item} onAddToCart={handleAddToCart} />
         ))}
       </ScrollView>
     </>
@@ -293,8 +318,8 @@ export default function CartScreen() {
           </View>
         </View>
 
-        {/* Shipping Address */}
-        <ShippingAddressCard />
+        {/* Shipping Address — tap ✎ để chọn địa chỉ trong Checkout */}
+        <ShippingAddressCard onEditPress={() => navigation.navigate("Checkout")} />
 
         {/* Conditional content */}
         {hasItems ? renderCartContent() : renderEmptyContent()}
@@ -307,13 +332,13 @@ export default function CartScreen() {
       <View style={styles.bottomBar}>
         <View style={styles.totalWrap}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalAmount}>{formatUSD(totalAmount)}</Text>
+          <Text style={styles.totalAmount}>{formatUSD(subtotal)}</Text>
         </View>
         <TouchableOpacity
           style={[styles.checkoutBtn, !hasItems && styles.checkoutBtnDisabled]}
           activeOpacity={0.85}
           disabled={!hasItems}
-          onPress={() => console.log("Chuyển sang thanh toán")}
+          onPress={() => navigation.navigate("Checkout")}
         >
           <Text style={styles.checkoutBtnText}>Checkout</Text>
         </TouchableOpacity>
