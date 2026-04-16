@@ -1,9 +1,22 @@
+import { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
+import {
+  clearAdminSession,
+  getStoredAdminToken,
+  hasValidAdminSession,
+} from '../../utils/auth';
 
 export default function AuthLayout() {
-  // If already logged in, redirect to dashboard
-  const token = localStorage.getItem('admin_token');
-  if (token) {
+  const hasSession = hasValidAdminSession();
+
+  useEffect(() => {
+    if (!hasSession && getStoredAdminToken()) {
+      clearAdminSession();
+    }
+  }, [hasSession]);
+
+  // If already logged in with valid admin/staff session, redirect to dashboard.
+  if (hasSession) {
     return <Navigate to="/" replace />;
   }
 

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAdminSession, getStoredAdminToken } from './utils/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -11,7 +12,7 @@ const client = axios.create({
 
 // Request Interceptor: Attach Bearer Token
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token');
+  const token = getStoredAdminToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -26,16 +27,15 @@ client.interceptors.response.use(
     const code = error.response?.data?.error?.code || 'UNKNOWN_ERROR';
     const message = error.response?.data?.error?.message || 'Unknown error occurred';
     const status = error.response?.status;
+    const requestPath = String(error.config?.url || '');
+    const isLoginRequest = requestPath.includes('/auth/login');
 
-    // Auth redirection for Unauthorized
-    if (status === 401) {
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_user');
-      window.location.href = '/login';
-    }
-    // Alert for Forbidden
-    else if (status === 403) {
-      alert(`Access Denied: ${message}`);
+    // Force logout on token expiration / unauthorized calls.
+    if (!isLoginRequest && (status === 401 || (status === 403 && code === 'FORBIDDEN'))) {
+      clearAdminSession();
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
 
     return Promise.reject({ code, message, status });
@@ -70,6 +70,17 @@ class ApiService {
   static async updateOrderStatus(id, status) {
     return client.patch(`/admin/orders/${id}/status`, { status });
   }
+  static async getOrderDeliveryEvents(id) {
+    return client.get(`/admin/orders/${id}/delivery-events`);
+  }
+  static async submitAddressChangeDecision(id, decision, approvedShippingFee = null) {
+    const payload = { decision };
+    if (approvedShippingFee != null && approvedShippingFee !== '') {
+      payload.approvedShippingFee = Number(approvedShippingFee);
+    }
+
+    return client.post(`/admin/orders/${id}/address-change-decision`, payload);
+  }
 
   // ISSUES
   static async getIssues(params = {}) {
@@ -87,6 +98,27 @@ class ApiService {
   }
   static async updateIssueStatus(id, status) {
     return client.patch(`/admin/issues/${id}/status`, { status });
+  }
+
+  // REFUND REQUESTS
+  static async getRefundRequests(status = null) {
+    const params = {};
+    if (status && status !== 'ALL') {
+      params.status = status.toLowerCase();
+    }
+
+    return client.get('/admin/refund-requests', { params });
+  }
+  static async getRefundRequest(id) {
+    return client.get(`/admin/refund-requests/${id}`);
+  }
+  static async updateRefundRequestStatus(id, status, reviewNote = null) {
+    const payload = { status };
+    if (reviewNote != null) {
+      payload.reviewNote = reviewNote;
+    }
+
+    return client.patch(`/admin/refund-requests/${id}/status`, payload);
   }
 }
 

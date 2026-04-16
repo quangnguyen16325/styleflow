@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ApiService from '../../api';
 import ErrorMessage from '../../components/ui/ErrorMessage';
+import { clearAdminSession, isPrivilegedRole } from '../../utils/auth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -19,6 +20,15 @@ export default function Login() {
     setError(null);
     try {
       const response = await ApiService.login(email, password);
+      if (!isPrivilegedRole(response?.customer?.role)) {
+        clearAdminSession();
+        setError({
+          code: 'FORBIDDEN',
+          message: 'Only admin/staff accounts can access the admin portal.',
+        });
+        return;
+      }
+
       localStorage.setItem('admin_token', response.token);
       localStorage.setItem('admin_user', JSON.stringify(response.customer));
       navigate(from, { replace: true });
