@@ -238,14 +238,15 @@ export default function CheckoutScreen({ navigation }) {
 
     try {
       const response = await api.post("/orders", payload);
-      
+
       console.log("[CheckoutScreen] Tạo đơn thành công:", response.data);
-      
+
       clearCart();
       navigation.navigate("Success");
     } catch (error) {
       console.log("[CheckoutScreen] Lỗi chi tiết khi đặt hàng:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Đặt hàng thất bại. Vui lòng thử lại.";
+      const errorMessage =
+        error.response?.data?.message || error.message || "Đặt hàng thất bại. Vui lòng thử lại.";
       Alert.alert("Lỗi đặt hàng", errorMessage);
     } finally {
       setIsPlacingOrder(false);
