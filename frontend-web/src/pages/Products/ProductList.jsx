@@ -45,6 +45,9 @@ export default function ProductList() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ margin: 0, color: '#202124' }}>Inventory Info</h2>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <Link to="/products/new" className="btn-primary">
+            + Create Product
+          </Link>
           {lowStockCount > 0 && (
             <span style={{
               padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,

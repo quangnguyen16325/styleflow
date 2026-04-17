@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import ErrorMessage from '../../components/ui/ErrorMessage';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
@@ -34,6 +35,7 @@ function formatFileSize(bytes) {
 
 export default function ProductDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,6 +44,8 @@ export default function ProductDetails() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -148,6 +152,32 @@ export default function ProductDetails() {
     }
   };
 
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setDeleting(true);
+    try {
+      await ApiService.deleteProduct(id);
+      navigate('/products');
+    } catch (err) {
+      console.error('Delete error:', err);
+      if (err.code === 'CONFLICT') {
+        setError({ code: 'CONFLICT', message: 'Cannot delete product with active orders or reservations' });
+      } else {
+        setError(err);
+      }
+      setShowDeleteDialog(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
+  };
+
   if (loading) return <LoadingSpinner message="Loading product details..." />;
   if (error) return <ErrorMessage error={error} />;
   if (!product) return null;
@@ -170,16 +200,29 @@ export default function ProductDetails() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ margin: 0, color: '#202124' }}>{product.name}</h2>
-        <span style={{
-          padding: '6px 14px',
-          backgroundColor: isLowStock ? '#ffebee' : '#e8f5e9',
-          color: isLowStock ? '#c62828' : '#2e7d32',
-          borderRadius: '16px',
-          fontWeight: 600,
-          fontSize: '12px',
-        }}>
-          {isLowStock ? '⚠ LOW STOCK' : '✓ IN STOCK'}
-        </span>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <Link to={`/products/${id}/edit`} className="btn-primary">
+            Edit
+          </Link>
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            className="btn-danger"
+            disabled={deleting}
+          >
+            Delete
+          </button>
+          <span style={{
+            padding: '6px 14px',
+            backgroundColor: isLowStock ? '#ffebee' : '#e8f5e9',
+            color: isLowStock ? '#c62828' : '#2e7d32',
+            borderRadius: '16px',
+            fontWeight: 600,
+            fontSize: '12px',
+          }}>
+            {isLowStock ? '⚠ LOW STOCK' : '✓ IN STOCK'}
+          </span>
+        </div>
       </div>
 
       {/* Product Image */}
@@ -304,6 +347,18 @@ export default function ProductDetails() {
           </div>
         ))}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        title="Delete Product"
+        message={`Are you sure you want to delete "${product.name}" (SKU: ${product.sku})? This action cannot be undone.`}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+      />
     </div>
   );
 }

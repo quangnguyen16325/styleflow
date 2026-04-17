@@ -6,6 +6,7 @@ import Login from './pages/Auth/Login';
 import Dashboard from './pages/Dashboard';
 import ProductList from './pages/Products/ProductList';
 import ProductDetails from './pages/Products/ProductDetails';
+import ProductForm from './pages/Products/ProductForm';
 import OrderList from './pages/Orders/OrderList';
 import OrderDetails from './pages/Orders/OrderDetails';
 import IssueList from './pages/Issues/IssueList';
@@ -27,7 +28,9 @@ function App() {
           <Route path="/" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="products" element={<ProductList />} />
+            <Route path="products/new" element={<ProductForm />} />
             <Route path="products/:id" element={<ProductDetails />} />
+            <Route path="products/:id/edit" element={<ProductForm />} />
             <Route path="orders" element={<OrderList />} />
             <Route path="orders/:id" element={<OrderDetails />} />
             <Route path="issues" element={<IssueList />} />

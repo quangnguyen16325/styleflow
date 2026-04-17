@@ -65,6 +65,15 @@ class ApiService {
   static async updateProductImage(id, imageUrl) {
     return client.patch(`/admin/products/${id}/image`, { imageUrl });
   }
+  static async createProduct(productData) {
+    return client.post('/admin/products', productData);
+  }
+  static async updateProduct(id, productData) {
+    return client.patch(`/admin/products/${id}`, productData);
+  }
+  static async deleteProduct(id) {
+    return client.delete(`/admin/products/${id}`);
+  }
 
   // ORDERS (admin routes per contract)
   static async getOrders(status = null) {
