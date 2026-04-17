@@ -55,6 +55,16 @@ class ApiService {
   static async getProduct(id) {
     return client.get(`/products/${id}`);
   }
+  static async createProductUploadPresign(productId, fileName, contentType) {
+    return client.post('/admin/uploads/presign', {
+      productId,
+      fileName,
+      contentType,
+    });
+  }
+  static async updateProductImage(id, imageUrl) {
+    return client.patch(`/admin/products/${id}/image`, { imageUrl });
+  }
 
   // ORDERS (admin routes per contract)
   static async getOrders(status = null) {
