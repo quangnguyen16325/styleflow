@@ -4,8 +4,6 @@ import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import ErrorMessage from '../../components/ui/ErrorMessage';
 
-const CATEGORIES = ['apparel', 'accessories', 'footwear', 'other'];
-
 function validateSKU(sku) {
   if (!sku || sku.trim() === '') return 'SKU is required';
   if (!/^[A-Z0-9-]+$/.test(sku)) return 'SKU must contain only uppercase letters, numbers, and hyphens';
@@ -48,18 +46,33 @@ export default function ProductForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
     basePrice: '',
-    category: 'apparel',
+    categoryId: '',
     stockQty: '',
     minStockLevel: '',
   });
 
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
+
+  // Load categories
+  useEffect(() => {
+    ApiService.getCategories()
+      .then((data) => {
+        setCategories(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        console.error('Failed to load categories:', err);
+        setCategories([]);
+      })
+      .finally(() => setLoadingCategories(false));
+  }, []);
 
   useEffect(() => {
     if (isEditMode) {
@@ -69,7 +82,7 @@ export default function ProductForm() {
             sku: data.sku || '',
             name: data.name || '',
             basePrice: data.basePrice || '',
-            category: data.category || 'apparel',
+            categoryId: data.categoryId || '',
             stockQty: data.stockQty || '',
             minStockLevel: data.minStockLevel || '',
           });
@@ -151,7 +164,7 @@ export default function ProductForm() {
     const payload = {
       name: formData.name.trim(),
       basePrice: Number(formData.basePrice),
-      category: formData.category,
+      categoryId: Number(formData.categoryId),
       stockQty: Number(formData.stockQty),
       minStockLevel: Number(formData.minStockLevel),
     };
@@ -194,6 +207,7 @@ export default function ProductForm() {
   }, [successMessage]);
 
   if (loading) return <LoadingSpinner message="Loading product..." />;
+  if (loadingCategories) return <LoadingSpinner message="Loading categories..." />;
   if (error && error.code === 'NOT_FOUND') return <ErrorMessage error={error} />;
 
   const hasErrors = Object.values(errors).some((err) => err !== null);
@@ -289,24 +303,30 @@ export default function ProductForm() {
 
           {/* Category */}
           <div>
-            <label htmlFor="category" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
+            <label htmlFor="categoryId" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
               Category <span style={{ color: '#c62828' }}>*</span>
             </label>
             <select
-              id="category"
-              name="category"
-              value={formData.category}
+              id="categoryId"
+              name="categoryId"
+              value={formData.categoryId}
               onChange={handleChange}
-              disabled={submitting}
+              disabled={submitting || categories.length === 0}
               className="form-select"
               style={{ width: '100%' }}
             >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              <option value="">Select a category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
                 </option>
               ))}
             </select>
+            {categories.length === 0 && (
+              <div style={{ marginTop: '4px', fontSize: '12px', color: '#c62828' }}>
+                No categories available. Please create a category first.
+              </div>
+            )}
           </div>
 
           {/* Base Price */}

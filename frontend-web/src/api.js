@@ -75,6 +75,26 @@ class ApiService {
     return client.delete(`/admin/products/${id}`);
   }
 
+  // CATEGORIES
+  static async getCategories() {
+    return client.get('/categories');
+  }
+  static async getAdminCategories() {
+    return client.get('/admin/categories');
+  }
+  static async getCategory(id) {
+    return client.get(`/admin/categories/${id}`);
+  }
+  static async createCategory(categoryData) {
+    return client.post('/admin/categories', categoryData);
+  }
+  static async updateCategory(id, categoryData) {
+    return client.patch(`/admin/categories/${id}`, categoryData);
+  }
+  static async deleteCategory(id) {
+    return client.delete(`/admin/categories/${id}`);
+  }
+
   // ORDERS (admin routes per contract)
   static async getOrders(status = null) {
     const params = {};

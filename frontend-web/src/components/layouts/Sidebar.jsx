@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const menuItems = [
   { to: '/', label: 'Dashboard', icon: '📊', end: true },
   { to: '/products', label: 'Inventory Info', icon: '📦' },
+  { to: '/categories', label: 'Categories', icon: '🏷️' },
   { to: '/orders', label: 'Order Management', icon: '🛒' },
   { to: '/issues', label: 'Issues Tracking', icon: '⚠️' },
   { to: '/refund-requests', label: 'Refund Requests', icon: '💸' },

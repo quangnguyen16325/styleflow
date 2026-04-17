@@ -7,6 +7,9 @@ import Dashboard from './pages/Dashboard';
 import ProductList from './pages/Products/ProductList';
 import ProductDetails from './pages/Products/ProductDetails';
 import ProductForm from './pages/Products/ProductForm';
+import CategoryList from './pages/Categories/CategoryList';
+import CategoryDetails from './pages/Categories/CategoryDetails';
+import CategoryForm from './pages/Categories/CategoryForm';
 import OrderList from './pages/Orders/OrderList';
 import OrderDetails from './pages/Orders/OrderDetails';
 import IssueList from './pages/Issues/IssueList';
@@ -31,6 +34,10 @@ function App() {
             <Route path="products/new" element={<ProductForm />} />
             <Route path="products/:id" element={<ProductDetails />} />
             <Route path="products/:id/edit" element={<ProductForm />} />
+            <Route path="categories" element={<CategoryList />} />
+            <Route path="categories/new" element={<CategoryForm />} />
+            <Route path="categories/:id" element={<CategoryDetails />} />
+            <Route path="categories/:id/edit" element={<CategoryForm />} />
             <Route path="orders" element={<OrderList />} />
             <Route path="orders/:id" element={<OrderDetails />} />
             <Route path="issues" element={<IssueList />} />
