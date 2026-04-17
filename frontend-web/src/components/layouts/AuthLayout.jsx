@@ -15,11 +15,22 @@ export default function AuthLayout() {
     }
   }, [hasSession]);
 
-  // If already logged in with valid admin/staff session, redirect to dashboard.
+  // If already logged in with valid admin/staff session, redirect to dashboard
   if (hasSession) {
     return <Navigate to="/" replace />;
   }
 
   // Login page handles its own full-page layout
-  return <Outlet />;
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'var(--color-bg)',
+      }}
+    >
+      <Outlet />
+    </div>
+  );
 }

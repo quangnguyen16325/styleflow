@@ -11,51 +11,112 @@ export default function Header() {
   };
 
   const initials = user?.fullName
-    ? user.fullName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    ? user.fullName.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
     : 'A';
 
   return (
-    <header style={{
-      height: '60px',
-      backgroundColor: '#ffffff',
-      borderBottom: '1px solid #e0e0e0',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      padding: '0 24px',
-      flexShrink: 0,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    <header
+      style={{
+        height: '64px',
+        backgroundColor: 'var(--color-surface)',
+        borderBottom: '1px solid var(--color-border)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 var(--spacing-xl)',
+        flexShrink: 0,
+        boxShadow: 'var(--shadow-xs)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 'var(--z-sticky)',
+      }}
+    >
+      {/* Left side - Breadcrumb or Title */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+        <h1
+          style={{
+            fontSize: 'var(--font-size-lg)',
+            fontWeight: 'var(--font-weight-semibold)',
+            color: 'var(--color-dark)',
+            margin: 0,
+          }}
+        >
+          Admin Portal
+        </h1>
+      </div>
+
+      {/* Right side - User menu */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
         {user ? (
           <>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#202124', lineHeight: 1.3 }}>{user.fullName}</div>
-              <div style={{ fontSize: '11px', color: '#5f6368', textTransform: 'capitalize' }}>{user.role}</div>
+              <div
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-dark)',
+                  lineHeight: 1.3,
+                }}
+              >
+                {user.fullName}
+              </div>
+              <div
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--color-text-secondary)',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {user.role}
+              </div>
             </div>
-            <div style={{
-              width: '34px', height: '34px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 700, fontSize: '13px', letterSpacing: '-0.5px',
-            }}>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: 'var(--radius-full)',
+                background: 'linear-gradient(135deg, var(--color-primary), #6366f1)',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'var(--font-weight-bold)',
+                fontSize: 'var(--font-size-sm)',
+                letterSpacing: '-0.5px',
+                boxShadow: 'var(--shadow-sm)',
+                border: '2px solid var(--color-surface)',
+              }}
+            >
               {initials}
             </div>
             <button
               onClick={handleLogout}
+              className="btn-secondary btn-sm"
               style={{
-                marginLeft: '4px', padding: '7px 14px',
-                background: 'transparent', border: '1px solid #e0e0e0',
-                borderRadius: '6px', fontSize: '13px', fontWeight: 500,
-                color: '#5f6368', transition: 'all 0.15s ease',
+                marginLeft: 'var(--spacing-xs)',
               }}
-              onMouseEnter={(e) => { e.target.style.background = '#f1f3f4'; e.target.style.color = '#c62828'; }}
-              onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.color = '#5f6368'; }}
+              onMouseEnter={(e) => {
+                e.target.style.color = 'var(--color-danger)';
+                e.target.style.borderColor = 'var(--color-danger)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.color = 'var(--color-text)';
+                e.target.style.borderColor = 'var(--color-border)';
+              }}
             >
-              Log Out
+              🚪 Log Out
             </button>
           </>
         ) : (
-          <div style={{ fontSize: '14px', fontWeight: 500, color: '#5f6368' }}>Guest</div>
+          <div
+            style={{
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 'var(--font-weight-medium)',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            Guest
+          </div>
         )}
       </div>
     </header>
