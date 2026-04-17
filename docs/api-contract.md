@@ -1010,7 +1010,8 @@ Response `200`:
 ```json
 {
   "success": true,
-  "action": "retry_pending"
+  "action": "retry_pending",
+  "customerEmail": "nguyenvana@example.com"
 }
 ```
 

@@ -23,9 +23,15 @@ router.post("/delivery-callback", async (req, res) => {
 
     const orderResult = await client.query(
       `
-        SELECT id, status, delivery_fail_count, delivery_status
-        FROM orders
-        WHERE id = $1
+        SELECT
+          o.id,
+          o.status,
+          o.delivery_fail_count,
+          o.delivery_status,
+          c.email AS customer_email
+        FROM orders o
+        JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = $1
         LIMIT 1
       `,
       [orderId],
@@ -56,7 +62,11 @@ router.post("/delivery-callback", async (req, res) => {
 
     if (externalEventId && deliveryEventResult.rows.length === 0) {
       await client.query("COMMIT");
-      return res.json({ success: true, action: "duplicate_ignored" });
+      return res.json({
+        success: true,
+        action: "duplicate_ignored",
+        customerEmail: order.customer_email,
+      });
     }
 
     let action = "updated";
@@ -157,7 +167,11 @@ router.post("/delivery-callback", async (req, res) => {
     }
 
     await client.query("COMMIT");
-    return res.json({ success: true, action });
+    return res.json({
+      success: true,
+      action,
+      customerEmail: order.customer_email,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("POST /delivery-callback failed:", error);
