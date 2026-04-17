@@ -191,6 +191,7 @@ Common error codes:
   "orderId": 12,
   "customerId": 4,
   "orderAmount": 219000,
+  "customerEmail": "customer@example.com",
   "imageUrl": "https://example.com/evidence.jpg",
   "status": "pending",
   "abuseScoreSnapshot": 1,

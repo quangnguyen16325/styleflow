@@ -179,6 +179,10 @@ export function mapRefundRequestRow(row) {
     mapped.orderAmount = Number(row.order_total_amount);
   }
 
+  if (row.customer_email != null) {
+    mapped.customerEmail = row.customer_email;
+  }
+
   return mapped;
 }
 
