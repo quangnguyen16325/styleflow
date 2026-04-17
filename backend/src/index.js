@@ -4,11 +4,15 @@ import cors from "cors";
 import { migrate } from "./db/migrate.js";
 import { attachAuthCustomerId, requireAuth, requireRole } from "./middleware/require-auth.js";
 import adminPaymentLogsRouter from "./routes/admin-payment-logs.js";
+import adminCategoriesRouter from "./routes/admin-categories.js";
 import adminOrdersRouter from "./routes/admin-orders.js";
 import adminPaymentIncidentsRouter from "./routes/admin-payment-incidents.js";
+import adminProductsRouter from "./routes/admin-products.js";
 import adminRefundRequestsRouter from "./routes/admin-refund-requests.js";
 import adminSystemConfigRouter from "./routes/admin-system-config.js";
+import adminUploadsRouter from "./routes/admin-uploads.js";
 import authRouter from "./routes/auth.js";
+import categoriesRouter from "./routes/categories.js";
 import addressesRouter from "./routes/addresses.js";
 import deliveryRouter from "./routes/delivery.js";
 import issuesRouter from "./routes/issues.js";
@@ -37,8 +41,10 @@ app.use("/me/addresses", requireAuth, attachAuthCustomerId, addressesRouter);
 app.use("/refund-requests", requireAuth, refundRequestsRouter);
 app.use("/", deliveryRouter);
 app.use("/", paymentsRouter);
+app.use("/admin/categories", requireAuth, requireRole("admin", "staff"), adminCategoriesRouter);
 app.use("/admin/payment-logs", requireAuth, requireRole("admin", "staff"), adminPaymentLogsRouter);
 app.use("/admin/orders", requireAuth, requireRole("admin", "staff"), adminOrdersRouter);
+app.use("/admin/products", requireAuth, requireRole("admin", "staff"), adminProductsRouter);
 app.use(
   "/admin/payment-incidents",
   requireAuth,
@@ -58,7 +64,9 @@ app.use(
   requireRole("admin", "staff"),
   adminSystemConfigRouter,
 );
+app.use("/admin/uploads", requireAuth, requireRole("admin", "staff"), adminUploadsRouter);
 app.use("/customers/:customerId/addresses", addressesRouter);
+app.use("/categories", categoriesRouter);
 app.use("/products", productsRouter);
 app.use("/orders", ordersRouter);
 
