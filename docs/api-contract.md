@@ -977,6 +977,9 @@ Response `200`:
 
 Process delivery partner callback.
 
+Headers:
+- `X-Internal-Webhook-Secret: <secret>` required
+
 Request body:
 
 ```json
@@ -999,6 +1002,8 @@ Allowed `status`:
 Rules:
 - `orderId`: required, positive integer
 - `reason`: required when `status = FAILED`
+- `externalEventId` is optional
+- when `externalEventId` is provided, repeated callbacks with the same value are ignored idempotently
 
 Response `200`:
 
@@ -1014,6 +1019,7 @@ Other possible `action` values:
 - `returning`
 - `returned`
 - `updated`
+- `duplicate_ignored`
 
 Side effects:
 - when delivery reaches `DELIVERED`, backend records `SALE` inventory transactions once

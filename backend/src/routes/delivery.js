@@ -5,6 +5,11 @@ import { applyOrderLifecycleTransition, applyOrderReturn } from "./order-lifecyc
 const router = Router();
 
 router.post("/delivery-callback", async (req, res) => {
+  const secretError = validateInternalWebhookSecret(req);
+  if (secretError) {
+    return res.status(secretError.status).json(secretError.body);
+  }
+
   const payloadError = validateDeliveryPayload(req.body);
   if (payloadError) {
     return res.status(400).json(validationError(payloadError));
@@ -32,7 +37,7 @@ router.post("/delivery-callback", async (req, res) => {
     }
 
     const order = orderResult.rows[0];
-    await client.query(
+    const deliveryEventResult = await client.query(
       `
         INSERT INTO delivery_events (
           order_id,
@@ -43,9 +48,16 @@ router.post("/delivery-callback", async (req, res) => {
           payload
         )
         VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+        ON CONFLICT (external_event_id) DO NOTHING
+        RETURNING id
       `,
       [orderId, partner, externalEventId, status, reason, JSON.stringify(req.body)],
     );
+
+    if (externalEventId && deliveryEventResult.rows.length === 0) {
+      await client.query("COMMIT");
+      return res.json({ success: true, action: "duplicate_ignored" });
+    }
 
     let action = "updated";
     if (status === "DELIVERED") {
@@ -157,6 +169,33 @@ router.post("/delivery-callback", async (req, res) => {
 
 export default router;
 
+function validateInternalWebhookSecret(req) {
+  const configuredSecret = process.env.INTERNAL_WEBHOOK_SECRET?.trim();
+  if (!configuredSecret) {
+    return {
+      status: 500,
+      body: internalError("Missing INTERNAL_WEBHOOK_SECRET env"),
+    };
+  }
+
+  const receivedSecret = req.get("X-Internal-Webhook-Secret")?.trim();
+  if (!receivedSecret) {
+    return {
+      status: 401,
+      body: unauthorizedError("X-Internal-Webhook-Secret header is required"),
+    };
+  }
+
+  if (receivedSecret !== configuredSecret) {
+    return {
+      status: 401,
+      body: unauthorizedError("Invalid internal webhook secret"),
+    };
+  }
+
+  return null;
+}
+
 function validateDeliveryPayload(body) {
   if (!body || typeof body !== "object") {
     return "Request body is required";
@@ -218,6 +257,15 @@ function notFoundError(message) {
   return {
     error: {
       code: "NOT_FOUND",
+      message,
+    },
+  };
+}
+
+function unauthorizedError(message) {
+  return {
+    error: {
+      code: "UNAUTHORIZED",
       message,
     },
   };
