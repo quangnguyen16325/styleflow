@@ -23,7 +23,9 @@ function genOrderCode() {
 
 const ORDER_CODE = genOrderCode();
 
-export default function SuccessScreen({ navigation }) {
+export default function SuccessScreen({ route, navigation }) {
+  const { orderId } = route?.params || {};
+
   // ── Animations ──────────────────────────────────────────────────────────────
   const [scaleAnim] = useState(new Animated.Value(0));
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -54,7 +56,7 @@ export default function SuccessScreen({ navigation }) {
         }),
       ]),
     ]).start();
-  }, []);
+  }, [fadeAnim, scaleAnim, slideAnim]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -112,7 +114,13 @@ export default function SuccessScreen({ navigation }) {
           <TouchableOpacity
             style={styles.secondaryBtn}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate("MainApp", { screen: "Track" })}
+            onPress={() => {
+              if (orderId) {
+                navigation.navigate("OrderTracking", { orderId });
+              } else {
+                navigation.navigate("MainApp", { screen: "Track" });
+              }
+            }}
           >
             <Text style={styles.secondaryBtnText}>Theo dõi đơn hàng →</Text>
           </TouchableOpacity>

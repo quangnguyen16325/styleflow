@@ -242,7 +242,8 @@ export default function CheckoutScreen({ navigation }) {
       console.log("[CheckoutScreen] Tạo đơn thành công:", response.data);
 
       clearCart();
-      navigation.navigate("Success");
+      const newOrderId = response.data.id;
+      navigation.navigate("Success", { orderId: newOrderId });
     } catch (error) {
       console.log("[CheckoutScreen] Lỗi chi tiết khi đặt hàng:", error);
       const errorMessage =

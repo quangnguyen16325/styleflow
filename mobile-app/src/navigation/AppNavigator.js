@@ -23,6 +23,7 @@ import ProductListScreen from "../screens/ProductListScreen";
 import ProductDetailScreen from "../screens/ProductDetailScreen";
 import CheckoutScreen from "../screens/CheckoutScreen";
 import SuccessScreen from "../screens/SuccessScreen";
+import OrderDetailScreen from "../screens/OrderDetailScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 
 const Stack = createNativeStackNavigator();
@@ -44,7 +45,7 @@ function AuthStack() {
 const TAB_SCREENS = {
   Home: HomeScreen,
   Wishlist: WishlistScreen,
-  Track: OrderTrackingScreen,
+  Track: OrderDetailScreen, // Dùng OrderDetailScreen làm danh sách đơn hàng (Tab)
   Cart: CartScreen,
   Profile: ProfileScreen,
 };
@@ -130,6 +131,13 @@ function MainAppStack() {
         }}
       />
       <Stack.Screen name="Success" component={SuccessScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="OrderTracking"
+        component={OrderTrackingScreen}
+        options={{
+          headerShown: false, // Custom header internally
+        }}
+      />
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
