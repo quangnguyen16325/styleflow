@@ -438,6 +438,12 @@ WHERE p.category_id IS NULL
 ALTER TABLE payment_logs
 ADD COLUMN IF NOT EXISTS external_event_id VARCHAR(120);
 
+DELETE FROM delivery_events de
+USING delivery_events older
+WHERE de.id > older.id
+  AND de.external_event_id IS NOT NULL
+  AND de.external_event_id = older.external_event_id;
+
 ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS review_note TEXT;
 
@@ -509,6 +515,9 @@ CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
 CREATE INDEX IF NOT EXISTS idx_issues_severity ON issues(severity);
 CREATE INDEX IF NOT EXISTS idx_delivery_events_order_id ON delivery_events(order_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_events_status ON delivery_events(status);
+DROP INDEX IF EXISTS uniq_delivery_events_external_event_id;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_delivery_events_external_event_id
+ON delivery_events(external_event_id);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_customer_address_id ON orders(customer_address_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
