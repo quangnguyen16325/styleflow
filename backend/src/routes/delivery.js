@@ -70,6 +70,7 @@ router.post("/delivery-callback", async (req, res) => {
     }
 
     let action = "updated";
+    let failCount = Number(order.delivery_fail_count);
     if (status === "DELIVERED") {
       await client.query(
         `
@@ -84,6 +85,7 @@ router.post("/delivery-callback", async (req, res) => {
       );
       await applyOrderLifecycleTransition(client, orderId, order.status, "completed");
       action = "delivered";
+      failCount = 0;
     } else if (status === "RETURNED") {
       if (order.status === "completed" && order.delivery_status !== "returned") {
         await applyOrderReturn(client, orderId);
@@ -102,6 +104,7 @@ router.post("/delivery-callback", async (req, res) => {
         [orderId, partner],
       );
       action = "returned";
+      failCount = Number(order.delivery_fail_count);
     } else if (status === "FAILED") {
       const nextFailCount = Number(order.delivery_fail_count) + 1;
       const nextDeliveryStatus = nextFailCount >= 3 ? "returning" : "retry_pending";
@@ -152,6 +155,7 @@ router.post("/delivery-callback", async (req, res) => {
       }
 
       action = nextFailCount >= 3 ? "returning" : "retry_pending";
+      failCount = nextFailCount;
     } else {
       await client.query(
         `
@@ -164,13 +168,14 @@ router.post("/delivery-callback", async (req, res) => {
         `,
         [orderId, mapCallbackStatusToDeliveryStatus(status), partner],
       );
+      failCount = Number(order.delivery_fail_count);
     }
 
     await client.query("COMMIT");
     return res.json({
       success: true,
       action,
-      delivery_fail_count,
+      failCount,
       customerEmail: order.customer_email,
     });
   } catch (error) {
