@@ -170,6 +170,7 @@ router.post("/delivery-callback", async (req, res) => {
     return res.json({
       success: true,
       action,
+      delivery_fail_count,
       customerEmail: order.customer_email,
     });
   } catch (error) {
