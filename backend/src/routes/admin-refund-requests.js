@@ -72,6 +72,7 @@ router.get("/:id", async (req, res) => {
           rr.id,
           rr.order_id,
           rr.customer_id,
+          o.total_amount AS order_total_amount,
           rr.image_url,
           rr.status,
           rr.abuse_score_snapshot,
@@ -79,6 +80,7 @@ router.get("/:id", async (req, res) => {
           rr.created_at,
           rr.updated_at
         FROM refund_requests rr
+        JOIN orders o ON o.id = rr.order_id
         WHERE rr.id = $1
         LIMIT 1
       `,

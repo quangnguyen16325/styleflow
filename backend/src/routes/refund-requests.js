@@ -163,7 +163,7 @@ function validateRefundRequestPayload(body) {
 }
 
 export function mapRefundRequestRow(row) {
-  return {
+  const mapped = {
     id: Number(row.id),
     orderId: Number(row.order_id),
     customerId: Number(row.customer_id),
@@ -174,6 +174,12 @@ export function mapRefundRequestRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+
+  if (row.order_total_amount != null) {
+    mapped.orderAmount = Number(row.order_total_amount);
+  }
+
+  return mapped;
 }
 
 const ABUSE_SCORE_MANUAL_REVIEW_THRESHOLD = 3;

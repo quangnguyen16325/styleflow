@@ -190,6 +190,7 @@ Common error codes:
   "id": 1,
   "orderId": 12,
   "customerId": 4,
+  "orderAmount": 219000,
   "imageUrl": "https://example.com/evidence.jpg",
   "status": "pending",
   "abuseScoreSnapshot": 1,
