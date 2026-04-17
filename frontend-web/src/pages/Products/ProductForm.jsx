@@ -37,6 +37,11 @@ function validateMinStockLevel(level) {
   return null;
 }
 
+function validateCategoryId(categoryId) {
+  if (!categoryId || categoryId === '') return 'Category is required';
+  return null;
+}
+
 export default function ProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -108,6 +113,8 @@ export default function ProductForm() {
         return validateName(value);
       case 'basePrice':
         return validateBasePrice(value);
+      case 'categoryId':
+        return validateCategoryId(value);
       case 'stockQty':
         return validateStockQty(value);
       case 'minStockLevel':
@@ -311,6 +318,7 @@ export default function ProductForm() {
               name="categoryId"
               value={formData.categoryId}
               onChange={handleChange}
+              onBlur={handleBlur}
               disabled={submitting || categories.length === 0}
               className="form-select"
               style={{ width: '100%' }}
@@ -322,6 +330,9 @@ export default function ProductForm() {
                 </option>
               ))}
             </select>
+            {errors.categoryId && touched.categoryId && (
+              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.categoryId}</div>
+            )}
             {categories.length === 0 && (
               <div style={{ marginTop: '4px', fontSize: '12px', color: '#c62828' }}>
                 No categories available. Please create a category first.
