@@ -48,31 +48,41 @@ VALUES
     'staff',
     0,
     FALSE
-  )
+)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO products (id, sku, name, base_price, category)
+INSERT INTO categories (id, name, slug)
+VALUES
+  (1, 'Apparel', 'apparel'),
+  (2, 'Accessories', 'accessories'),
+  (3, 'General', 'general')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO products (id, sku, name, base_price, category, category_id)
 VALUES
   (
     1,
     'TSHIRT-001',
     'Classic T-Shirt',
     199000.00,
-    'apparel'
+    'apparel',
+    1
   ),
   (
     2,
     'HOODIE-001',
     'Black Hoodie',
     499000.00,
-    'apparel'
+    'apparel',
+    1
   ),
   (
     3,
     'TOTE-001',
     'Canvas Tote Bag',
     149000.00,
-    'accessories'
+    'accessories',
+    2
   )
 ON CONFLICT (id) DO NOTHING;
 
@@ -167,6 +177,12 @@ ON CONFLICT DO NOTHING;
 SELECT setval(
   pg_get_serial_sequence('customers', 'id'),
   COALESCE((SELECT MAX(id) FROM customers), 1),
+  true
+);
+
+SELECT setval(
+  pg_get_serial_sequence('categories', 'id'),
+  COALESCE((SELECT MAX(id) FROM categories), 1),
   true
 );
 

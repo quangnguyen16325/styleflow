@@ -31,12 +31,21 @@ CREATE TABLE IF NOT EXISTS customer_addresses (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS categories (
+  id BIGSERIAL PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  slug VARCHAR(120) NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS products (
   id BIGSERIAL PRIMARY KEY,
   sku VARCHAR(100) NOT NULL UNIQUE,
   name VARCHAR(255) NOT NULL,
   base_price NUMERIC(12, 2) NOT NULL CHECK (base_price >= 0),
   category VARCHAR(100) NOT NULL DEFAULT 'general',
+  category_id BIGINT REFERENCES categories(id) ON DELETE SET NULL,
   image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -410,6 +419,22 @@ ADD COLUMN IF NOT EXISTS shipping_postal_code VARCHAR(30);
 ALTER TABLE products
 ADD COLUMN IF NOT EXISTS image_url TEXT;
 
+ALTER TABLE products
+ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES categories(id) ON DELETE SET NULL;
+
+INSERT INTO categories (name, slug)
+VALUES
+  ('Apparel', 'apparel'),
+  ('Accessories', 'accessories'),
+  ('General', 'general')
+ON CONFLICT (slug) DO NOTHING;
+
+UPDATE products p
+SET category_id = c.id
+FROM categories c
+WHERE p.category_id IS NULL
+  AND LOWER(TRIM(p.category)) = c.slug;
+
 ALTER TABLE payment_logs
 ADD COLUMN IF NOT EXISTS external_event_id VARCHAR(120);
 
@@ -466,10 +491,12 @@ CREATE INDEX IF NOT EXISTS idx_customers_role ON customers(role);
 CREATE INDEX IF NOT EXISTS idx_customers_blacklisted ON customers(is_blacklisted);
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_customer_id ON customer_addresses(customer_id);
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_city ON customer_addresses(city);
+CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_customer_addresses_default_per_customer
 ON customer_addresses(customer_id)
 WHERE is_default = TRUE;
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_inventory_id ON inventory_transactions(inventory_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_order_id ON inventory_transactions(order_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_type ON inventory_transactions(type);
