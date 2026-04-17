@@ -9,16 +9,19 @@ import {
   ActivityIndicator,
   Dimensions,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { getProductById, formatPrice } from "../services/api";
+import { useCart } from "../context/CartContext";
 import { COLORS } from "../constants/colors";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ProductDetailScreen() {
   const route = useRoute();
+  const navigation = useNavigation();
   const productId = parseInt(route.params?.id || "1", 10);
 
+  const { addToCart } = useCart();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,6 +58,20 @@ export default function ProductDetailScreen() {
   const increaseQty = () => setQuantity((p) => p + 1);
   const decreaseQty = () => {
     if (quantity > 1) setQuantity((p) => p - 1);
+  };
+
+  const handleAddToCart = () => {
+    if (product) {
+      addToCart(product, quantity);
+      alert("Đã thêm vào giỏ hàng!");
+    }
+  };
+
+  const handleBuyNow = () => {
+    if (product) {
+      addToCart(product, quantity);
+      navigation.navigate("Checkout");
+    }
   };
 
   if (loading) {
@@ -306,10 +323,10 @@ export default function ProductDetailScreen() {
         <TouchableOpacity style={styles.heartBtn} onPress={() => setLiked(!liked)}>
           <Text style={[styles.heartIcon, liked && styles.heartActive]}>{liked ? "♥" : "♡"}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.85} onPress={handleAddToCart}>
           <Text style={styles.addCartText}>Add to cart</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.buyNowBtn} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.buyNowBtn} activeOpacity={0.85} onPress={handleBuyNow}>
           <Text style={styles.buyNowText}>Buy now</Text>
         </TouchableOpacity>
       </View>

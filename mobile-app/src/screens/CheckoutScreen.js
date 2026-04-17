@@ -10,7 +10,7 @@
  *  - Thành công → clearCart() → navigate("Success")
  *  - KHÔNG sửa App.js
  */
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import {
   SafeAreaView,
 } from "react-native";
 import { useCart } from "../context/CartContext";
-import { createOrder } from "../services/api";
+import api from "../services/api";
 import { COLORS } from "../constants/colors";
 
 // ── Mock address book (sẽ replace bằng API GET /addresses ở Commit 6) ────────
@@ -201,7 +201,7 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function CheckoutScreen({ navigation }) {
-  const { items, subtotal, buildOrderItems, clearCart } = useCart();
+  const { items, subtotal, clearCart } = useCart();
 
   // ── State ─────────────────────────────────────────────────────────────────
   const defaultAddr = MOCK_ADDRESSES.find((a) => a.isDefault) || MOCK_ADDRESSES[0];
@@ -220,7 +220,7 @@ export default function CheckoutScreen({ navigation }) {
   const grandTotal = subtotal + shippingCost;
 
   // ── handlePlaceOrder ──────────────────────────────────────────────────────
-  const handlePlaceOrder = useCallback(async () => {
+  const handlePlaceOrder = async () => {
     if (items.length === 0) {
       Alert.alert("Giỏ hàng trống", "Vui lòng thêm sản phẩm trước khi đặt hàng.");
       return;
@@ -228,50 +228,29 @@ export default function CheckoutScreen({ navigation }) {
 
     setIsPlacingOrder(true);
 
-    // Chuẩn bị payload — KHÔNG chứa priceAtPurchase / totalAmount (Manifesto)
-    const orderItems = buildOrderItems(); // [{productId: int, quantity: int}]
     const payload = {
-      items: orderItems,
-      paymentMethod: selectedPaymentMethod,
-      shippingAddressId: shippingAddressId, // integer — mock
-      voucherCode: voucherCode,
+      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      addressId: 1,
+      shippingFee: 15,
     };
 
-    // Race: 30 giây timeout vs API call
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("TIMEOUT")), 30_000),
-    );
+    console.log("[CheckoutScreen] Gửi payload tạo đơn:", JSON.stringify(payload, null, 2));
 
     try {
-      await Promise.race([createOrder(payload), timeoutPromise]);
-
-      // Thành công
+      const response = await api.post("/orders", payload);
+      
+      console.log("[CheckoutScreen] Tạo đơn thành công:", response.data);
+      
       clearCart();
-      navigation.replace("Success");
-    } catch (err) {
-      const isTimeout = err?.message === "TIMEOUT";
-      const isServerError = err?.code >= 500 || err?.code === "NETWORK_ERROR";
-
-      if (isTimeout || isServerError) {
-        Alert.alert(
-          "Không thể xử lý thanh toán",
-          "Phương thức thanh toán hiện tại gặp sự cố.\nHệ thống đề xuất chuyển sang Chuyển khoản ngân hàng.",
-          [
-            {
-              text: "Chuyển sang Chuyển khoản",
-              onPress: () => setSelectedPaymentMethod("BANK_TRANSFER"),
-            },
-            { text: "Thử lại sau", style: "cancel" },
-          ],
-        );
-      } else {
-        const msg = err?.message || "Đặt hàng thất bại. Vui lòng thử lại.";
-        Alert.alert("Lỗi đặt hàng", msg, [{ text: "OK" }]);
-      }
+      navigation.navigate("Success");
+    } catch (error) {
+      console.log("[CheckoutScreen] Lỗi chi tiết khi đặt hàng:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Đặt hàng thất bại. Vui lòng thử lại.";
+      Alert.alert("Lỗi đặt hàng", errorMessage);
     } finally {
       setIsPlacingOrder(false);
     }
-  }, [items, buildOrderItems, selectedPaymentMethod, shippingAddressId, clearCart, navigation]);
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
