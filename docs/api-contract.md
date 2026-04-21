@@ -1769,7 +1769,6 @@ Request body using a new address:
 
 Rules:
 - use either `addressId` or `newAddress`, not both
-- `requestedShippingFee` is optional legacy input and should normally be omitted
 - if the order status is `pending`, the address change is applied immediately and `shippingFee` is recalculated from the new address without any extra handling fee
 - for orders that have moved past `pending`, the request is stored as pending approval for admin/n8n flow
 - same-province approved changes keep the current `shippingFee` and add a `10000` handling fee

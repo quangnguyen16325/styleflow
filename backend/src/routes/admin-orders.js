@@ -345,11 +345,7 @@ router.post("/:id/address-change-decision", async (req, res) => {
 
       const approvedShippingFee =
         req.body?.approvedShippingFee == null
-          ? Number(
-              payload.calculatedShippingFee ??
-                payload.requestedShippingFee ??
-                orderRow.shipping_fee,
-            )
+          ? Number(payload.calculatedShippingFee ?? orderRow.shipping_fee)
           : Number(req.body.approvedShippingFee);
       const processingFee = Number(payload.processingFee ?? ADDRESS_CHANGE_PROCESSING_FEE);
       const feeDelta = processingFee + (approvedShippingFee - Number(orderRow.shipping_fee));

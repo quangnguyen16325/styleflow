@@ -544,8 +544,6 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
       });
     }
 
-    const requestedShippingFee =
-      req.body.requestedShippingFee == null ? null : Number(req.body.requestedShippingFee);
     await client.query(
       `
         UPDATE orders
@@ -574,7 +572,6 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
           country: shippingSnapshot.country,
           postalCode: shippingSnapshot.postalCode,
           fullAddress: shippingSnapshot.fullAddress,
-          requestedShippingFee,
           calculatedShippingFee: feeBreakdown.effectiveShippingFee,
           processingFee: feeBreakdown.processingFee,
           currentShippingFee: Number(orderRow.shipping_fee),
@@ -588,7 +585,6 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
       success: true,
       action: "pending_approval",
       calculatedShippingFee: feeBreakdown.effectiveShippingFee,
-      requestedShippingFee,
       processingFee: feeBreakdown.processingFee,
       feeDelta: feeBreakdown.feeDelta,
     });
@@ -740,13 +736,6 @@ function validateAddressChangePayload(body) {
     if (addressError) {
       return addressError;
     }
-  }
-
-  if (
-    body.requestedShippingFee != null &&
-    (Number.isNaN(Number(body.requestedShippingFee)) || Number(body.requestedShippingFee) < 0)
-  ) {
-    return "requestedShippingFee must be a non-negative number";
   }
 
   return null;
