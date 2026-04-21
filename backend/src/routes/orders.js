@@ -429,6 +429,7 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
         SELECT
           id,
           customer_id,
+          status,
           city,
           shipping_province_code AS province_code,
           delivery_status,
@@ -482,7 +483,10 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
       currentShippingFee: Number(orderRow.shipping_fee),
     });
 
-    if (feeBreakdown.sameProvince) {
+    if (orderRow.status === "pending") {
+      const updatedShippingFee = feeBreakdown.recalculatedShippingFee;
+      const feeDelta = updatedShippingFee - Number(orderRow.shipping_fee);
+
       await client.query(
         `
           UPDATE orders
@@ -500,11 +504,12 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
             city = $12,
             shipping_country = $13,
             shipping_postal_code = $14,
-            total_amount = total_amount + $15,
+            shipping_fee = $15,
+            total_amount = total_amount + $16,
             address_change_status = 'approved',
             address_change_requested_at = NOW(),
             address_change_payload = NULL,
-            address_change_fee_delta = $15,
+            address_change_fee_delta = 0,
             shipping_fee_approved = TRUE,
             updated_at = NOW()
           WHERE id = $1
@@ -524,17 +529,18 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
           shippingSnapshot.city,
           shippingSnapshot.country,
           shippingSnapshot.postalCode,
-          feeBreakdown.feeDelta,
+          updatedShippingFee,
+          feeDelta,
         ],
       );
 
       await client.query("COMMIT");
       return res.json({
         success: true,
-        action: "updated_same_city",
-        shippingFee: Number(orderRow.shipping_fee),
-        processingFee: feeBreakdown.processingFee,
-        feeDelta: feeBreakdown.feeDelta,
+        action: "updated_pending_recalculated",
+        shippingFee: updatedShippingFee,
+        processingFee: 0,
+        feeDelta,
       });
     }
 
@@ -569,7 +575,7 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
           postalCode: shippingSnapshot.postalCode,
           fullAddress: shippingSnapshot.fullAddress,
           requestedShippingFee,
-          calculatedShippingFee: feeBreakdown.recalculatedShippingFee,
+          calculatedShippingFee: feeBreakdown.effectiveShippingFee,
           processingFee: feeBreakdown.processingFee,
           currentShippingFee: Number(orderRow.shipping_fee),
         }),
@@ -581,7 +587,7 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
     return res.json({
       success: true,
       action: "pending_approval",
-      calculatedShippingFee: feeBreakdown.recalculatedShippingFee,
+      calculatedShippingFee: feeBreakdown.effectiveShippingFee,
       requestedShippingFee,
       processingFee: feeBreakdown.processingFee,
       feeDelta: feeBreakdown.feeDelta,

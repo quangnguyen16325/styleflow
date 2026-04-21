@@ -199,6 +199,7 @@ Common error codes:
   "orderAmount": 219000,
   "customerEmail": "customer@example.com",
   "imageUrl": "https://example.com/evidence.jpg",
+  "reason": "Product was damaged on arrival",
   "status": "pending",
   "abuseScoreSnapshot": 1,
   "reviewNote": null,
@@ -206,6 +207,10 @@ Common error codes:
   "updatedAt": "2026-04-02T10:00:00.000Z"
 }
 ```
+
+Notes:
+- `orderAmount` and `customerEmail` are returned by `GET /admin/refund-requests/:id`
+- list and status-update responses do not currently include `orderAmount` or `customerEmail`
 
 ## Auth Response Model
 
@@ -232,8 +237,8 @@ Common error codes:
 {
   "id": 1,
   "status": "pending",
-  "totalAmount": 418000,
-  "shippingFee": 20000,
+  "totalAmount": 438000,
+  "shippingFee": 40000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
   "customerAddressId": 1,
@@ -243,6 +248,9 @@ Common error codes:
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
     "addressLine": "123 Nguyen Trai",
+    "provinceCode": "79",
+    "districtCode": "760",
+    "wardCode": "26734",
     "ward": "Ward 2",
     "district": "District 5",
     "city": "Ho Chi Minh City",
@@ -820,7 +828,17 @@ Access rules:
 - admin/staff only
 
 Response `200`:
-- array of `Refund Request Model`
+- array of refund request summary objects with:
+  - `id`
+  - `orderId`
+  - `customerId`
+  - `imageUrl`
+  - `reason`
+  - `status`
+  - `abuseScoreSnapshot`
+  - `reviewNote`
+  - `createdAt`
+  - `updatedAt`
 
 ### `GET /admin/refund-requests/:id`
 
@@ -856,7 +874,17 @@ Allowed `status` values:
 - `refunded`
 
 Response `200`:
-- `Refund Request Model`
+- refund request status object with:
+  - `id`
+  - `orderId`
+  - `customerId`
+  - `imageUrl`
+  - `reason`
+  - `status`
+  - `abuseScoreSnapshot`
+  - `reviewNote`
+  - `createdAt`
+  - `updatedAt`
 
 ### `GET /admin/system-config`
 
@@ -1579,7 +1607,6 @@ Request body using a saved address:
 ```json
 {
   "addressId": 1,
-  "shippingFee": 20000,
   "items": [
     {
       "productId": 1,
@@ -1606,7 +1633,6 @@ Request body using a new address:
     "country": "Vietnam",
     "postalCode": "700000"
   },
-  "shippingFee": 20000,
   "items": [
     {
       "productId": 1,
@@ -1640,8 +1666,8 @@ Response `201`:
 {
   "id": 1,
   "status": "pending",
-  "totalAmount": 418000,
-  "shippingFee": 20000,
+  "totalAmount": 438000,
+  "shippingFee": 40000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
   "customerAddressId": 1,
@@ -1651,6 +1677,9 @@ Response `201`:
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
     "addressLine": "123 Nguyen Trai",
+    "provinceCode": "79",
+    "districtCode": "760",
+    "wardCode": "26734",
     "ward": "Ward 2",
     "district": "District 5",
     "city": "Ho Chi Minh City",
@@ -1734,15 +1763,16 @@ Request body using a new address:
     "city": "Da Nang",
     "country": "Vietnam",
     "postalCode": "550000"
-  },
-  "requestedShippingFee": 50000
+  }
 }
 ```
 
 Rules:
 - use either `addressId` or `newAddress`, not both
-- same-province change is applied immediately with a `10000` handling fee and current `shippingFee` kept unchanged
-- cross-city change is stored as pending approval for admin/n8n flow
+- `requestedShippingFee` is optional legacy input and should normally be omitted
+- if the order status is `pending`, the address change is applied immediately and `shippingFee` is recalculated from the new address without any extra handling fee
+- for orders that have moved past `pending`, the request is stored as pending approval for admin/n8n flow
+- same-province approved changes keep the current `shippingFee` and add a `10000` handling fee
 - cross-province change stores a recalculated shipping fee using the backend shipping rule
 - order must still be in an address-change-eligible delivery stage
 
@@ -1751,10 +1781,10 @@ Response `200` immediate update:
 ```json
 {
   "success": true,
-  "action": "updated_same_city",
+  "action": "updated_pending_recalculated",
   "shippingFee": 15000,
-  "processingFee": 10000,
-  "feeDelta": 10000
+  "processingFee": 0,
+  "feeDelta": -25000
 }
 ```
 
@@ -1765,7 +1795,6 @@ Response `200` pending approval:
   "success": true,
   "action": "pending_approval",
   "calculatedShippingFee": 40000,
-  "requestedShippingFee": 50000,
   "processingFee": 10000,
   "feeDelta": 35000
 }
@@ -1795,13 +1824,15 @@ Request body:
 ```json
 {
   "orderId": 12,
-  "imageUrl": "https://example.com/evidence.jpg"
+  "imageUrl": "https://example.com/evidence.jpg",
+  "reason": "Product was damaged on arrival"
 }
 ```
 
 Rules:
 - `orderId` must be a positive integer
 - `imageUrl` is required
+- `reason` is required
 - an order cannot have more than one active refund request at the same time
 - backend uses the authenticated customer from JWT, not any client-provided phone
 - if the customer's abuse score is high, the request starts as `manual_review_required`
@@ -1814,6 +1845,7 @@ Response `201`:
   "orderId": 12,
   "customerId": 4,
   "imageUrl": "https://example.com/evidence.jpg",
+  "reason": "Product was damaged on arrival",
   "status": "pending",
   "abuseScoreSnapshot": 1,
   "reviewNote": null,
