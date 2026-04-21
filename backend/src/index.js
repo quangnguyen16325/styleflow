@@ -16,6 +16,7 @@ import categoriesRouter from "./routes/categories.js";
 import addressesRouter from "./routes/addresses.js";
 import deliveryRouter from "./routes/delivery.js";
 import issuesRouter from "./routes/issues.js";
+import locationsRouter from "./routes/locations.js";
 import meRouter from "./routes/me.js";
 import paymentsRouter from "./routes/payments.js";
 import productsRouter from "./routes/products.js";
@@ -67,6 +68,7 @@ app.use(
 app.use("/admin/uploads", requireAuth, requireRole("admin", "staff"), adminUploadsRouter);
 app.use("/customers/:customerId/addresses", addressesRouter);
 app.use("/categories", categoriesRouter);
+app.use("/locations", locationsRouter);
 app.use("/products", productsRouter);
 app.use("/orders", ordersRouter);
 

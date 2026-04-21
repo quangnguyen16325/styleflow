@@ -5,6 +5,10 @@ import {
   applyOrderLifecycleTransition,
   insertInventoryTransactionOnce,
 } from "./order-lifecycle.js";
+import {
+  calculateAddressChangeFeeBreakdown,
+  calculateShippingFeeFromDaNang,
+} from "../lib/shipping-fee.js";
 
 const router = Router();
 
@@ -216,7 +220,6 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   const { items } = req.body;
-  const shippingFee = Number(req.body.shippingFee ?? 0);
 
   const client = await pool.connect();
   try {
@@ -224,6 +227,10 @@ router.post("/", requireAuth, async (req, res) => {
 
     const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
     const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
+    const shippingFee = calculateShippingFeeFromDaNang({
+      provinceCode: shippingSnapshot.provinceCode,
+      city: shippingSnapshot.city,
+    });
 
     const productIds = items.map((item) => item.productId);
     const productResult = await client.query(
@@ -270,6 +277,9 @@ router.post("/", requireAuth, async (req, res) => {
           shipping_receiver_name,
           shipping_receiver_phone,
           shipping_address_line,
+          shipping_province_code,
+          shipping_district_code,
+          shipping_ward_code,
           shipping_ward,
           shipping_district,
           shipping_address,
@@ -279,7 +289,7 @@ router.post("/", requireAuth, async (req, res) => {
           payment_expires_at
         )
         VALUES (
-          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW() + INTERVAL '24 hours'
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW() + INTERVAL '24 hours'
         )
         RETURNING *
       `,
@@ -291,6 +301,9 @@ router.post("/", requireAuth, async (req, res) => {
         shippingSnapshot.receiverName,
         shippingSnapshot.receiverPhone,
         shippingSnapshot.addressLine,
+        shippingSnapshot.provinceCode,
+        shippingSnapshot.districtCode,
+        shippingSnapshot.wardCode,
         shippingSnapshot.ward,
         shippingSnapshot.district,
         shippingSnapshot.fullAddress,
@@ -417,6 +430,7 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
           id,
           customer_id,
           city,
+          shipping_province_code AS province_code,
           delivery_status,
           address_change_status,
           shipping_fee
@@ -460,10 +474,15 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
 
     const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
     const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
-    const isSameCity =
-      normalizeCityName(shippingSnapshot.city) === normalizeCityName(orderRow.city);
+    const feeBreakdown = calculateAddressChangeFeeBreakdown({
+      currentCity: orderRow.city,
+      currentProvinceCode: orderRow.province_code,
+      nextCity: shippingSnapshot.city,
+      nextProvinceCode: shippingSnapshot.provinceCode,
+      currentShippingFee: Number(orderRow.shipping_fee),
+    });
 
-    if (isSameCity) {
+    if (feeBreakdown.sameProvince) {
       await client.query(
         `
           UPDATE orders
@@ -472,16 +491,20 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
             shipping_receiver_name = $3,
             shipping_receiver_phone = $4,
             shipping_address_line = $5,
-            shipping_ward = $6,
-            shipping_district = $7,
-            shipping_address = $8,
-            city = $9,
-            shipping_country = $10,
-            shipping_postal_code = $11,
+            shipping_province_code = $6,
+            shipping_district_code = $7,
+            shipping_ward_code = $8,
+            shipping_ward = $9,
+            shipping_district = $10,
+            shipping_address = $11,
+            city = $12,
+            shipping_country = $13,
+            shipping_postal_code = $14,
+            total_amount = total_amount + $15,
             address_change_status = 'approved',
             address_change_requested_at = NOW(),
             address_change_payload = NULL,
-            address_change_fee_delta = NULL,
+            address_change_fee_delta = $15,
             shipping_fee_approved = TRUE,
             updated_at = NOW()
           WHERE id = $1
@@ -492,12 +515,16 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
           shippingSnapshot.receiverName,
           shippingSnapshot.receiverPhone,
           shippingSnapshot.addressLine,
+          shippingSnapshot.provinceCode,
+          shippingSnapshot.districtCode,
+          shippingSnapshot.wardCode,
           shippingSnapshot.ward,
           shippingSnapshot.district,
           shippingSnapshot.fullAddress,
           shippingSnapshot.city,
           shippingSnapshot.country,
           shippingSnapshot.postalCode,
+          feeBreakdown.feeDelta,
         ],
       );
 
@@ -505,6 +532,9 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
       return res.json({
         success: true,
         action: "updated_same_city",
+        shippingFee: Number(orderRow.shipping_fee),
+        processingFee: feeBreakdown.processingFee,
+        feeDelta: feeBreakdown.feeDelta,
       });
     }
 
@@ -526,6 +556,9 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
         orderId,
         JSON.stringify({
           customerAddressId: shippingSnapshot.customerAddressId,
+          provinceCode: shippingSnapshot.provinceCode,
+          districtCode: shippingSnapshot.districtCode,
+          wardCode: shippingSnapshot.wardCode,
           receiverName: shippingSnapshot.receiverName,
           receiverPhone: shippingSnapshot.receiverPhone,
           addressLine: shippingSnapshot.addressLine,
@@ -536,9 +569,11 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
           postalCode: shippingSnapshot.postalCode,
           fullAddress: shippingSnapshot.fullAddress,
           requestedShippingFee,
+          calculatedShippingFee: feeBreakdown.recalculatedShippingFee,
+          processingFee: feeBreakdown.processingFee,
           currentShippingFee: Number(orderRow.shipping_fee),
         }),
-        requestedShippingFee == null ? null : requestedShippingFee - Number(orderRow.shipping_fee),
+        feeBreakdown.feeDelta,
       ],
     );
 
@@ -546,6 +581,10 @@ router.post("/:id/address-change-request", requireAuth, async (req, res) => {
     return res.json({
       success: true,
       action: "pending_approval",
+      calculatedShippingFee: feeBreakdown.recalculatedShippingFee,
+      requestedShippingFee,
+      processingFee: feeBreakdown.processingFee,
+      feeDelta: feeBreakdown.feeDelta,
     });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -585,6 +624,9 @@ const listOrdersBaseQuery = `
     o.shipping_receiver_name,
     o.shipping_receiver_phone,
     o.shipping_address_line,
+    o.shipping_province_code,
+    o.shipping_district_code,
+    o.shipping_ward_code,
     o.shipping_ward,
     o.shipping_district,
     o.shipping_address,
@@ -751,6 +793,9 @@ function mapShippingRow(row) {
     receiverName: row.shipping_receiver_name,
     receiverPhone: row.shipping_receiver_phone,
     addressLine: row.shipping_address_line,
+    provinceCode: row.shipping_province_code,
+    districtCode: row.shipping_district_code,
+    wardCode: row.shipping_ward_code,
     ward: row.shipping_ward,
     district: row.shipping_district,
     city: row.city,
@@ -790,6 +835,9 @@ async function resolveShippingSnapshot(client, body, customerRow) {
           receiver_name,
           receiver_phone,
           address_line,
+          province_code,
+          district_code,
+          ward_code,
           ward,
           district,
           city,
@@ -815,6 +863,9 @@ async function resolveShippingSnapshot(client, body, customerRow) {
       receiver_name: body.newAddress.receiverName.trim(),
       receiver_phone: body.newAddress.receiverPhone.trim(),
       address_line: body.newAddress.addressLine.trim(),
+      province_code: body.newAddress.provinceCode?.trim() || null,
+      district_code: body.newAddress.districtCode?.trim() || null,
+      ward_code: body.newAddress.wardCode?.trim() || null,
       ward: body.newAddress.ward?.trim() || null,
       district: body.newAddress.district?.trim() || null,
       city: body.newAddress.city.trim(),
@@ -832,6 +883,9 @@ function mapShippingAddressRecord(row) {
     receiverName: row.receiver_name,
     receiverPhone: row.receiver_phone,
     addressLine: row.address_line,
+    provinceCode: row.province_code,
+    districtCode: row.district_code,
+    wardCode: row.ward_code,
     ward: row.ward,
     district: row.district,
     city: row.city,
@@ -839,12 +893,6 @@ function mapShippingAddressRecord(row) {
     postalCode: row.postal_code,
     fullAddress: parts.join(", "),
   };
-}
-
-function normalizeCityName(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
 }
 
 function validateShippingAddressPayload(address) {

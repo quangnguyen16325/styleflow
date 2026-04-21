@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { applyOrderLifecycleTransition } from "./order-lifecycle.js";
+import { ADDRESS_CHANGE_PROCESSING_FEE } from "../lib/shipping-fee.js";
 
 const router = Router();
 
@@ -300,7 +301,8 @@ router.post("/:id/address-change-decision", async (req, res) => {
           id,
           address_change_status,
           address_change_payload,
-          shipping_fee
+          shipping_fee,
+          total_amount
         FROM orders
         WHERE id = $1
         LIMIT 1
@@ -343,8 +345,14 @@ router.post("/:id/address-change-decision", async (req, res) => {
 
       const approvedShippingFee =
         req.body?.approvedShippingFee == null
-          ? Number(payload.requestedShippingFee ?? orderRow.shipping_fee)
+          ? Number(
+              payload.calculatedShippingFee ??
+                payload.requestedShippingFee ??
+                orderRow.shipping_fee,
+            )
           : Number(req.body.approvedShippingFee);
+      const processingFee = Number(payload.processingFee ?? ADDRESS_CHANGE_PROCESSING_FEE);
+      const feeDelta = processingFee + (approvedShippingFee - Number(orderRow.shipping_fee));
 
       await client.query(
         `
@@ -354,16 +362,20 @@ router.post("/:id/address-change-decision", async (req, res) => {
             shipping_receiver_name = $3,
             shipping_receiver_phone = $4,
             shipping_address_line = $5,
-            shipping_ward = $6,
-            shipping_district = $7,
-            shipping_address = $8,
-            city = $9,
-            shipping_country = $10,
-            shipping_postal_code = $11,
-            shipping_fee = $12,
+            shipping_province_code = $6,
+            shipping_district_code = $7,
+            shipping_ward_code = $8,
+            shipping_ward = $9,
+            shipping_district = $10,
+            shipping_address = $11,
+            city = $12,
+            shipping_country = $13,
+            shipping_postal_code = $14,
+            shipping_fee = $15,
+            total_amount = total_amount + $16,
             address_change_status = 'approved',
             address_change_payload = NULL,
-            address_change_fee_delta = NULL,
+            address_change_fee_delta = $16,
             shipping_fee_approved = TRUE,
             updated_at = NOW()
           WHERE id = $1
@@ -374,6 +386,9 @@ router.post("/:id/address-change-decision", async (req, res) => {
           payload.receiverName,
           payload.receiverPhone,
           payload.addressLine,
+          payload.provinceCode,
+          payload.districtCode,
+          payload.wardCode,
           payload.ward,
           payload.district,
           payload.fullAddress,
@@ -381,11 +396,18 @@ router.post("/:id/address-change-decision", async (req, res) => {
           payload.country,
           payload.postalCode,
           approvedShippingFee,
+          feeDelta,
         ],
       );
 
       await client.query("COMMIT");
-      return res.json({ success: true, action: "approved" });
+      return res.json({
+        success: true,
+        action: "approved",
+        shippingFee: approvedShippingFee,
+        processingFee,
+        feeDelta,
+      });
     }
 
     await client.query(
@@ -432,6 +454,9 @@ const listOrdersBaseQuery = `
     o.shipping_receiver_name,
     o.shipping_receiver_phone,
     o.shipping_address_line,
+    o.shipping_province_code,
+    o.shipping_district_code,
+    o.shipping_ward_code,
     o.shipping_ward,
     o.shipping_district,
     o.shipping_address,
@@ -517,6 +542,9 @@ function mapShippingRow(row) {
     receiverName: row.shipping_receiver_name,
     receiverPhone: row.shipping_receiver_phone,
     addressLine: row.shipping_address_line,
+    provinceCode: row.shipping_province_code,
+    districtCode: row.shipping_district_code,
+    wardCode: row.shipping_ward_code,
     ward: row.shipping_ward,
     district: row.shipping_district,
     city: row.city,

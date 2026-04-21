@@ -120,6 +120,9 @@ Common error codes:
   "receiverName": "Nguyen Van A",
   "receiverPhone": "0901234567",
   "addressLine": "123 Nguyen Trai",
+  "provinceCode": "79",
+  "districtCode": "760",
+  "wardCode": "26734",
   "ward": "Ward 2",
   "district": "District 5",
   "city": "Ho Chi Minh City",
@@ -138,6 +141,9 @@ Common error codes:
   "receiverName": "Nguyen Van A",
   "receiverPhone": "0901234567",
   "addressLine": "123 Nguyen Trai",
+  "provinceCode": "79",
+  "districtCode": "760",
+  "wardCode": "26734",
   "ward": "Ward 2",
   "district": "District 5",
   "city": "Ho Chi Minh City",
@@ -439,6 +445,31 @@ Response `200`:
 
 Create a new address for the authenticated customer.
 
+Request body example:
+
+```json
+{
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "provinceCode": "79",
+  "districtCode": "760",
+  "wardCode": "26734",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true
+}
+```
+
+Rules:
+- `receiverName`, `receiverPhone`, `addressLine`, and `city` are required
+- `provinceCode`, `districtCode`, and `wardCode` are optional additive fields for precise Vietnam administrative mapping
+- existing clients can continue sending only text fields (`ward`, `district`, `city`)
+
 Response `201`:
 - `Customer Address Model`
 
@@ -455,6 +486,60 @@ Delete one address of the authenticated customer.
 
 Response `204`:
 - empty body
+
+### `GET /locations/provinces`
+
+Get the Vietnam province/city list for address pickers.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": 48,
+    "name": "Thành phố Đà Nẵng",
+    "divisionType": "thành phố trung ương",
+    "codename": "thanh_pho_da_nang",
+    "phoneCode": 236
+  }
+]
+```
+
+### `GET /locations/provinces/:provinceCode/districts`
+
+Get the district list for one province.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": 493,
+    "name": "Quận Sơn Trà",
+    "divisionType": "quận",
+    "codename": "quan_son_tra",
+    "provinceCode": 48
+  }
+]
+```
+
+### `GET /locations/districts/:districtCode/wards`
+
+Get the ward list for one district.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": 20194,
+    "name": "Phường Hòa Hiệp Bắc",
+    "divisionType": "phường",
+    "codename": "phuong_hoa_hiep_bac",
+    "districtCode": 490
+  }
+]
+```
 
 ### Admin
 
@@ -1512,6 +1597,9 @@ Request body using a new address:
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
     "addressLine": "123 Nguyen Trai",
+    "provinceCode": "79",
+    "districtCode": "760",
+    "wardCode": "26734",
     "ward": "Ward 2",
     "district": "District 5",
     "city": "Ho Chi Minh City",
@@ -1542,6 +1630,8 @@ Rules:
 - `productId`: required
 - `quantity`: required, integer, greater than 0
 - `priceAtPurchase` and `totalAmount` are computed by the backend
+- backend computes final `shippingFee` from the shipping city using the Da Nang origin zone rules
+- client-provided `shippingFee` is accepted for backward compatibility, but backend-calculated fee is the source of truth
 - when `addressId` is used, it must belong to the authenticated customer
 
 Response `201`:
@@ -1651,8 +1741,9 @@ Request body using a new address:
 
 Rules:
 - use either `addressId` or `newAddress`, not both
-- same-city change is applied immediately
+- same-province change is applied immediately with a `10000` handling fee and current `shippingFee` kept unchanged
 - cross-city change is stored as pending approval for admin/n8n flow
+- cross-province change stores a recalculated shipping fee using the backend shipping rule
 - order must still be in an address-change-eligible delivery stage
 
 Response `200` immediate update:
@@ -1660,7 +1751,10 @@ Response `200` immediate update:
 ```json
 {
   "success": true,
-  "action": "updated_same_city"
+  "action": "updated_same_city",
+  "shippingFee": 15000,
+  "processingFee": 10000,
+  "feeDelta": 10000
 }
 ```
 
@@ -1669,7 +1763,11 @@ Response `200` pending approval:
 ```json
 {
   "success": true,
-  "action": "pending_approval"
+  "action": "pending_approval",
+  "calculatedShippingFee": 40000,
+  "requestedShippingFee": 50000,
+  "processingFee": 10000,
+  "feeDelta": 35000
 }
 ```
 

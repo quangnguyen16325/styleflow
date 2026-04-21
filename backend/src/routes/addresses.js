@@ -24,6 +24,9 @@ router.get("/", async (req, res) => {
           receiver_name,
           receiver_phone,
           address_line,
+          province_code,
+          district_code,
+          ward_code,
           ward,
           district,
           city,
@@ -67,6 +70,9 @@ router.get("/:addressId", async (req, res) => {
           receiver_name,
           receiver_phone,
           address_line,
+          province_code,
+          district_code,
+          ward_code,
           ward,
           district,
           city,
@@ -139,6 +145,9 @@ router.post("/", async (req, res) => {
           receiver_name,
           receiver_phone,
           address_line,
+          province_code,
+          district_code,
+          ward_code,
           ward,
           district,
           city,
@@ -146,7 +155,7 @@ router.post("/", async (req, res) => {
           postal_code,
           is_default
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING
           id,
           customer_id,
@@ -154,6 +163,9 @@ router.post("/", async (req, res) => {
           receiver_name,
           receiver_phone,
           address_line,
+          province_code,
+          district_code,
+          ward_code,
           ward,
           district,
           city,
@@ -169,6 +181,9 @@ router.post("/", async (req, res) => {
         normalizedPayload.receiverName,
         normalizedPayload.receiverPhone,
         normalizedPayload.addressLine,
+        normalizedPayload.provinceCode,
+        normalizedPayload.districtCode,
+        normalizedPayload.wardCode,
         normalizedPayload.ward,
         normalizedPayload.district,
         normalizedPayload.city,
@@ -267,6 +282,9 @@ router.patch("/:addressId", async (req, res) => {
           receiver_name,
           receiver_phone,
           address_line,
+          province_code,
+          district_code,
+          ward_code,
           ward,
           district,
           city,
@@ -419,6 +437,9 @@ function validateAddressPayload(body, { partial }) {
     "receiverName",
     "receiverPhone",
     "addressLine",
+    "provinceCode",
+    "districtCode",
+    "wardCode",
     "ward",
     "district",
     "city",
@@ -429,6 +450,13 @@ function validateAddressPayload(body, { partial }) {
   for (const field of stringFields) {
     if (body[field] != null && !getTrimmedString(body[field])) {
       return `${field} must not be empty`;
+    }
+  }
+
+  const codeFields = ["provinceCode", "districtCode", "wardCode"];
+  for (const field of codeFields) {
+    if (body[field] != null && !/^\d+$/.test(String(body[field]).trim())) {
+      return `${field} must be a positive integer string or number`;
     }
   }
 
@@ -456,6 +484,18 @@ function normalizeAddressPayload(body, { partial = false } = {}) {
 
   if (!partial || body.addressLine != null) {
     normalized.addressLine = getTrimmedString(body.addressLine);
+  }
+
+  if (body.provinceCode != null) {
+    normalized.provinceCode = String(body.provinceCode).trim();
+  }
+
+  if (body.districtCode != null) {
+    normalized.districtCode = String(body.districtCode).trim();
+  }
+
+  if (body.wardCode != null) {
+    normalized.wardCode = String(body.wardCode).trim();
   }
 
   if (body.ward != null) {
@@ -514,6 +554,9 @@ function mapAddressRow(row) {
     receiverName: row.receiver_name,
     receiverPhone: row.receiver_phone,
     addressLine: row.address_line,
+    provinceCode: row.province_code,
+    districtCode: row.district_code,
+    wardCode: row.ward_code,
     ward: row.ward,
     district: row.district,
     city: row.city,
