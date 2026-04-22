@@ -221,50 +221,42 @@ export default function ProductForm() {
 
   return (
     <div>
-      <h2 style={{ margin: '0 0 24px 0', color: '#202124' }}>
-        {isEditMode ? 'Edit Product' : 'Create New Product'}
+      <h2 style={{ margin: '0 0 var(--spacing-xl) 0', color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>
+        {isEditMode ? 'Edit Product' : 'Create Product'}
       </h2>
 
       {error && (
         <div style={{
-          marginBottom: '20px',
-          padding: '12px 16px',
-          backgroundColor: '#ffebee',
-          color: '#c62828',
-          borderRadius: '4px',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
+          marginBottom: 'var(--spacing-lg)',
+          padding: 'var(--spacing-md) var(--spacing-lg)',
+          backgroundColor: 'var(--color-danger-bg)',
+          color: 'var(--color-danger)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--font-size-sm)',
         }}>
-          <span>⚠</span>
-          <span>{error.message || 'An error occurred'}</span>
+          {error.message || 'An error occurred'}
         </div>
       )}
 
       {successMessage && (
         <div style={{
-          marginBottom: '20px',
-          padding: '12px 16px',
-          backgroundColor: '#e8f5e9',
-          color: '#2e7d32',
-          borderRadius: '4px',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
+          marginBottom: 'var(--spacing-lg)',
+          padding: 'var(--spacing-md) var(--spacing-lg)',
+          backgroundColor: 'var(--color-success-bg)',
+          color: 'var(--color-success)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--font-size-sm)',
         }}>
-          <span>✓</span>
-          <span>{successMessage}</span>
+          {successMessage}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="card" style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gap: '20px' }}>
+      <form onSubmit={handleSubmit} className="card" style={{ padding: 'var(--spacing-xl)' }}>
+        <div style={{ display: 'grid', gap: 'var(--spacing-lg)' }}>
           {/* SKU */}
           <div>
-            <label htmlFor="sku" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              SKU {!isEditMode && <span style={{ color: '#c62828' }}>*</span>}
+            <label htmlFor="sku" className="form-label">
+              SKU {!isEditMode && <span style={{ color: 'var(--color-danger)' }}>*</span>}
             </label>
             <input
               type="text"
@@ -279,17 +271,17 @@ export default function ProductForm() {
               placeholder="e.g., TSHIRT-001"
             />
             {errors.sku && touched.sku && (
-              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.sku}</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.sku}</div>
             )}
             {isEditMode && (
-              <div style={{ marginTop: '4px', fontSize: '12px', color: '#5f6368' }}>SKU cannot be changed</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>SKU cannot be changed</div>
             )}
           </div>
 
           {/* Name */}
           <div>
-            <label htmlFor="name" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              Name <span style={{ color: '#c62828' }}>*</span>
+            <label htmlFor="name" className="form-label">
+              Name <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               type="text"
@@ -310,8 +302,8 @@ export default function ProductForm() {
 
           {/* Category */}
           <div>
-            <label htmlFor="categoryId" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              Category <span style={{ color: '#c62828' }}>*</span>
+            <label htmlFor="categoryId" className="form-label">
+              Category <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <select
               id="categoryId"
@@ -331,10 +323,10 @@ export default function ProductForm() {
               ))}
             </select>
             {errors.categoryId && touched.categoryId && (
-              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.categoryId}</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.categoryId}</div>
             )}
             {categories.length === 0 && (
-              <div style={{ marginTop: '4px', fontSize: '12px', color: '#c62828' }}>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)' }}>
                 No categories available. Please create a category first.
               </div>
             )}
@@ -342,8 +334,8 @@ export default function ProductForm() {
 
           {/* Base Price */}
           <div>
-            <label htmlFor="basePrice" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              Base Price (đ) <span style={{ color: '#c62828' }}>*</span>
+            <label htmlFor="basePrice" className="form-label">
+              Base Price (đ) <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               type="number"
@@ -360,14 +352,14 @@ export default function ProductForm() {
               min="0"
             />
             {errors.basePrice && touched.basePrice && (
-              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.basePrice}</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.basePrice}</div>
             )}
           </div>
 
           {/* Stock Quantity */}
           <div>
-            <label htmlFor="stockQty" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              Stock Quantity <span style={{ color: '#c62828' }}>*</span>
+            <label htmlFor="stockQty" className="form-label">
+              Stock Quantity <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               type="number"
@@ -384,14 +376,14 @@ export default function ProductForm() {
               min="0"
             />
             {errors.stockQty && touched.stockQty && (
-              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.stockQty}</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.stockQty}</div>
             )}
           </div>
 
           {/* Min Stock Level */}
           <div>
-            <label htmlFor="minStockLevel" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              Min Stock Level <span style={{ color: '#c62828' }}>*</span>
+            <label htmlFor="minStockLevel" className="form-label">
+              Min Stock Level <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               type="number"
@@ -408,13 +400,13 @@ export default function ProductForm() {
               min="0"
             />
             {errors.minStockLevel && touched.minStockLevel && (
-              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.minStockLevel}</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.minStockLevel}</div>
             )}
           </div>
         </div>
 
         {/* Actions */}
-        <div style={{ marginTop: '32px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        <div style={{ marginTop: 'var(--spacing-2xl)', display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
           <button
             type="button"
             onClick={handleCancel}

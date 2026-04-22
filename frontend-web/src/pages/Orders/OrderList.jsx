@@ -80,13 +80,13 @@ export default function OrderList() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, color: '#202124' }}>Order Management</h2>
-        <span style={{ fontSize: '13px', color: '#5f6368' }}>{filteredOrders.length} order(s)</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
+        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Orders</h2>
+        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>{filteredOrders.length} orders</span>
       </div>
 
       {/* Filter Toolbar */}
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
         <input
           type="text"
           placeholder="Search by ID, name, phone..."
@@ -129,18 +129,18 @@ export default function OrderList() {
             <tbody>
               {filteredOrders.map(order => (
                 <tr key={order.id}>
-                  <td style={{ fontWeight: 'bold' }}>#{order.id}</td>
+                  <td style={{ fontWeight: 'var(--font-weight-bold)' }}>#{order.id}</td>
                   <td><StatusBadge value={order.status} /></td>
                   <td>{(order.totalAmount || 0).toLocaleString()} đ</td>
                   <td>{(order.shippingFee || 0).toLocaleString()} đ</td>
                   <td>{order.customer?.fullName || '—'}</td>
                   <td>{order.customer?.phone || '—'}</td>
-                  <td style={{ fontSize: '13px', color: '#5f6368' }}>
+                  <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
                     {new Date(order.createdAt).toLocaleString()}
                   </td>
                   <td>
                     <Link to={`/orders/${order.id}`} className="link">
-                      View Details
+                      View
                     </Link>
                   </td>
                 </tr>

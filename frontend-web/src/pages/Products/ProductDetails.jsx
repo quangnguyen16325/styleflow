@@ -185,23 +185,23 @@ export default function ProductDetails() {
   const isLowStock = product.availableQty < product.minStockLevel;
 
   const metricCards = [
-    { label: 'Gross Stock', value: product.stockQty, bg: '#f8f9fa', border: '#e0e0e0', color: '#202124' },
-    { label: 'Reserved (Orders)', value: product.reservedQty, bg: '#f8f9fa', border: '#e0e0e0', color: '#202124' },
-    { label: 'Available To Sell', value: product.availableQty, bg: isLowStock ? '#fff8e1' : '#e8f0fe', border: isLowStock ? '#ffc107' : '#e0e0e0', color: isLowStock ? '#c62828' : '#1a73e8' },
-    { label: 'Min Level Limit', value: product.minStockLevel, bg: '#f8f9fa', border: '#e0e0e0', color: '#202124' },
+    { label: 'Gross Stock', value: product.stockQty, bg: 'var(--color-bg)', border: 'var(--color-border)', color: 'var(--color-dark)' },
+    { label: 'Reserved (Orders)', value: product.reservedQty, bg: 'var(--color-bg)', border: 'var(--color-border)', color: 'var(--color-dark)' },
+    { label: 'Available To Sell', value: product.availableQty, bg: isLowStock ? 'var(--color-warning-bg)' : '#e8f0fe', border: isLowStock ? '#ffc107' : 'var(--color-border)', color: isLowStock ? 'var(--color-danger)' : 'var(--color-primary)' },
+    { label: 'Min Level Limit', value: product.minStockLevel, bg: 'var(--color-bg)', border: 'var(--color-border)', color: 'var(--color-dark)' },
   ];
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
         <Link to="/products" className="link">&larr; Back to Inventory</Link>
       </div>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ margin: 0, color: '#202124' }}>{product.name}</h2>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <Link to={`/products/${id}/edit`} className="btn-primary">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xl)' }}>
+        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>{product.name}</h2>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+          <Link to={`/products/${id}/edit`} className="btn-primary" style={{ textDecoration: 'none' }}>
             Edit
           </Link>
           <button
@@ -214,32 +214,32 @@ export default function ProductDetails() {
           </button>
           <span style={{
             padding: '6px 14px',
-            backgroundColor: isLowStock ? '#ffebee' : '#e8f5e9',
-            color: isLowStock ? '#c62828' : '#2e7d32',
-            borderRadius: '16px',
-            fontWeight: 600,
-            fontSize: '12px',
+            backgroundColor: isLowStock ? 'var(--color-danger-bg)' : 'var(--color-success-bg)',
+            color: isLowStock ? 'var(--color-danger)' : 'var(--color-success)',
+            borderRadius: 'var(--radius-full)',
+            fontWeight: 'var(--font-weight-semibold)',
+            fontSize: 'var(--font-size-xs)',
           }}>
-            {isLowStock ? '⚠ LOW STOCK' : '✓ IN STOCK'}
+            {isLowStock ? 'LOW STOCK' : 'IN STOCK'}
           </span>
         </div>
       </div>
 
       {/* Product Image */}
-      <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px', fontSize: '15px' }}>
+      <div className="card" style={{ padding: 'var(--spacing-xl)', marginBottom: 'var(--spacing-xl)' }}>
+        <h3 style={{ margin: '0 0 var(--spacing-md) 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
           Product Image
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--spacing-lg)' }}>
           <div>
             <div style={{
-              border: '1px dashed #c2c7cc',
-              borderRadius: '8px',
+              border: '1px dashed var(--color-border)',
+              borderRadius: 'var(--radius-md)',
               minHeight: '240px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: '#f8f9fa',
+              background: 'var(--color-bg)',
               overflow: 'hidden',
             }}>
               {product.imageUrl ? (
@@ -249,18 +249,18 @@ export default function ProductDetails() {
                   style={{ width: '100%', height: '100%', maxHeight: '320px', objectFit: 'contain', display: 'block' }}
                 />
               ) : (
-                <div style={{ color: '#5f6368', fontSize: '14px', padding: '16px', textAlign: 'center' }}>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', padding: 'var(--spacing-lg)', textAlign: 'center' }}>
                   No product image yet
                 </div>
               )}
             </div>
-            <div style={{ marginTop: '8px', fontSize: '13px', color: '#5f6368', wordBreak: 'break-word' }}>
+            <div style={{ marginTop: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', wordBreak: 'break-word' }}>
               {product.imageUrl || 'Placeholder is displayed until an image is uploaded.'}
             </div>
           </div>
 
           <div>
-            <label htmlFor="product-image-upload" style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
+            <label htmlFor="product-image-upload" className="form-label">
               Select image (jpeg/png/webp/gif)
             </label>
             <input
@@ -271,24 +271,24 @@ export default function ProductDetails() {
               onChange={handleFileChange}
               disabled={uploading}
               className="form-input"
-              style={{ width: '100%', marginBottom: '12px' }}
+              style={{ width: '100%', marginBottom: 'var(--spacing-md)' }}
             />
 
             {selectedFile && (
-              <div style={{ fontSize: '13px', color: '#202124', marginBottom: '10px' }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-dark)', marginBottom: 'var(--spacing-sm)' }}>
                 {selectedFile.name} ({formatFileSize(selectedFile.size)})
               </div>
             )}
 
             {previewUrl && (
               <div style={{
-                border: '1px solid #e0e0e0',
-                borderRadius: '8px',
-                marginBottom: '12px',
-                padding: '8px',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: 'var(--spacing-md)',
+                padding: 'var(--spacing-xs)',
                 background: '#ffffff',
               }}>
-                <div style={{ fontSize: '12px', color: '#5f6368', marginBottom: '8px' }}>Preview</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--spacing-xs)' }}>Preview</div>
                 <img
                   src={previewUrl}
                   alt="Upload preview"
@@ -298,13 +298,13 @@ export default function ProductDetails() {
             )}
 
             {uploadError && (
-              <div style={{ marginBottom: '10px', fontSize: '13px', color: '#c62828', background: '#ffebee', padding: '10px', borderRadius: '4px' }}>
+              <div style={{ marginBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)', background: 'var(--color-danger-bg)', padding: 'var(--spacing-sm)', borderRadius: 'var(--radius-md)' }}>
                 {uploadError}
               </div>
             )}
 
             {uploadSuccess && (
-              <div style={{ marginBottom: '10px', fontSize: '13px', color: '#2e7d32', background: '#e8f5e9', padding: '10px', borderRadius: '4px' }}>
+              <div style={{ marginBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: 'var(--spacing-sm)', borderRadius: 'var(--radius-md)' }}>
                 {uploadSuccess}
               </div>
             )}
@@ -322,26 +322,26 @@ export default function ProductDetails() {
       </div>
 
       {/* General Info */}
-      <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px', fontSize: '15px' }}>General Information</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', fontSize: '14px' }}>
+      <div className="card" style={{ padding: 'var(--spacing-xl)', marginBottom: 'var(--spacing-xl)' }}>
+        <h3 style={{ margin: '0 0 var(--spacing-md) 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>General Information</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)' }}>
           <div><strong>ID:</strong> {product.id}</div>
-          <div><strong>SKU:</strong> <code style={{ fontSize: '13px', background: '#f1f3f4', padding: '2px 6px', borderRadius: '4px' }}>{product.sku}</code></div>
+          <div><strong>SKU:</strong> <code style={{ fontSize: 'var(--font-size-sm)', background: 'var(--color-bg)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{product.sku}</code></div>
           <div><strong>Category:</strong> <span style={{ textTransform: 'capitalize' }}>{product.category}</span></div>
-          <div><strong>Base Price:</strong> <span style={{ color: '#1a73e8', fontWeight: 600 }}>{(product.basePrice || 0).toLocaleString()} đ</span></div>
+          <div><strong>Base Price:</strong> <span style={{ color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)' }}>{(product.basePrice || 0).toLocaleString()} đ</span></div>
           <div><strong>Created:</strong> {new Date(product.createdAt).toLocaleString()}</div>
         </div>
       </div>
 
       {/* Inventory Metrics */}
-      <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#202124' }}>Inventory Metrics</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '16px' }}>
+      <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-md)', color: 'var(--color-dark)' }}>Inventory Metrics</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 'var(--spacing-lg)' }}>
         {metricCards.map((card) => (
-          <div key={card.label} className="card" style={{ padding: '20px', background: card.bg, borderColor: card.border }}>
-            <div style={{ color: '#5f6368', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.4px' }}>
+          <div key={card.label} className="card" style={{ padding: 'var(--spacing-lg)', background: card.bg, borderColor: card.border }}>
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', fontWeight: 'var(--font-weight-semibold)', letterSpacing: '0.4px' }}>
               {card.label}
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, marginTop: '8px', color: card.color }}>
+            <div style={{ fontSize: '28px', fontWeight: 'var(--font-weight-bold)', marginTop: 'var(--spacing-xs)', color: card.color }}>
               {card.value}
             </div>
           </div>
