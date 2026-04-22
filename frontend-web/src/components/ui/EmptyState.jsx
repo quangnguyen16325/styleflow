@@ -7,14 +7,13 @@ export default function EmptyState({
 }) {
   return (
     <div
-      className="animate-fadeIn"
       style={{
-        padding: 'var(--spacing-2xl) var(--spacing-lg)',
+        padding: 'var(--spacing-3xl) var(--spacing-xl)',
         textAlign: 'center',
-        background: 'var(--color-bg)',
-        borderRadius: 'var(--radius-lg)',
-        border: '2px dashed var(--color-border)',
-        minHeight: '300px',
+        background: 'var(--color-surface)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px dashed var(--color-border)',
+        minHeight: '240px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -23,18 +22,18 @@ export default function EmptyState({
     >
       <div
         style={{
-          fontSize: '64px',
-          marginBottom: 'var(--spacing-lg)',
-          opacity: 0.6,
+          fontSize: '48px',
+          marginBottom: 'var(--spacing-md)',
+          opacity: 0.4,
         }}
       >
         {icon}
       </div>
       <h3
         style={{
-          margin: '0 0 var(--spacing-sm) 0',
+          margin: '0 0 var(--spacing-xs) 0',
           color: 'var(--color-dark)',
-          fontSize: 'var(--font-size-xl)',
+          fontSize: 'var(--font-size-lg)',
           fontWeight: 'var(--font-weight-semibold)',
         }}
       >
@@ -44,7 +43,7 @@ export default function EmptyState({
         style={{
           margin: 0,
           color: 'var(--color-text-secondary)',
-          fontSize: 'var(--font-size-base)',
+          fontSize: 'var(--font-size-sm)',
           maxWidth: '400px',
           lineHeight: 'var(--line-height-normal)',
         }}

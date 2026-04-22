@@ -31,11 +31,8 @@ export default function ConfirmDialog({
 
   if (!isOpen) return null;
 
-  const defaultIcon = danger ? '⚠️' : 'ℹ️';
-
   return (
     <div
-      className="animate-fadeIn"
       style={{
         position: 'fixed',
         top: 0,
@@ -43,7 +40,6 @@ export default function ConfirmDialog({
         right: 0,
         bottom: 0,
         backgroundColor: 'var(--color-overlay)',
-        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -53,53 +49,42 @@ export default function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="card animate-slideUp"
+        className="card"
         style={{
-          maxWidth: '500px',
+          maxWidth: '480px',
           width: '100%',
           padding: 'var(--spacing-xl)',
           backgroundColor: 'var(--color-surface)',
-          boxShadow: 'var(--shadow-xl)',
+          boxShadow: 'var(--shadow-lg)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-lg)' }}>
-          <div
+        <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <h3
             style={{
-              fontSize: '32px',
-              lineHeight: 1,
-              flexShrink: 0,
+              margin: '0 0 var(--spacing-sm) 0',
+              color: 'var(--color-dark)',
+              fontSize: 'var(--font-size-lg)',
+              fontWeight: 'var(--font-weight-semibold)',
             }}
           >
-            {icon || defaultIcon}
-          </div>
-          <div style={{ flex: 1 }}>
-            <h3
-              style={{
-                margin: '0 0 var(--spacing-sm) 0',
-                color: 'var(--color-dark)',
-                fontSize: 'var(--font-size-xl)',
-                fontWeight: 'var(--font-weight-semibold)',
-              }}
-            >
-              {title}
-            </h3>
-            <p
-              style={{
-                margin: 0,
-                color: 'var(--color-text-secondary)',
-                fontSize: 'var(--font-size-base)',
-                lineHeight: 'var(--line-height-normal)',
-              }}
-            >
-              {message}
-            </p>
-          </div>
+            {title}
+          </h3>
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--color-text-secondary)',
+              fontSize: 'var(--font-size-sm)',
+              lineHeight: 'var(--line-height-normal)',
+            }}
+          >
+            {message}
+          </p>
         </div>
         <div
           style={{
             display: 'flex',
-            gap: 'var(--spacing-md)',
+            gap: 'var(--spacing-sm)',
             justifyContent: 'flex-end',
           }}
         >
