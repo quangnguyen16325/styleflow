@@ -2,11 +2,11 @@ import { NavLink } from 'react-router-dom';
 
 const menuItems = [
   { to: '/', label: 'Dashboard', icon: '📊', end: true },
-  { to: '/products', label: 'Inventory Info', icon: '📦' },
+  { to: '/products', label: 'Inventory', icon: '📦' },
   { to: '/categories', label: 'Categories', icon: '🏷️' },
-  { to: '/orders', label: 'Order Management', icon: '🛒' },
-  { to: '/issues', label: 'Issues Tracking', icon: '⚠️' },
-  { to: '/refund-requests', label: 'Refund Requests', icon: '💸' },
+  { to: '/orders', label: 'Orders', icon: '🛒' },
+  { to: '/issues', label: 'Issues', icon: '⚠️' },
+  { to: '/refund-requests', label: 'Refunds', icon: '💸' },
 ];
 
 export default function Sidebar({ collapsed = false, onToggle }) {
@@ -14,54 +14,49 @@ export default function Sidebar({ collapsed = false, onToggle }) {
     display: 'flex',
     alignItems: 'center',
     gap: 'var(--spacing-sm)',
-    padding: collapsed ? 'var(--spacing-md)' : '12px var(--spacing-md)',
-    color: isActive ? '#fff' : '#94a3b8',
-    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-    borderLeft: isActive ? '3px solid #3b82f6' : '3px solid transparent',
+    padding: collapsed ? 'var(--spacing-md)' : '10px var(--spacing-md)',
+    color: isActive ? 'var(--color-primary)' : '#64748b',
+    backgroundColor: isActive ? 'var(--color-primary-light)' : 'transparent',
+    borderLeft: isActive ? '2px solid var(--color-primary)' : '2px solid transparent',
     textDecoration: 'none',
-    fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-normal)',
+    fontWeight: 'var(--font-weight-medium)',
     fontSize: 'var(--font-size-sm)',
-    borderRadius: '0 var(--radius-md) var(--radius-md) 0',
-    marginBottom: 'var(--spacing-xs)',
+    borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+    marginBottom: '2px',
     transition: 'all var(--transition-fast)',
     justifyContent: collapsed ? 'center' : 'flex-start',
-    position: 'relative',
   });
 
   const hoverStyle = (e) => {
     if (!e.currentTarget.classList.contains('active')) {
-      e.currentTarget.style.backgroundColor = 'rgba(148, 163, 184, 0.1)';
-      e.currentTarget.style.color = '#cbd5e1';
+      e.currentTarget.style.backgroundColor = 'var(--color-bg)';
+      e.currentTarget.style.color = 'var(--color-text)';
     }
   };
 
   const leaveStyle = (e) => {
     if (!e.currentTarget.classList.contains('active')) {
       e.currentTarget.style.backgroundColor = 'transparent';
-      e.currentTarget.style.color = '#94a3b8';
+      e.currentTarget.style.color = '#64748b';
     }
   };
 
   return (
     <aside
       style={{
-        width: collapsed ? '80px' : '260px',
-        backgroundColor: '#0f172a',
-        color: '#fff',
+        width: collapsed ? '64px' : '220px',
+        backgroundColor: 'var(--color-surface)',
+        borderRight: '1px solid var(--color-border)',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         transition: 'width var(--transition-normal)',
-        boxShadow: 'var(--shadow-lg)',
-        position: 'relative',
-        zIndex: 'var(--z-sticky)',
       }}
     >
-      {/* Brand */}
       <div
         style={{
           padding: collapsed ? 'var(--spacing-lg) var(--spacing-sm)' : 'var(--spacing-lg) var(--spacing-md)',
-          borderBottom: '1px solid rgba(148,163,184,0.1)',
+          borderBottom: '1px solid var(--color-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
@@ -71,17 +66,16 @@ export default function Sidebar({ collapsed = false, onToggle }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
           <div
             style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: 'var(--radius-lg)',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-primary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 'var(--font-size-lg)',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 'var(--font-weight-bold)',
               color: '#fff',
-              boxShadow: 'var(--shadow-md)',
             }}
           >
             SF
@@ -90,21 +84,12 @@ export default function Sidebar({ collapsed = false, onToggle }) {
             <div>
               <div
                 style={{
-                  fontSize: 'var(--font-size-xl)',
-                  fontWeight: 'var(--font-weight-bold)',
-                  letterSpacing: '-0.5px',
+                  fontSize: 'var(--font-size-md)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-dark)',
                 }}
               >
                 StyleFlow
-              </div>
-              <div
-                style={{
-                  fontSize: 'var(--font-size-xs)',
-                  color: '#64748b',
-                  fontWeight: 'var(--font-weight-medium)',
-                }}
-              >
-                Admin Portal
               </div>
             </div>
           )}
@@ -115,65 +100,50 @@ export default function Sidebar({ collapsed = false, onToggle }) {
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#64748b',
+              color: 'var(--color-text-muted)',
               cursor: 'pointer',
               padding: 'var(--spacing-xs)',
-              fontSize: 'var(--font-size-lg)',
+              fontSize: 'var(--font-size-md)',
               transition: 'color var(--transition-fast)',
             }}
-            onMouseEnter={(e) => (e.target.style.color = '#cbd5e1')}
-            onMouseLeave={(e) => (e.target.style.color = '#64748b')}
-            title="Collapse sidebar"
+            onMouseEnter={(e) => (e.target.style.color = 'var(--color-text)')}
+            onMouseLeave={(e) => (e.target.style.color = 'var(--color-text-muted)')}
+            title="Collapse"
           >
             ◀
           </button>
         )}
       </div>
 
-      {/* Toggle button when collapsed */}
       {collapsed && (
         <button
           onClick={onToggle}
           style={{
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            color: '#3b82f6',
+            background: 'transparent',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-muted)',
             cursor: 'pointer',
             padding: 'var(--spacing-xs)',
-            fontSize: 'var(--font-size-lg)',
+            fontSize: 'var(--font-size-md)',
             margin: 'var(--spacing-sm)',
-            borderRadius: 'var(--radius-md)',
+            borderRadius: 'var(--radius-sm)',
             transition: 'all var(--transition-fast)',
           }}
           onMouseEnter={(e) => {
-            e.target.style.background = 'rgba(59, 130, 246, 0.2)';
+            e.target.style.background = 'var(--color-bg)';
+            e.target.style.color = 'var(--color-text)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.background = 'rgba(59, 130, 246, 0.1)';
+            e.target.style.background = 'transparent';
+            e.target.style.color = 'var(--color-text-muted)';
           }}
-          title="Expand sidebar"
+          title="Expand"
         >
           ▶
         </button>
       )}
 
-      {/* Navigation */}
       <nav style={{ flex: 1, padding: 'var(--spacing-md) var(--spacing-sm) var(--spacing-md) 0', overflowY: 'auto' }}>
-        {!collapsed && (
-          <div
-            style={{
-              padding: '0 var(--spacing-md)',
-              marginBottom: 'var(--spacing-sm)',
-              fontSize: 'var(--font-size-xs)',
-              fontWeight: 'var(--font-weight-semibold)',
-              color: '#475569',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}
-          >
-            Menu
-          </div>
-        )}
         {menuItems.map((item) => (
           <NavLink
             key={item.to}
@@ -185,25 +155,23 @@ export default function Sidebar({ collapsed = false, onToggle }) {
             onMouseLeave={leaveStyle}
             title={collapsed ? item.label : ''}
           >
-            <span style={{ fontSize: 'var(--font-size-lg)' }}>{item.icon}</span>
+            <span style={{ fontSize: 'var(--font-size-md)' }}>{item.icon}</span>
             {!collapsed && <span>{item.label}</span>}
           </NavLink>
         ))}
       </nav>
 
-      {/* Footer */}
       {!collapsed && (
         <div
           style={{
             padding: 'var(--spacing-md)',
-            borderTop: '1px solid rgba(148,163,184,0.1)',
+            borderTop: '1px solid var(--color-border)',
             fontSize: 'var(--font-size-xs)',
-            color: '#475569',
+            color: 'var(--color-text-muted)',
             textAlign: 'center',
-            fontWeight: 'var(--font-weight-medium)',
           }}
         >
-          v0.5.0-alpha
+          v0.5.0
         </div>
       )}
     </aside>

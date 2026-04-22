@@ -23,7 +23,6 @@ export default function AdminLayout() {
           flexDirection: 'column',
           flex: 1,
           overflow: 'hidden',
-          transition: 'margin-left var(--transition-normal)',
         }}
       >
         <Header />
@@ -35,7 +34,6 @@ export default function AdminLayout() {
           }}
         >
           <div
-            className="animate-fadeIn"
             style={{
               padding: 'var(--spacing-xl)',
               maxWidth: '1400px',
@@ -46,7 +44,6 @@ export default function AdminLayout() {
             <Outlet />
           </div>
         </main>
-        {/* Footer */}
         <footer
           style={{
             padding: 'var(--spacing-md) var(--spacing-xl)',
@@ -57,7 +54,7 @@ export default function AdminLayout() {
             textAlign: 'center',
           }}
         >
-          © 2026 StyleFlow Admin Portal • v0.5.0-alpha
+          © 2026 StyleFlow • v0.5.0
         </footer>
       </div>
     </div>

@@ -6,26 +6,22 @@ import {
   isPrivilegedRole,
   isTokenExpired,
 } from '../../utils/auth';
-import LoadingSpinner from '../ui/LoadingSpinner';
 
 export default function ProtectedRoute() {
   const token = getStoredAdminToken();
   const user = getStoredAdminUser();
   const location = useLocation();
 
-  // Check authentication
   if (!token || !user) {
     clearAdminSession();
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check token expiration
   if (isTokenExpired(token)) {
     clearAdminSession();
     return <Navigate to="/login" state={{ from: location, expired: true }} replace />;
   }
 
-  // Check role authorization
   if (!isPrivilegedRole(user.role)) {
     clearAdminSession();
     return (
@@ -39,18 +35,18 @@ export default function ProtectedRoute() {
         }}
       >
         <div
-          className="card animate-slideUp"
+          className="card"
           style={{
-            padding: 'var(--spacing-2xl)',
+            padding: 'var(--spacing-3xl)',
             textAlign: 'center',
-            maxWidth: '500px',
+            maxWidth: '480px',
           }}
         >
-          <div style={{ fontSize: '64px', marginBottom: 'var(--spacing-lg)' }}>🚫</div>
-          <h2 style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--color-danger)' }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-lg)', opacity: 0.4 }}>🚫</div>
+          <h2 style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--color-danger)', fontSize: 'var(--font-size-xl)' }}>
             Access Denied
           </h2>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-lg)' }}>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-sm)' }}>
             You don't have permission to access the admin portal.
           </p>
           <button
