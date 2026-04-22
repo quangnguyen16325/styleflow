@@ -57,7 +57,7 @@ const STATUS_COLORS = {
 
 const DEFAULT = { color: '#6B7280', bg: '#F3F4F6' };
 
-export default function StatusBadge({ value, showIcon = false, size = 'md', style = {} }) {
+export default function StatusBadge({ value, size = 'md', style = {} }) {
   if (!value) return null;
   
   const scheme = STATUS_COLORS[value] || DEFAULT;

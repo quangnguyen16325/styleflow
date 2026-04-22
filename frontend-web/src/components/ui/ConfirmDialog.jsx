@@ -9,7 +9,6 @@ export default function ConfirmDialog({
   confirmText = 'Confirm', 
   cancelText = 'Cancel', 
   danger = false,
-  icon = null,
 }) {
   useEffect(() => {
     const handleEscape = (e) => {
