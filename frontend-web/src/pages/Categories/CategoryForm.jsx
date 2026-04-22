@@ -154,50 +154,42 @@ export default function CategoryForm() {
 
   return (
     <div>
-      <h2 style={{ margin: '0 0 24px 0', color: '#202124' }}>
-        {isEditMode ? 'Edit Category' : 'Create New Category'}
+      <h2 style={{ margin: '0 0 var(--spacing-xl) 0', color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>
+        {isEditMode ? 'Edit Category' : 'Create Category'}
       </h2>
 
       {error && (
         <div style={{
-          marginBottom: '20px',
-          padding: '12px 16px',
-          backgroundColor: '#ffebee',
-          color: '#c62828',
-          borderRadius: '4px',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
+          marginBottom: 'var(--spacing-lg)',
+          padding: 'var(--spacing-md) var(--spacing-lg)',
+          backgroundColor: 'var(--color-danger-bg)',
+          color: 'var(--color-danger)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--font-size-sm)',
         }}>
-          <span>⚠</span>
-          <span>{error.message || 'An error occurred'}</span>
+          {error.message || 'An error occurred'}
         </div>
       )}
 
       {successMessage && (
         <div style={{
-          marginBottom: '20px',
-          padding: '12px 16px',
-          backgroundColor: '#e8f5e9',
-          color: '#2e7d32',
-          borderRadius: '4px',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
+          marginBottom: 'var(--spacing-lg)',
+          padding: 'var(--spacing-md) var(--spacing-lg)',
+          backgroundColor: 'var(--color-success-bg)',
+          color: 'var(--color-success)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--font-size-sm)',
         }}>
-          <span>✓</span>
-          <span>{successMessage}</span>
+          {successMessage}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="card" style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gap: '20px' }}>
+      <form onSubmit={handleSubmit} className="card" style={{ padding: 'var(--spacing-xl)' }}>
+        <div style={{ display: 'grid', gap: 'var(--spacing-lg)' }}>
           {/* Name */}
           <div>
-            <label htmlFor="name" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              Name <span style={{ color: '#c62828' }}>*</span>
+            <label htmlFor="name" className="form-label">
+              Name <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               type="text"
@@ -212,14 +204,14 @@ export default function CategoryForm() {
               placeholder="e.g., Apparel"
             />
             {errors.name && touched.name && (
-              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.name}</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.name}</div>
             )}
           </div>
 
           {/* Slug */}
           <div>
-            <label htmlFor="slug" style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '6px', color: '#202124' }}>
-              Slug <span style={{ color: '#c62828' }}>*</span>
+            <label htmlFor="slug" className="form-label">
+              Slug <span style={{ color: 'var(--color-danger)' }}>*</span>
             </label>
             <input
               type="text"
@@ -234,16 +226,16 @@ export default function CategoryForm() {
               placeholder="e.g., apparel"
             />
             {errors.slug && touched.slug && (
-              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.slug}</div>
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.slug}</div>
             )}
-            <div style={{ marginTop: '4px', fontSize: '12px', color: '#5f6368' }}>
+            <div style={{ marginTop: '4px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
               URL-friendly identifier (lowercase, numbers, hyphens only)
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div style={{ marginTop: '32px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        <div style={{ marginTop: 'var(--spacing-2xl)', display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
           <button
             type="button"
             onClick={handleCancel}

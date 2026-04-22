@@ -57,15 +57,15 @@ export default function CategoryDetails() {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
         <Link to="/categories" className="link">&larr; Back to Categories</Link>
       </div>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ margin: 0, color: '#202124' }}>{category.name}</h2>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <Link to={`/categories/${id}/edit`} className="btn-primary">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xl)' }}>
+        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>{category.name}</h2>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <Link to={`/categories/${id}/edit`} className="btn-primary" style={{ textDecoration: 'none' }}>
             Edit
           </Link>
           <button
@@ -80,14 +80,14 @@ export default function CategoryDetails() {
       </div>
 
       {/* Category Info */}
-      <div className="card" style={{ padding: '24px' }}>
-        <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px', fontSize: '15px' }}>
+      <div className="card" style={{ padding: 'var(--spacing-xl)' }}>
+        <h3 style={{ margin: '0 0 var(--spacing-md) 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
           Category Information
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', fontSize: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)' }}>
           <div><strong>ID:</strong> {category.id}</div>
           <div><strong>Name:</strong> {category.name}</div>
-          <div><strong>Slug:</strong> <code style={{ fontSize: '13px', background: '#f1f3f4', padding: '2px 6px', borderRadius: '4px' }}>{category.slug}</code></div>
+          <div><strong>Slug:</strong> <code style={{ fontSize: 'var(--font-size-sm)', background: 'var(--color-bg)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{category.slug}</code></div>
           <div><strong>Created:</strong> {new Date(category.createdAt).toLocaleString()}</div>
           {category.updatedAt && (
             <div><strong>Updated:</strong> {new Date(category.updatedAt).toLocaleString()}</div>

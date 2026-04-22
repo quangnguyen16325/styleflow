@@ -62,24 +62,24 @@ export default function RefundRequestDetails() {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
         <Link to="/refund-requests" className="link">&larr; Back to Refund Requests</Link>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <h2 style={{ margin: 0, color: '#202124' }}>Refund Request #{refundRequest.id}</h2>
-        <StatusBadge value={refundRequest.status} style={{ fontSize: '14px', padding: '6px 16px' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xs)' }}>
+        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Refund Request #{refundRequest.id}</h2>
+        <StatusBadge value={refundRequest.status} style={{ fontSize: 'var(--font-size-sm)', padding: '6px 16px' }} />
       </div>
-      <p style={{ color: '#5f6368', marginBottom: '24px', fontSize: '14px' }}>
+      <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xl)', fontSize: 'var(--font-size-sm)' }}>
         Created on <strong>{refundRequest.createdAt ? new Date(refundRequest.createdAt).toLocaleString() : '—'}</strong>
         {refundRequest.updatedAt && refundRequest.updatedAt !== refundRequest.createdAt && (
           <> &middot; Updated <strong>{new Date(refundRequest.updatedAt).toLocaleString()}</strong></>
         )}
       </p>
 
-      <div className="card" style={{ padding: '20px', marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 14px 0', fontSize: '15px', color: '#202124' }}>Update Refund Status</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+      <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-xl)' }}>
+        <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-md)', color: 'var(--color-dark)' }}>Update Refund Status</h3>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', marginBottom: 'var(--spacing-sm)' }}>
           <select
             value={newStatus}
             onChange={(e) => setNewStatus(e.target.value)}
@@ -107,33 +107,33 @@ export default function RefundRequestDetails() {
 
         {updateError && <ErrorMessage error={updateError} />}
         {updateSuccess && (
-          <div style={{ marginTop: '10px', padding: '10px 14px', background: '#e8f5e9', color: '#2e7d32', borderRadius: '4px', fontSize: '14px' }}>
-            ✓ Refund request updated successfully
+          <div style={{ marginTop: 'var(--spacing-sm)', padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--color-success-bg)', color: 'var(--color-success)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)' }}>
+            Refund request updated successfully
           </div>
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-        <div className="card" style={{ padding: '24px' }}>
-          <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px', fontSize: '15px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--spacing-lg)' }}>
+        <div className="card" style={{ padding: 'var(--spacing-xl)' }}>
+          <h3 style={{ margin: '0 0 var(--spacing-md) 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
             Refund Request Information
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)' }}>
             <div><strong>Order ID:</strong> {refundRequest.orderId || '—'}</div>
             <div><strong>Customer ID:</strong> {refundRequest.customerId || '—'}</div>
             <div><strong>Status:</strong> <StatusBadge value={refundRequest.status} /></div>
             <div><strong>Abuse Score Snapshot:</strong> {refundRequest.abuseScoreSnapshot ?? '—'}</div>
             <div>
               <strong>Review Note:</strong>{' '}
-              <span style={{ color: refundRequest.reviewNote ? '#202124' : '#777' }}>
+              <span style={{ color: refundRequest.reviewNote ? 'var(--color-dark)' : 'var(--color-text-muted)' }}>
                 {refundRequest.reviewNote || 'No review note yet'}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '24px' }}>
-          <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid #e0e0e0', paddingBottom: '10px', fontSize: '15px' }}>
+        <div className="card" style={{ padding: 'var(--spacing-xl)' }}>
+          <h3 style={{ margin: '0 0 var(--spacing-md) 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
             Evidence Image
           </h3>
           {refundRequest.imageUrl ? (
@@ -143,11 +143,11 @@ export default function RefundRequestDetails() {
                 target="_blank"
                 rel="noreferrer"
                 className="link"
-                style={{ display: 'inline-block', marginBottom: '12px' }}
+                style={{ display: 'inline-block', marginBottom: 'var(--spacing-md)' }}
               >
                 Open original image
               </a>
-              <div style={{ border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden', background: '#fafafa' }}>
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--color-bg)' }}>
                 <img
                   src={refundRequest.imageUrl}
                   alt={`Refund evidence #${refundRequest.id}`}
@@ -156,7 +156,7 @@ export default function RefundRequestDetails() {
               </div>
             </div>
           ) : (
-            <div style={{ color: '#777', fontSize: '14px' }}>No image evidence.</div>
+            <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>No image evidence.</div>
           )}
         </div>
       </div>

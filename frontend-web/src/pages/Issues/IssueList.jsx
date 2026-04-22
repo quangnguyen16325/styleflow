@@ -89,13 +89,13 @@ export default function IssueList() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, color: '#202124' }}>Issues Tracking</h2>
-        <span style={{ fontSize: '13px', color: '#5f6368' }}>{issues.length} issue(s)</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
+        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Issues</h2>
+        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>{issues.length} issues</span>
       </div>
 
       {/* Filter Toolbar */}
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
         <select
           value={statusFilter}
           onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -148,7 +148,7 @@ export default function IssueList() {
             <tbody>
               {issues.map((issue) => (
                 <tr key={issue.id}>
-                  <td style={{ fontWeight: 'bold' }}>#{issue.id}</td>
+                  <td style={{ fontWeight: 'var(--font-weight-bold)' }}>#{issue.id}</td>
                   <td><StatusBadge value={issue.type} /></td>
                   <td><StatusBadge value={issue.severity} /></td>
                   <td><StatusBadge value={issue.status} /></td>
@@ -166,12 +166,12 @@ export default function IssueList() {
                       </Link>
                     ) : '—'}
                   </td>
-                  <td style={{ fontSize: '13px', color: '#5f6368' }}>
+                  <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
                     {new Date(issue.createdAt).toLocaleString()}
                   </td>
                   <td>
                     <Link to={`/issues/${issue.id}`} className="link">
-                      View Details
+                      View
                     </Link>
                   </td>
                 </tr>
