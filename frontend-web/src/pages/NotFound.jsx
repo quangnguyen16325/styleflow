@@ -9,13 +9,13 @@ export default function NotFound() {
       justifyContent: 'center',
       minHeight: '60vh',
       textAlign: 'center',
-      padding: '40px',
+      padding: 'var(--spacing-3xl)',
     }}>
-      <div style={{ fontSize: '72px', fontWeight: 800, color: '#e0e0e0', lineHeight: 1, marginBottom: '8px' }}>
+      <div style={{ fontSize: '64px', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-border)', lineHeight: 1, marginBottom: 'var(--spacing-md)' }}>
         404
       </div>
-      <h2 style={{ margin: '0 0 8px 0', color: '#202124', fontSize: '22px' }}>Page Not Found</h2>
-      <p style={{ color: '#5f6368', marginBottom: '24px', maxWidth: '400px', fontSize: '14px' }}>
+      <h2 style={{ margin: '0 0 var(--spacing-xs) 0', color: 'var(--color-dark)', fontSize: 'var(--font-size-xl)' }}>Page Not Found</h2>
+      <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xl)', maxWidth: '400px', fontSize: 'var(--font-size-sm)' }}>
         The page you're looking for doesn't exist or has been moved.
       </p>
       <Link to="/" className="btn-primary" style={{ textDecoration: 'none' }}>

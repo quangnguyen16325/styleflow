@@ -91,56 +91,49 @@ export default function Dashboard() {
   const cards = [
     {
       title: 'Products',
-      icon: '📦',
       total: stats.products?.total ?? 0,
       sub: `${stats.products?.lowStock ?? 0} low stock`,
-      subColor: (stats.products?.lowStock ?? 0) > 0 ? '#c62828' : '#2e7d32',
+      subColor: (stats.products?.lowStock ?? 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
       link: '/products',
     },
     {
       title: 'Orders',
-      icon: '🛒',
       total: stats.orders?.total ?? 0,
       sub: `${stats.orders?.pending ?? 0} pending`,
-      subColor: (stats.orders?.pending ?? 0) > 0 ? '#e65100' : '#2e7d32',
+      subColor: (stats.orders?.pending ?? 0) > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)',
       link: '/orders',
     },
     {
       title: 'Issues',
-      icon: '⚠️',
       total: stats.issues?.total ?? 0,
       sub: `${stats.issues?.open ?? 0} open`,
-      subColor: (stats.issues?.open ?? 0) > 0 ? '#c62828' : '#2e7d32',
+      subColor: (stats.issues?.open ?? 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
       link: '/issues',
     },
   ];
 
   return (
     <div>
-      <h2 style={{ margin: '0 0 8px 0', color: '#202124' }}>Dashboard</h2>
-      <p style={{ color: '#5f6368', marginBottom: '28px', fontSize: '14px' }}>
-        Welcome back! Here's an overview of your store.
+      <h2 style={{ margin: '0 0 var(--spacing-xs) 0', color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Dashboard</h2>
+      <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xl)', fontSize: 'var(--font-size-sm)' }}>
+        Overview of your store
       </p>
 
-      {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-lg)', marginBottom: 'var(--spacing-xl)' }}>
         {cards.map((card) => (
           <Link
             key={card.title}
             to={card.link}
             style={{ textDecoration: 'none', color: 'inherit' }}
           >
-            <div className="card" style={{ padding: '24px', cursor: 'pointer' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#5f6368', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {card.title}
-                </span>
-                <span style={{ fontSize: '28px' }}>{card.icon}</span>
+            <div className="card" style={{ padding: 'var(--spacing-lg)', cursor: 'pointer' }}>
+              <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 'var(--spacing-md)' }}>
+                {card.title}
               </div>
-              <div style={{ fontSize: '36px', fontWeight: 700, color: '#202124', marginBottom: '6px' }}>
+              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-dark)', marginBottom: 'var(--spacing-xs)' }}>
                 {card.total}
               </div>
-              <div style={{ fontSize: '13px', fontWeight: 500, color: card.subColor }}>
+              <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: card.subColor }}>
                 {card.sub}
               </div>
             </div>
@@ -148,37 +141,33 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Quick Links */}
-      <div className="card" style={{ padding: '24px', marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#202124' }}>Quick Actions</h3>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
+        <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-md)', color: 'var(--color-dark)' }}>Quick Actions</h3>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
           <Link to="/orders?status=pending" className="btn-primary" style={{ textDecoration: 'none' }}>
-            View Pending Orders
+            Pending Orders
           </Link>
-          <Link to="/issues?status=open" className="btn-primary" style={{ textDecoration: 'none', background: '#c62828' }}>
-            View Open Issues
+          <Link to="/issues?status=open" className="btn-danger" style={{ textDecoration: 'none' }}>
+            Open Issues
           </Link>
-          <Link to="/refund-requests?status=pending" className="btn-primary" style={{ textDecoration: 'none', background: '#6a1b9a' }}>
-            Review Pending Refunds
+          <Link to="/refund-requests?status=pending" className="btn-secondary" style={{ textDecoration: 'none' }}>
+            Pending Refunds
           </Link>
-          <Link to="/orders?status=failed" className="btn-primary" style={{ textDecoration: 'none', background: '#5d4037' }}>
-            Check Failed Orders
-          </Link>
-          <Link to="/products" className="btn-primary" style={{ textDecoration: 'none', background: '#2e7d32' }}>
-            Check Inventory
+          <Link to="/products" className="btn-secondary" style={{ textDecoration: 'none' }}>
+            Inventory
           </Link>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(240px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--spacing-lg)' }}>
         <Link
           to="/refund-requests?status=pending"
           style={{ textDecoration: 'none', color: 'inherit' }}
         >
-          <div className="card" style={{ padding: '20px', cursor: 'pointer' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '15px', color: '#202124' }}>Refund Requests Pending</h3>
+          <div className="card" style={{ padding: 'var(--spacing-lg)', cursor: 'pointer' }}>
+            <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Refund Requests</h3>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: '30px', fontWeight: 700, color: '#6a1b9a' }}>
+              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-dark)' }}>
                 {stats.refunds?.pending ?? 0}
               </div>
               <StatusBadge value="pending" />
@@ -190,10 +179,10 @@ export default function Dashboard() {
           to="/orders"
           style={{ textDecoration: 'none', color: 'inherit' }}
         >
-          <div className="card" style={{ padding: '20px', cursor: 'pointer' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '15px', color: '#202124' }}>Orders Returning / Failed Delivery</h3>
+          <div className="card" style={{ padding: 'var(--spacing-lg)', cursor: 'pointer' }}>
+            <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Delivery Issues</h3>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: '30px', fontWeight: 700, color: '#5d4037' }}>
+              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-dark)' }}>
                 {stats.deliveryRisk?.returningOrFailed ?? 0}
               </div>
               <StatusBadge value="returned" />
