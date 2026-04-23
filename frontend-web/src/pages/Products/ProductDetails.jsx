@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -7,6 +7,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 function resolveContentType(file) {
   if (file?.type) return file.type;
@@ -49,14 +50,30 @@ export default function ProductDetails() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    let isActive = true;
     setLoading(true);
+    
     ApiService.getProduct(id)
       .then((data) => {
-        setProduct(data);
-        setError(null);
+        if (isActive) {
+          setProduct(data);
+          setError(null);
+        }
       })
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (isActive) {
+          setError(err);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -73,7 +90,7 @@ export default function ProductDetails() {
     };
   }, [selectedFile]);
 
-  const handleFileChange = (event) => {
+  const handleFileChange = useCallback((event) => {
     const file = event.target.files?.[0];
     setUploadError('');
     setUploadSuccess('');
@@ -90,8 +107,15 @@ export default function ProductDetails() {
       return;
     }
 
+    if (file.size > MAX_FILE_SIZE) {
+      setSelectedFile(null);
+      setUploadError(`File too large. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`);
+      event.target.value = '';
+      return;
+    }
+
     setSelectedFile(file);
-  };
+  }, []);
 
   const handleUploadImage = async () => {
     if (!product || !selectedFile || uploading) return;
@@ -152,9 +176,9 @@ export default function ProductDetails() {
     }
   };
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = useCallback(() => {
     setShowDeleteDialog(true);
-  };
+  }, []);
 
   const handleDeleteConfirm = async () => {
     setDeleting(true);
@@ -174,12 +198,12 @@ export default function ProductDetails() {
     }
   };
 
-  const handleDeleteCancel = () => {
+  const handleDeleteCancel = useCallback(() => {
     setShowDeleteDialog(false);
-  };
+  }, []);
 
   if (loading) return <LoadingSpinner message="Loading product details..." />;
-  if (error) return <ErrorMessage error={error} />;
+  if (error) return <ErrorMessage error={error} onRetry={() => window.location.reload()} />;
   if (!product) return null;
 
   const isLowStock = product.availableQty < product.minStockLevel;
@@ -192,15 +216,18 @@ export default function ProductDetails() {
   ];
 
   return (
-    <div>
+    <div className="animate-fadeIn">
       <div style={{ marginBottom: 'var(--spacing-lg)' }}>
         <Link to="/products" className="link">&larr; Back to Inventory</Link>
       </div>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xl)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>{product.name}</h2>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+      <div className="page-header">
+        <div className="page-header-content">
+          <h2 className="page-title">{product.name}</h2>
+          <p className="page-subtitle">SKU: {product.sku}</p>
+        </div>
+        <div className="page-header-actions">
           <Link to={`/products/${id}/edit`} className="btn-primary" style={{ textDecoration: 'none' }}>
             Edit
           </Link>
@@ -210,17 +237,18 @@ export default function ProductDetails() {
             className="btn-danger"
             disabled={deleting}
           >
-            Delete
+            {deleting ? 'Deleting...' : 'Delete'}
           </button>
           <span style={{
             padding: '6px 14px',
-            backgroundColor: isLowStock ? 'var(--color-danger-bg)' : 'var(--color-success-bg)',
+            backgroundColor: isLowStock ? 'var(--color-danger-light)' : 'var(--color-success-light)',
             color: isLowStock ? 'var(--color-danger)' : 'var(--color-success)',
             borderRadius: 'var(--radius-full)',
             fontWeight: 'var(--font-weight-semibold)',
             fontSize: 'var(--font-size-xs)',
+            border: `1px solid ${isLowStock ? 'var(--color-danger)' : 'var(--color-success)'}`,
           }}>
-            {isLowStock ? 'LOW STOCK' : 'IN STOCK'}
+            {isLowStock ? '⚠️ LOW STOCK' : '✓ IN STOCK'}
           </span>
         </div>
       </div>

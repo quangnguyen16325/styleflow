@@ -68,40 +68,68 @@ export default function ProductForm() {
 
   // Load categories
   useEffect(() => {
+    let isActive = true;
+
     ApiService.getCategories()
       .then((data) => {
-        setCategories(Array.isArray(data) ? data : []);
+        if (isActive) {
+          setCategories(Array.isArray(data) ? data : []);
+        }
       })
       .catch((err) => {
-        console.error('Failed to load categories:', err);
-        setCategories([]);
+        if (isActive) {
+          console.error('Failed to load categories:', err);
+          setCategories([]);
+        }
       })
-      .finally(() => setLoadingCategories(false));
+      .finally(() => {
+        if (isActive) {
+          setLoadingCategories(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
     if (isEditMode) {
+      let isActive = true;
+
       ApiService.getProduct(id)
         .then((data) => {
-          setFormData({
-            sku: data.sku || '',
-            name: data.name || '',
-            basePrice: data.basePrice || '',
-            categoryId: data.categoryId || '',
-            stockQty: data.stockQty || '',
-            minStockLevel: data.minStockLevel || '',
-          });
-          setError(null);
-        })
-        .catch((err) => {
-          if (err.code === 'NOT_FOUND') {
-            setError({ code: 'NOT_FOUND', message: 'Product not found' });
-            setTimeout(() => navigate('/products'), 2000);
-          } else {
-            setError(err);
+          if (isActive) {
+            setFormData({
+              sku: data.sku || '',
+              name: data.name || '',
+              basePrice: data.basePrice || '',
+              categoryId: data.categoryId || '',
+              stockQty: data.stockQty || '',
+              minStockLevel: data.minStockLevel || '',
+            });
+            setError(null);
           }
         })
-        .finally(() => setLoading(false));
+        .catch((err) => {
+          if (isActive) {
+            if (err.code === 'NOT_FOUND') {
+              setError({ code: 'NOT_FOUND', message: 'Product not found' });
+              setTimeout(() => navigate('/products'), 2000);
+            } else {
+              setError(err);
+            }
+          }
+        })
+        .finally(() => {
+          if (isActive) {
+            setLoading(false);
+          }
+        });
+
+      return () => {
+        isActive = false;
+      };
     }
   }, [id, isEditMode, navigate]);
 
@@ -220,10 +248,15 @@ export default function ProductForm() {
   const hasErrors = Object.values(errors).some((err) => err !== null);
 
   return (
-    <div>
-      <h2 style={{ margin: '0 0 var(--spacing-xl) 0', color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>
-        {isEditMode ? 'Edit Product' : 'Create Product'}
-      </h2>
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <div className="page-header-content">
+          <h2 className="page-title">{isEditMode ? 'Edit Product' : 'Create Product'}</h2>
+          <p className="page-subtitle">
+            {isEditMode ? 'Update product information' : 'Add a new product to inventory'}
+          </p>
+        </div>
+      </div>
 
       {error && (
         <div style={{

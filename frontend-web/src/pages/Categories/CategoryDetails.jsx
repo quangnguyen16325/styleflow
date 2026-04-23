@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -15,19 +15,35 @@ export default function CategoryDetails() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    let isActive = true;
     setLoading(true);
+
     ApiService.getCategory(id)
       .then((data) => {
-        setCategory(data);
-        setError(null);
+        if (isActive) {
+          setCategory(data);
+          setError(null);
+        }
       })
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (isActive) {
+          setError(err);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [id]);
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = useCallback(() => {
     setShowDeleteDialog(true);
-  };
+  }, []);
 
   const handleDeleteConfirm = async () => {
     setDeleting(true);
@@ -47,24 +63,27 @@ export default function CategoryDetails() {
     }
   };
 
-  const handleDeleteCancel = () => {
+  const handleDeleteCancel = useCallback(() => {
     setShowDeleteDialog(false);
-  };
+  }, []);
 
   if (loading) return <LoadingSpinner message="Loading category details..." />;
-  if (error) return <ErrorMessage error={error} />;
+  if (error) return <ErrorMessage error={error} onRetry={() => window.location.reload()} />;
   if (!category) return null;
 
   return (
-    <div>
+    <div className="animate-fadeIn">
       <div style={{ marginBottom: 'var(--spacing-lg)' }}>
         <Link to="/categories" className="link">&larr; Back to Categories</Link>
       </div>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xl)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>{category.name}</h2>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+      <div className="page-header">
+        <div className="page-header-content">
+          <h2 className="page-title">{category.name}</h2>
+          <p className="page-subtitle">Slug: {category.slug}</p>
+        </div>
+        <div className="page-header-actions">
           <Link to={`/categories/${id}/edit`} className="btn-primary" style={{ textDecoration: 'none' }}>
             Edit
           </Link>
@@ -74,7 +93,7 @@ export default function CategoryDetails() {
             className="btn-danger"
             disabled={deleting}
           >
-            Delete
+            {deleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>
       </div>

@@ -35,23 +35,37 @@ export default function CategoryForm() {
 
   useEffect(() => {
     if (isEditMode) {
+      let isActive = true;
+
       ApiService.getCategory(id)
         .then((data) => {
-          setFormData({
-            name: data.name || '',
-            slug: data.slug || '',
-          });
-          setError(null);
-        })
-        .catch((err) => {
-          if (err.code === 'NOT_FOUND') {
-            setError({ code: 'NOT_FOUND', message: 'Category not found' });
-            setTimeout(() => navigate('/categories'), 2000);
-          } else {
-            setError(err);
+          if (isActive) {
+            setFormData({
+              name: data.name || '',
+              slug: data.slug || '',
+            });
+            setError(null);
           }
         })
-        .finally(() => setLoading(false));
+        .catch((err) => {
+          if (isActive) {
+            if (err.code === 'NOT_FOUND') {
+              setError({ code: 'NOT_FOUND', message: 'Category not found' });
+              setTimeout(() => navigate('/categories'), 2000);
+            } else {
+              setError(err);
+            }
+          }
+        })
+        .finally(() => {
+          if (isActive) {
+            setLoading(false);
+          }
+        });
+
+      return () => {
+        isActive = false;
+      };
     }
   }, [id, isEditMode, navigate]);
 
@@ -153,10 +167,15 @@ export default function CategoryForm() {
   const hasErrors = Object.values(errors).some((err) => err !== null);
 
   return (
-    <div>
-      <h2 style={{ margin: '0 0 var(--spacing-xl) 0', color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>
-        {isEditMode ? 'Edit Category' : 'Create Category'}
-      </h2>
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <div className="page-header-content">
+          <h2 className="page-title">{isEditMode ? 'Edit Category' : 'Create Category'}</h2>
+          <p className="page-subtitle">
+            {isEditMode ? 'Update category information' : 'Add a new category'}
+          </p>
+        </div>
+      </div>
 
       {error && (
         <div style={{

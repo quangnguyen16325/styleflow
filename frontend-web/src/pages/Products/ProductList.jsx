@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -13,79 +13,160 @@ export default function ProductList() {
   const [categoryFilter, setCategoryFilter] = useState('ALL');
 
   useEffect(() => {
+    let isActive = true;
+
     ApiService.getProducts()
       .then((data) => {
-        setProducts(Array.isArray(data) ? data : []);
-        setError(null);
+        if (isActive) {
+          setProducts(Array.isArray(data) ? data : []);
+          setError(null);
+        }
       })
-      .catch((err) => setError(err))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (isActive) {
+          setError(err);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
+  const categories = useMemo(() => {
+    return ['ALL', ...new Set(products.map(p => p.category).filter(Boolean))];
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    return products.filter((p) => {
+      const matchesSearch = !searchTerm ||
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = categoryFilter === 'ALL' || p.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, categoryFilter]);
+
+  const lowStockCount = useMemo(() => {
+    return products.filter(p => p.availableQty < p.minStockLevel).length;
+  }, [products]);
+
   if (loading) return <LoadingSpinner message="Loading inventory..." />;
-  if (error) return <ErrorMessage error={error} />;
-  if (!products || products.length === 0) return <EmptyState title="No Products" description="Inventory is currently empty." />;
-
-  // Extract unique categories
-  const categories = ['ALL', ...new Set(products.map(p => p.category).filter(Boolean))];
-
-  // Filter logic
-  const filtered = products.filter((p) => {
-    const matchesSearch = !searchTerm ||
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'ALL' || p.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  const lowStockCount = products.filter(p => p.availableQty < p.minStockLevel).length;
+  if (error) return <ErrorMessage error={error} onRetry={() => window.location.reload()} />;
+  if (!products || products.length === 0) {
+    return (
+      <EmptyState 
+        title="No Products" 
+        description="Inventory is currently empty." 
+        action={() => window.location.href = '/products/new'}
+        actionLabel="Create First Product"
+      />
+    );
+  }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Inventory</h2>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <div className="page-header-content">
+          <h2 className="page-title">Inventory</h2>
+          <p className="page-subtitle">Manage your product catalog</p>
+        </div>
+        <div className="page-header-actions">
           <Link to="/products/new" className="btn-primary" style={{ textDecoration: 'none' }}>
             Create Product
           </Link>
-          {lowStockCount > 0 && (
-            <span style={{
-              padding: '4px 10px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)',
-              color: 'var(--color-danger)', backgroundColor: 'var(--color-danger-bg)',
-            }}>
-              {lowStockCount} low stock
-            </span>
-          )}
-          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>{filtered.length} products</span>
+        </div>
+      </div>
+
+      {/* Stats Bar */}
+      <div style={{ 
+        display: 'flex', 
+        gap: 'var(--spacing-md)', 
+        marginBottom: 'var(--spacing-lg)',
+        flexWrap: 'wrap',
+      }}>
+        <div className="card" style={{ padding: 'var(--spacing-md)', flex: '1', minWidth: '150px' }}>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+            Total Products
+          </div>
+          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-dark)' }}>
+            {products.length}
+          </div>
+        </div>
+        {lowStockCount > 0 && (
+          <div className="card" style={{ padding: 'var(--spacing-md)', flex: '1', minWidth: '150px', background: 'var(--color-danger-light)' }}>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+              Low Stock Alert
+            </div>
+            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-danger)' }}>
+              {lowStockCount}
+            </div>
+          </div>
+        )}
+        <div className="card" style={{ padding: 'var(--spacing-md)', flex: '1', minWidth: '150px' }}>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
+            Filtered Results
+          </div>
+          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+            {filtered.length}
+          </div>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Search by name or SKU..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="form-input"
-          style={{ width: '260px' }}
+          style={{ flex: '1', minWidth: '200px', maxWidth: '300px' }}
+          aria-label="Search products"
         />
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
           className="form-select"
-          style={{ width: '180px' }}
+          style={{ minWidth: '180px' }}
+          aria-label="Filter by category"
         >
           {categories.map((c) => (
-            <option key={c} value={c}>{c === 'ALL' ? 'All Categories' : c.charAt(0).toUpperCase() + c.slice(1)}</option>
+            <option key={c} value={c}>
+              {c === 'ALL' ? 'All Categories' : c.charAt(0).toUpperCase() + c.slice(1)}
+            </option>
           ))}
         </select>
+        {(searchTerm || categoryFilter !== 'ALL') && (
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setCategoryFilter('ALL');
+            }}
+            className="btn-secondary btn-sm"
+          >
+            Clear Filters
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState title="No matches" description="No products match your search criteria." />
+        <EmptyState 
+          title="No matches" 
+          description="No products match your search criteria. Try adjusting your filters."
+          action={() => {
+            setSearchTerm('');
+            setCategoryFilter('ALL');
+          }}
+          actionLabel="Clear Filters"
+        />
       ) : (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card" style={{ overflow: 'auto' }}>
           <table>
             <thead>
               <tr>
@@ -105,16 +186,38 @@ export default function ProductList() {
               {filtered.map(product => {
                 const isLowStock = product.availableQty < product.minStockLevel;
                 return (
-                  <tr key={product.id} style={{ backgroundColor: isLowStock ? 'var(--color-warning-bg)' : 'transparent' }}>
+                  <tr 
+                    key={product.id} 
+                    style={{ 
+                      backgroundColor: isLowStock ? 'var(--color-warning-light)' : 'transparent' 
+                    }}
+                  >
                     <td>{product.id}</td>
-                    <td><code style={{ fontSize: 'var(--font-size-sm)', background: 'var(--color-bg)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{product.sku}</code></td>
+                    <td>
+                      <code style={{ 
+                        fontSize: 'var(--font-size-sm)', 
+                        background: 'var(--color-bg)', 
+                        padding: '2px 6px', 
+                        borderRadius: 'var(--radius-sm)' 
+                      }}>
+                        {product.sku}
+                      </code>
+                    </td>
                     <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{product.name}</td>
-                    <td><span style={{ textTransform: 'capitalize', color: 'var(--color-text-secondary)' }}>{product.category}</span></td>
+                    <td>
+                      <span style={{ textTransform: 'capitalize', color: 'var(--color-text-secondary)' }}>
+                        {product.category}
+                      </span>
+                    </td>
                     <td>{(product.basePrice || 0).toLocaleString()} đ</td>
                     <td>{product.stockQty}</td>
                     <td>{product.reservedQty}</td>
-                    <td style={{ fontWeight: 'var(--font-weight-bold)', color: isLowStock ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                    <td style={{ 
+                      fontWeight: 'var(--font-weight-bold)', 
+                      color: isLowStock ? 'var(--color-danger)' : 'var(--color-success)' 
+                    }}>
                       {product.availableQty}
+                      {isLowStock && <span style={{ marginLeft: '4px' }}>⚠️</span>}
                     </td>
                     <td>{product.minStockLevel}</td>
                     <td>
