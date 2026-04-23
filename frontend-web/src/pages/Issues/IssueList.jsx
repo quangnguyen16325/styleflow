@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -45,7 +45,7 @@ export default function IssueList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = useCallback((key, value) => {
     setLoading(true);
     setError(null);
 
@@ -56,7 +56,12 @@ export default function IssueList() {
       nextParams.set(key, value);
     }
     setSearchParams(nextParams, { replace: true });
-  };
+  }, [searchParams, setSearchParams]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -85,12 +90,12 @@ export default function IssueList() {
   }, [statusFilter, severityFilter, typeFilter]);
 
   if (loading) return <LoadingSpinner message="Loading issues..." />;
-  if (error) return <ErrorMessage error={error} />;
+  if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Issues</h2>
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <h2>Issues</h2>
         <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>{issues.length} issues</span>
       </div>
 
@@ -101,6 +106,7 @@ export default function IssueList() {
           onChange={(e) => handleFilterChange('status', e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
+          aria-label="Filter issues by status"
         >
           {ISSUE_STATUSES.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
@@ -111,6 +117,7 @@ export default function IssueList() {
           onChange={(e) => handleFilterChange('severity', e.target.value)}
           className="form-select"
           style={{ width: '180px' }}
+          aria-label="Filter issues by severity"
         >
           {ISSUE_SEVERITIES.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
@@ -121,6 +128,7 @@ export default function IssueList() {
           onChange={(e) => handleFilterChange('type', e.target.value)}
           className="form-select"
           style={{ width: '200px' }}
+          aria-label="Filter issues by type"
         >
           {ISSUE_TYPES.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>

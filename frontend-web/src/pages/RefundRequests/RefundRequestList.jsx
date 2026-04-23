@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -47,7 +47,7 @@ export default function RefundRequestList() {
     };
   }, [statusFilter]);
 
-  const handleStatusChange = (nextStatus) => {
+  const handleStatusChange = useCallback((nextStatus) => {
     setLoading(true);
     setError(null);
 
@@ -58,16 +58,27 @@ export default function RefundRequestList() {
       nextParams.set('status', nextStatus);
     }
     setSearchParams(nextParams, { replace: true });
-  };
+  }, [searchParams, setSearchParams]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+  }, []);
+
+  const pendingCount = useMemo(() => {
+    return refundRequests.filter(r => r.status === 'pending' || r.status === 'manual_review_required').length;
+  }, [refundRequests]);
 
   if (loading) return <LoadingSpinner message="Loading refund requests..." />;
-  if (error) return <ErrorMessage error={error} />;
+  if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Refund Requests</h2>
-        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>{refundRequests.length} requests</span>
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <h2>Refund Requests</h2>
+        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+          {refundRequests.length} requests · {pendingCount} pending review
+        </span>
       </div>
 
       <div style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
@@ -76,6 +87,7 @@ export default function RefundRequestList() {
           onChange={(e) => handleStatusChange(e.target.value)}
           className="form-select"
           style={{ width: '240px' }}
+          aria-label="Filter refund requests by status"
         >
           {REFUND_STATUSES.map((status) => (
             <option key={status.value} value={status.value}>{status.label}</option>

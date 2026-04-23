@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -51,7 +51,7 @@ export default function OrderList() {
     };
   }, [statusFilter]);
 
-  const handleStatusChange = (nextStatus) => {
+  const handleStatusChange = useCallback((nextStatus) => {
     setLoading(true);
     setError(null);
 
@@ -62,7 +62,16 @@ export default function OrderList() {
       nextParams.set('status', nextStatus);
     }
     setSearchParams(nextParams, { replace: true });
-  };
+  }, [searchParams, setSearchParams]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+  }, []);
+
+  const totalAmount = useMemo(() => {
+    return orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+  }, [orders]);
 
   // Client-side search within server-filtered results
   const filteredOrders = orders.filter((order) => {
@@ -76,13 +85,15 @@ export default function OrderList() {
   });
 
   if (loading) return <LoadingSpinner message="Loading orders..." />;
-  if (error) return <ErrorMessage error={error} />;
+  if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Orders</h2>
-        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>{filteredOrders.length} orders</span>
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <h2>Orders</h2>
+        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+          {filteredOrders.length} orders · Total: ${totalAmount.toFixed(2)}
+        </span>
       </div>
 
       {/* Filter Toolbar */}
@@ -94,12 +105,14 @@ export default function OrderList() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="form-input"
           style={{ width: '260px' }}
+          aria-label="Search orders by ID, name, or phone"
         />
         <select
           value={statusFilter}
           onChange={(e) => handleStatusChange(e.target.value)}
           className="form-select"
           style={{ width: '200px' }}
+          aria-label="Filter orders by status"
         >
           {ORDER_STATUSES.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>

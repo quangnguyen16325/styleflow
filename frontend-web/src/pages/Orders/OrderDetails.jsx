@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -79,7 +79,7 @@ export default function OrderDetails() {
     };
   }, [id]);
 
-  const handleUpdateStatus = async () => {
+  const handleUpdateStatus = useCallback(async () => {
     if (newStatus === order.status) return;
     setUpdating(true);
     setUpdateError(null);
@@ -94,9 +94,9 @@ export default function OrderDetails() {
     } finally {
       setUpdating(false);
     }
-  };
+  }, [id, newStatus, order]);
 
-  const handleAddressChangeDecision = async () => {
+  const handleAddressChangeDecision = useCallback(async () => {
     setAddressDecisionLoading(true);
     setAddressDecisionError(null);
     setAddressDecisionSuccess(null);
@@ -116,10 +116,15 @@ export default function OrderDetails() {
     } finally {
       setAddressDecisionLoading(false);
     }
-  };
+  }, [id, addressDecision, approvedShippingFee]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+  }, []);
 
   if (loading) return <LoadingSpinner message="Loading order details..." />;
-  if (error) return <ErrorMessage error={error} />;
+  if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
   if (!order) return null;
 
   const shipping = order.shipping || {};
@@ -135,14 +140,14 @@ export default function OrderDetails() {
   const hasAddressPayload = !!addressChangePayload && typeof addressChangePayload === 'object';
 
   return (
-    <div>
+    <div className="animate-fadeIn">
       <div style={{ marginBottom: 'var(--spacing-lg)' }}>
         <Link to="/orders" className="link">&larr; Back to Orders</Link>
       </div>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xs)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Order #{order.id}</h2>
+      <div className="page-header">
+        <h2>Order #{order.id}</h2>
         <StatusBadge value={order.status} style={{ fontSize: 'var(--font-size-sm)', padding: '6px 16px' }} />
       </div>
       <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-xl)', fontSize: 'var(--font-size-sm)' }}>

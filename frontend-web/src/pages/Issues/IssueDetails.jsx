@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ApiService from '../../api';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -30,7 +30,7 @@ export default function IssueDetails() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleUpdateStatus = async () => {
+  const handleUpdateStatus = useCallback(async () => {
     if (newStatus === issue.status) return;
     setUpdating(true);
     setUpdateError(null);
@@ -45,23 +45,28 @@ export default function IssueDetails() {
     } finally {
       setUpdating(false);
     }
-  };
+  }, [id, newStatus, issue]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+  }, []);
 
   if (loading) return <LoadingSpinner message="Loading issue details..." />;
-  if (error) return <ErrorMessage error={error} />;
+  if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
   if (!issue) return null;
 
   const logHistory = Array.isArray(issue.logHistory) ? issue.logHistory : [];
 
   return (
-    <div>
+    <div className="animate-fadeIn">
       <div style={{ marginBottom: 'var(--spacing-lg)' }}>
         <Link to="/issues" className="link">&larr; Back to Issues</Link>
       </div>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xs)' }}>
-        <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: 'var(--font-size-2xl)' }}>Issue #{issue.id}</h2>
+      <div className="page-header">
+        <h2>Issue #{issue.id}</h2>
         <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>
           <StatusBadge value={issue.type} style={{ fontSize: 'var(--font-size-sm)', padding: '5px 14px' }} />
           <StatusBadge value={issue.severity} style={{ fontSize: 'var(--font-size-sm)', padding: '5px 14px' }} />
