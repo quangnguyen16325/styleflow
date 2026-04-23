@@ -1,8 +1,12 @@
-export default function LoadingSpinner({ message = 'Loading...', size = 'md', fullScreen = false }) {
+export default function LoadingSpinner({ 
+  message = 'Loading...', 
+  size = 'md', 
+  fullScreen = false 
+}) {
   const sizes = {
     sm: { spinner: '20px', border: '2px', fontSize: '13px' },
     md: { spinner: '32px', border: '3px', fontSize: '14px' },
-    lg: { spinner: '48px', border: '3px', fontSize: '15px' },
+    lg: { spinner: '48px', border: '4px', fontSize: '15px' },
   };
 
   const currentSize = sizes[size] || sizes.md;
@@ -20,6 +24,7 @@ export default function LoadingSpinner({ message = 'Loading...', size = 'md', fu
         justifyContent: 'center',
         backgroundColor: 'var(--color-overlay)',
         zIndex: 'var(--z-modal)',
+        animation: 'fadeIn 0.15s ease-in-out',
       }
     : {
         padding: 'var(--spacing-3xl)',
@@ -32,7 +37,7 @@ export default function LoadingSpinner({ message = 'Loading...', size = 'md', fu
       };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} role="status" aria-live="polite">
       <div
         className="animate-spin"
         style={{
@@ -43,6 +48,7 @@ export default function LoadingSpinner({ message = 'Loading...', size = 'md', fu
           borderTopColor: 'var(--color-primary)',
           marginBottom: 'var(--spacing-md)',
         }}
+        aria-hidden="true"
       />
       {message && (
         <p
@@ -56,6 +62,7 @@ export default function LoadingSpinner({ message = 'Loading...', size = 'md', fu
           {message}
         </p>
       )}
+      <span className="sr-only">{message}</span>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ApiService from '../../api';
 import ErrorMessage from '../../components/ui/ErrorMessage';
-import { clearAdminSession, isPrivilegedRole } from '../../utils/auth';
+import { clearAdminSession, isPrivilegedRole, storeAdminSession } from '../../utils/auth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,14 +12,21 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
+  const expired = location.state?.expired;
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
     try {
       const response = await ApiService.login(email, password);
-      if (!isPrivilegedRole(response?.customer?.role)) {
+      
+      if (!response?.token || !response?.customer) {
+        throw new Error('Invalid response from server');
+      }
+
+      if (!isPrivilegedRole(response.customer.role)) {
         clearAdminSession();
         setError({
           code: 'FORBIDDEN',
@@ -28,8 +35,7 @@ export default function Login() {
         return;
       }
 
-      localStorage.setItem('admin_token', response.token);
-      localStorage.setItem('admin_user', JSON.stringify(response.customer));
+      storeAdminSession(response.token, response.customer);
       navigate(from, { replace: true });
     } catch (err) {
       setError(err);
@@ -39,58 +45,91 @@ export default function Login() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'var(--color-bg)',
-      padding: 'var(--spacing-xl)',
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-      }}>
-        <div style={{
-          textAlign: 'center',
-          marginBottom: 'var(--spacing-xl)',
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            margin: '0 auto var(--spacing-md)',
-            background: 'var(--color-primary)',
-            borderRadius: 'var(--radius-md)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 'var(--font-size-xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            color: '#fff',
-          }}>
+    <div 
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--color-bg)',
+        padding: 'var(--spacing-xl)',
+      }}
+    >
+      <div 
+        style={{
+          width: '100%',
+          maxWidth: '400px',
+          animation: 'fadeIn 0.3s ease-in-out',
+        }}
+      >
+        <div 
+          style={{
+            textAlign: 'center',
+            marginBottom: 'var(--spacing-xl)',
+          }}
+        >
+          <div 
+            style={{
+              width: '48px',
+              height: '48px',
+              margin: '0 auto var(--spacing-md)',
+              background: 'var(--color-primary)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 'var(--font-size-xl)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: '#fff',
+            }}
+          >
             SF
           </div>
-          <h1 style={{
-            margin: '0 0 var(--spacing-xs) 0',
-            fontSize: 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-semibold)',
-            color: 'var(--color-dark)',
-          }}>
+          <h1 
+            style={{
+              margin: '0 0 var(--spacing-xs) 0',
+              fontSize: 'var(--font-size-2xl)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-dark)',
+            }}
+          >
             StyleFlow
           </h1>
-          <p style={{
-            margin: 0,
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--color-text-secondary)',
-          }}>
+          <p 
+            style={{
+              margin: 0,
+              fontSize: 'var(--font-size-sm)',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
             Admin Portal
           </p>
         </div>
 
-        <div className="card" style={{
-          padding: 'var(--spacing-xl)',
-        }}>
-          {error && <ErrorMessage error={error} />}
+        <div 
+          className="card" 
+          style={{
+            padding: 'var(--spacing-xl)',
+          }}
+        >
+          {expired && (
+            <div 
+              style={{
+                padding: 'var(--spacing-md)',
+                marginBottom: 'var(--spacing-md)',
+                background: 'var(--color-warning-light)',
+                border: '1px solid var(--color-warning)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text)',
+              }}
+              role="alert"
+            >
+              Your session has expired. Please sign in again.
+            </div>
+          )}
+
+          {error && <ErrorMessage error={error} onDismiss={() => setError(null)} />}
 
           <form onSubmit={handleLogin}>
             <div className="form-group">
@@ -106,6 +145,7 @@ export default function Login() {
                 placeholder="admin@styleflow.vn"
                 autoComplete="email"
                 className="form-input"
+                disabled={loading}
               />
             </div>
 
@@ -122,21 +162,29 @@ export default function Login() {
                 placeholder="Enter your password"
                 autoComplete="current-password"
                 className="form-input"
+                disabled={loading}
               />
             </div>
 
-            <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%' }}>
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={loading} 
+              style={{ width: '100%' }}
+            >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
         </div>
 
-        <div style={{
-          textAlign: 'center',
-          marginTop: 'var(--spacing-lg)',
-          fontSize: 'var(--font-size-xs)',
-          color: 'var(--color-text-muted)',
-        }}>
+        <div 
+          style={{
+            textAlign: 'center',
+            marginTop: 'var(--spacing-lg)',
+            fontSize: 'var(--font-size-xs)',
+            color: 'var(--color-text-muted)',
+          }}
+        >
           StyleFlow Admin • Internal Use Only
         </div>
       </div>
