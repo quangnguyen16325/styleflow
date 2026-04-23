@@ -1,10 +1,32 @@
 import { Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
 export default function AdminLayout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar_collapsed');
+    return saved === 'true';
+  });
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sidebar_collapsed', sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
+  const handleToggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
 
   return (
     <div
@@ -16,26 +38,32 @@ export default function AdminLayout() {
         backgroundColor: 'var(--color-bg)',
       }}
     >
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Sidebar 
+        collapsed={sidebarCollapsed} 
+        onToggle={handleToggleSidebar}
+        isMobile={isMobile}
+      />
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
           overflow: 'hidden',
+          minWidth: 0,
         }}
       >
-        <Header />
+        <Header onToggleSidebar={handleToggleSidebar} isMobile={isMobile} />
         <main
           style={{
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
           }}
         >
           <div
             style={{
-              padding: 'var(--spacing-xl)',
+              padding: isMobile ? 'var(--spacing-md)' : 'var(--spacing-xl)',
               maxWidth: '1400px',
               margin: '0 auto',
               width: '100%',
@@ -52,6 +80,7 @@ export default function AdminLayout() {
             fontSize: 'var(--font-size-xs)',
             color: 'var(--color-text-muted)',
             textAlign: 'center',
+            flexShrink: 0,
           }}
         >
           © 2026 StyleFlow • v0.5.0

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 
 export default function ConfirmDialog({ 
   isOpen, 
@@ -10,13 +10,13 @@ export default function ConfirmDialog({
   cancelText = 'Cancel', 
   danger = false,
 }) {
+  const handleEscape = useCallback((e) => {
+    if (e.key === 'Escape' && isOpen) {
+      onCancel();
+    }
+  }, [isOpen, onCancel]);
+
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape' && isOpen) {
-        onCancel();
-      }
-    };
-    
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleEscape);
@@ -26,7 +26,7 @@ export default function ConfirmDialog({
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen, onCancel]);
+  }, [isOpen, handleEscape]);
 
   if (!isOpen) return null;
 
@@ -44,8 +44,13 @@ export default function ConfirmDialog({
         justifyContent: 'center',
         zIndex: 'var(--z-modal)',
         padding: 'var(--spacing-lg)',
+        animation: 'fadeIn 0.15s ease-in-out',
       }}
       onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+      aria-describedby="dialog-message"
     >
       <div
         className="card"
@@ -55,14 +60,16 @@ export default function ConfirmDialog({
           padding: 'var(--spacing-xl)',
           backgroundColor: 'var(--color-surface)',
           boxShadow: 'var(--shadow-lg)',
+          animation: 'slideUp 0.2s ease-out',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ marginBottom: 'var(--spacing-lg)' }}>
           <h3
+            id="dialog-title"
             style={{
               margin: '0 0 var(--spacing-sm) 0',
-              color: 'var(--color-dark)',
+              color: danger ? 'var(--color-danger)' : 'var(--color-dark)',
               fontSize: 'var(--font-size-lg)',
               fontWeight: 'var(--font-weight-semibold)',
             }}
@@ -70,11 +77,12 @@ export default function ConfirmDialog({
             {title}
           </h3>
           <p
+            id="dialog-message"
             style={{
               margin: 0,
               color: 'var(--color-text-secondary)',
               fontSize: 'var(--font-size-sm)',
-              lineHeight: 'var(--line-height-normal)',
+              lineHeight: 'var(--line-height-relaxed)',
             }}
           >
             {message}
@@ -85,12 +93,14 @@ export default function ConfirmDialog({
             display: 'flex',
             gap: 'var(--spacing-sm)',
             justifyContent: 'flex-end',
+            flexWrap: 'wrap',
           }}
         >
           <button
             type="button"
             onClick={onCancel}
             className="btn-secondary"
+            autoFocus={!danger}
           >
             {cancelText}
           </button>
@@ -98,6 +108,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             className={danger ? 'btn-danger' : 'btn-primary'}
+            autoFocus={danger}
           >
             {confirmText}
           </button>

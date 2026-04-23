@@ -12,16 +12,19 @@ export default function ProtectedRoute() {
   const user = getStoredAdminUser();
   const location = useLocation();
 
+  // No token or user - redirect to login
   if (!token || !user) {
     clearAdminSession();
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Token expired - redirect to login with expired flag
   if (isTokenExpired(token)) {
     clearAdminSession();
     return <Navigate to="/login" state={{ from: location, expired: true }} replace />;
   }
 
+  // User doesn't have admin/staff role - show access denied
   if (!isPrivilegedRole(user.role)) {
     clearAdminSession();
     return (
@@ -32,6 +35,7 @@ export default function ProtectedRoute() {
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: 'var(--color-bg)',
+          padding: 'var(--spacing-lg)',
         }}
       >
         <div
@@ -40,14 +44,38 @@ export default function ProtectedRoute() {
             padding: 'var(--spacing-3xl)',
             textAlign: 'center',
             maxWidth: '480px',
+            width: '100%',
           }}
         >
-          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-lg)', opacity: 0.4 }}>🚫</div>
-          <h2 style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--color-danger)', fontSize: 'var(--font-size-xl)' }}>
+          <div 
+            style={{ 
+              fontSize: '48px', 
+              marginBottom: 'var(--spacing-lg)', 
+              opacity: 0.4 
+            }}
+            role="img"
+            aria-label="Access denied"
+          >
+            🚫
+          </div>
+          <h2 
+            style={{ 
+              marginBottom: 'var(--spacing-sm)', 
+              color: 'var(--color-danger)', 
+              fontSize: 'var(--font-size-xl)' 
+            }}
+          >
             Access Denied
           </h2>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-lg)', fontSize: 'var(--font-size-sm)' }}>
-            You don't have permission to access the admin portal.
+          <p 
+            style={{ 
+              color: 'var(--color-text-secondary)', 
+              marginBottom: 'var(--spacing-lg)', 
+              fontSize: 'var(--font-size-sm)',
+              lineHeight: 'var(--line-height-relaxed)',
+            }}
+          >
+            You don't have permission to access the admin portal. Only admin and staff accounts are allowed.
           </p>
           <button
             onClick={() => {

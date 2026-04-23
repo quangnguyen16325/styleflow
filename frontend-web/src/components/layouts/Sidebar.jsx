@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const menuItems = [
   { to: '/', label: 'Dashboard', icon: '📊', end: true },
@@ -9,7 +10,22 @@ const menuItems = [
   { to: '/refund-requests', label: 'Refunds', icon: '💸' },
 ];
 
-export default function Sidebar({ collapsed = false, onToggle }) {
+export default function Sidebar({ collapsed = false, onToggle, isMobile = false }) {
+  // Close sidebar on mobile when clicking outside
+  useEffect(() => {
+    if (!isMobile || collapsed) return;
+
+    const handleClickOutside = (e) => {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && !sidebar.contains(e.target)) {
+        onToggle();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobile, collapsed, onToggle]);
+
   const linkStyle = ({ isActive }) => ({
     display: 'flex',
     alignItems: 'center',
@@ -41,139 +57,185 @@ export default function Sidebar({ collapsed = false, onToggle }) {
     }
   };
 
+  const handleNavClick = () => {
+    if (isMobile && !collapsed) {
+      onToggle();
+    }
+  };
+
   return (
-    <aside
-      style={{
-        width: collapsed ? '64px' : '220px',
-        backgroundColor: 'var(--color-surface)',
-        borderRight: '1px solid var(--color-border)',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-        transition: 'width var(--transition-normal)',
-      }}
-    >
-      <div
+    <>
+      {/* Mobile overlay */}
+      {isMobile && !collapsed && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'var(--color-overlay)',
+            zIndex: 'var(--z-modal-backdrop)',
+          }}
+          onClick={onToggle}
+        />
+      )}
+
+      <aside
+        id="sidebar"
         style={{
-          padding: collapsed ? 'var(--spacing-lg) var(--spacing-sm)' : 'var(--spacing-lg) var(--spacing-md)',
-          borderBottom: '1px solid var(--color-border)',
+          width: collapsed ? (isMobile ? '0' : '64px') : '220px',
+          backgroundColor: 'var(--color-surface)',
+          borderRight: '1px solid var(--color-border)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          gap: 'var(--spacing-sm)',
+          flexDirection: 'column',
+          flexShrink: 0,
+          transition: 'width var(--transition-normal)',
+          position: isMobile ? 'fixed' : 'relative',
+          top: 0,
+          left: 0,
+          height: '100vh',
+          zIndex: isMobile ? 'var(--z-modal)' : 'auto',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-          <div
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 'var(--font-size-md)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: '#fff',
-            }}
-          >
-            SF
-          </div>
-          {!collapsed && (
-            <div>
-              <div
-                style={{
-                  fontSize: 'var(--font-size-md)',
-                  fontWeight: 'var(--font-weight-semibold)',
-                  color: 'var(--color-dark)',
-                }}
-              >
-                StyleFlow
-              </div>
+        <div
+          style={{
+            padding: collapsed ? 'var(--spacing-lg) var(--spacing-sm)' : 'var(--spacing-lg) var(--spacing-md)',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'space-between',
+            gap: 'var(--spacing-sm)',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--color-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 'var(--font-size-md)',
+                fontWeight: 'var(--font-weight-bold)',
+                color: '#fff',
+              }}
+            >
+              SF
             </div>
+            {!collapsed && (
+              <div>
+                <div
+                  style={{
+                    fontSize: 'var(--font-size-md)',
+                    fontWeight: 'var(--font-weight-semibold)',
+                    color: 'var(--color-dark)',
+                  }}
+                >
+                  StyleFlow
+                </div>
+              </div>
+            )}
+          </div>
+          {!collapsed && !isMobile && (
+            <button
+              onClick={onToggle}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-text-muted)',
+                cursor: 'pointer',
+                padding: 'var(--spacing-xs)',
+                fontSize: 'var(--font-size-md)',
+                transition: 'color var(--transition-fast)',
+              }}
+              onMouseEnter={(e) => (e.target.style.color = 'var(--color-text)')}
+              onMouseLeave={(e) => (e.target.style.color = 'var(--color-text-muted)')}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              ◀
+            </button>
           )}
         </div>
-        {!collapsed && (
+
+        {collapsed && !isMobile && (
           <button
             onClick={onToggle}
             style={{
               background: 'transparent',
-              border: 'none',
+              border: '1px solid var(--color-border)',
               color: 'var(--color-text-muted)',
               cursor: 'pointer',
               padding: 'var(--spacing-xs)',
               fontSize: 'var(--font-size-md)',
-              transition: 'color var(--transition-fast)',
+              margin: 'var(--spacing-sm)',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'all var(--transition-fast)',
             }}
-            onMouseEnter={(e) => (e.target.style.color = 'var(--color-text)')}
-            onMouseLeave={(e) => (e.target.style.color = 'var(--color-text-muted)')}
-            title="Collapse"
+            onMouseEnter={(e) => {
+              e.target.style.background = 'var(--color-bg)';
+              e.target.style.color = 'var(--color-text)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'transparent';
+              e.target.style.color = 'var(--color-text-muted)';
+            }}
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
           >
-            ◀
+            ▶
           </button>
         )}
-      </div>
 
-      {collapsed && (
-        <button
-          onClick={onToggle}
-          style={{
-            background: 'transparent',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text-muted)',
-            cursor: 'pointer',
-            padding: 'var(--spacing-xs)',
-            fontSize: 'var(--font-size-md)',
-            margin: 'var(--spacing-sm)',
-            borderRadius: 'var(--radius-sm)',
-            transition: 'all var(--transition-fast)',
+        <nav 
+          style={{ 
+            flex: 1, 
+            padding: 'var(--spacing-md) var(--spacing-sm) var(--spacing-md) 0', 
+            overflowY: 'auto',
+            overflowX: 'hidden',
           }}
-          onMouseEnter={(e) => {
-            e.target.style.background = 'var(--color-bg)';
-            e.target.style.color = 'var(--color-text)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.background = 'transparent';
-            e.target.style.color = 'var(--color-text-muted)';
-          }}
-          title="Expand"
         >
-          ▶
-        </button>
-      )}
+          {menuItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              style={linkStyle}
+              end={item.end}
+              className={({ isActive }) => (isActive ? 'active' : '')}
+              onMouseEnter={hoverStyle}
+              onMouseLeave={leaveStyle}
+              onClick={handleNavClick}
+              title={collapsed ? item.label : ''}
+              aria-label={item.label}
+            >
+              <span style={{ fontSize: 'var(--font-size-md)' }} role="img" aria-hidden="true">
+                {item.icon}
+              </span>
+              {!collapsed && <span>{item.label}</span>}
+            </NavLink>
+          ))}
+        </nav>
 
-      <nav style={{ flex: 1, padding: 'var(--spacing-md) var(--spacing-sm) var(--spacing-md) 0', overflowY: 'auto' }}>
-        {menuItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            style={linkStyle}
-            end={item.end}
-            className={({ isActive }) => (isActive ? 'active' : '')}
-            onMouseEnter={hoverStyle}
-            onMouseLeave={leaveStyle}
-            title={collapsed ? item.label : ''}
+        {!collapsed && (
+          <div
+            style={{
+              padding: 'var(--spacing-md)',
+              borderTop: '1px solid var(--color-border)',
+              fontSize: 'var(--font-size-xs)',
+              color: 'var(--color-text-muted)',
+              textAlign: 'center',
+              flexShrink: 0,
+            }}
           >
-            <span style={{ fontSize: 'var(--font-size-md)' }}>{item.icon}</span>
-            {!collapsed && <span>{item.label}</span>}
-          </NavLink>
-        ))}
-      </nav>
-
-      {!collapsed && (
-        <div
-          style={{
-            padding: 'var(--spacing-md)',
-            borderTop: '1px solid var(--color-border)',
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--color-text-muted)',
-            textAlign: 'center',
-          }}
-        >
-          v0.5.0
-        </div>
-      )}
-    </aside>
+            v0.5.0
+          </div>
+        )}
+      </aside>
+    </>
   );
 }

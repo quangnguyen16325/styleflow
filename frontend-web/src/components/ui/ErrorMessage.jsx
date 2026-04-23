@@ -15,14 +15,28 @@ export default function ErrorMessage({ error, onRetry, onDismiss }) {
         alignItems: 'flex-start',
         gap: 'var(--spacing-md)',
       }}
+      role="alert"
+      aria-live="assertive"
     >
-      <div style={{ flex: 1 }}>
+      <div 
+        style={{ 
+          fontSize: 'var(--font-size-lg)', 
+          flexShrink: 0,
+          marginTop: '2px',
+        }}
+        role="img"
+        aria-label="Error"
+      >
+        ⚠️
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <p
           style={{
             margin: 0,
             fontWeight: 'var(--font-weight-semibold)',
             fontSize: 'var(--font-size-sm)',
             marginBottom: 'var(--spacing-xs)',
+            wordBreak: 'break-word',
           }}
         >
           {code}
@@ -31,8 +45,9 @@ export default function ErrorMessage({ error, onRetry, onDismiss }) {
           style={{
             margin: 0,
             fontSize: 'var(--font-size-sm)',
-            lineHeight: 'var(--line-height-normal)',
+            lineHeight: 'var(--line-height-relaxed)',
             color: 'var(--color-text)',
+            wordBreak: 'break-word',
           }}
         >
           {message}
@@ -43,6 +58,7 @@ export default function ErrorMessage({ error, onRetry, onDismiss }) {
               marginTop: 'var(--spacing-md)',
               display: 'flex',
               gap: 'var(--spacing-sm)',
+              flexWrap: 'wrap',
             }}
           >
             {onRetry && (

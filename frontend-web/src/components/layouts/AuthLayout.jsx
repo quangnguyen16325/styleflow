@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import {
   clearAdminSession,
   getStoredAdminToken,
@@ -8,6 +8,7 @@ import {
 
 export default function AuthLayout() {
   const hasSession = hasValidAdminSession();
+  const location = useLocation();
 
   useEffect(() => {
     if (!hasSession && getStoredAdminToken()) {
@@ -15,9 +16,10 @@ export default function AuthLayout() {
     }
   }, [hasSession]);
 
-  // If already logged in with valid admin/staff session, redirect to dashboard
+  // If already logged in with valid admin/staff session, redirect to dashboard or intended page
   if (hasSession) {
-    return <Navigate to="/" replace />;
+    const from = location.state?.from?.pathname || '/';
+    return <Navigate to={from} replace />;
   }
 
   // Login page handles its own full-page layout

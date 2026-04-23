@@ -19,6 +19,8 @@ export default function EmptyState({
         alignItems: 'center',
         justifyContent: 'center',
       }}
+      role="status"
+      aria-live="polite"
     >
       <div
         style={{
@@ -26,6 +28,8 @@ export default function EmptyState({
           marginBottom: 'var(--spacing-md)',
           opacity: 0.4,
         }}
+        role="img"
+        aria-label={typeof icon === 'string' ? 'Empty state icon' : ''}
       >
         {icon}
       </div>
@@ -45,7 +49,7 @@ export default function EmptyState({
           color: 'var(--color-text-secondary)',
           fontSize: 'var(--font-size-sm)',
           maxWidth: '400px',
-          lineHeight: 'var(--line-height-normal)',
+          lineHeight: 'var(--line-height-relaxed)',
         }}
       >
         {description}
