@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/layouts/ProtectedRoute';
 import AdminLayout from './components/layouts/AdminLayout';
 import AuthLayout from './components/layouts/AuthLayout';
@@ -23,27 +23,51 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Auth Routes */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
         </Route>
 
+        {/* Protected Admin Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="products" element={<ProductList />} />
-            <Route path="products/new" element={<ProductForm />} />
-            <Route path="products/:id" element={<ProductDetails />} />
-            <Route path="products/:id/edit" element={<ProductForm />} />
-            <Route path="categories" element={<CategoryList />} />
-            <Route path="categories/new" element={<CategoryForm />} />
-            <Route path="categories/:id" element={<CategoryDetails />} />
-            <Route path="categories/:id/edit" element={<CategoryForm />} />
-            <Route path="orders" element={<OrderList />} />
-            <Route path="orders/:id" element={<OrderDetails />} />
-            <Route path="issues" element={<IssueList />} />
-            <Route path="issues/:id" element={<IssueDetails />} />
-            <Route path="refund-requests" element={<RefundRequestList />} />
-            <Route path="refund-requests/:id" element={<RefundRequestDetails />} />
+            
+            {/* Products */}
+            <Route path="products">
+              <Route index element={<ProductList />} />
+              <Route path="new" element={<ProductForm />} />
+              <Route path=":id" element={<ProductDetails />} />
+              <Route path=":id/edit" element={<ProductForm />} />
+            </Route>
+            
+            {/* Categories */}
+            <Route path="categories">
+              <Route index element={<CategoryList />} />
+              <Route path="new" element={<CategoryForm />} />
+              <Route path=":id" element={<CategoryDetails />} />
+              <Route path=":id/edit" element={<CategoryForm />} />
+            </Route>
+            
+            {/* Orders */}
+            <Route path="orders">
+              <Route index element={<OrderList />} />
+              <Route path=":id" element={<OrderDetails />} />
+            </Route>
+            
+            {/* Issues */}
+            <Route path="issues">
+              <Route index element={<IssueList />} />
+              <Route path=":id" element={<IssueDetails />} />
+            </Route>
+            
+            {/* Refund Requests */}
+            <Route path="refund-requests">
+              <Route index element={<RefundRequestList />} />
+              <Route path=":id" element={<RefundRequestDetails />} />
+            </Route>
+            
+            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Route>
         </Route>

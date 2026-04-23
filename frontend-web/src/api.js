@@ -8,29 +8,38 @@ const client = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 });
 
 // Request Interceptor: Attach Bearer Token
-client.interceptors.request.use((config) => {
-  const token = getStoredAdminToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+client.interceptors.request.use(
+  (config) => {
+    const token = getStoredAdminToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Response Interceptor: Uniform error handling & 401/403 rules
 client.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    if (axios.isCancel(error)) {
+      return Promise.reject({ code: 'CANCELLED', message: 'Request cancelled', status: 0 });
+    }
+
     console.error('API call failed:', error.response?.data || error.message);
+    
     const code = error.response?.data?.error?.code || 'UNKNOWN_ERROR';
     const message = error.response?.data?.error?.message || 'Unknown error occurred';
     const status = error.response?.status;
     const requestPath = String(error.config?.url || '');
     const isLoginRequest = requestPath.includes('/auth/login');
 
-    // Force logout on token expiration / unauthorized calls.
+    // Force logout on token expiration / unauthorized calls
     if (!isLoginRequest && (status === 401 || (status === 403 && code === 'FORBIDDEN'))) {
       clearAdminSession();
       if (window.location.pathname !== '/login') {
