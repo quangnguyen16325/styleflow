@@ -208,6 +208,59 @@ router.patch("/:id/status", requireAuth, requireRole("admin", "staff"), async (r
   }
 });
 
+router.post("/shipping-quote", requireAuth, async (req, res) => {
+  const validationError = validateShippingQuotePayload(req.body);
+  if (validationError) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: validationError,
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
+    const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
+    const shippingFee = calculateShippingFeeFromDaNang({
+      provinceCode: shippingSnapshot.provinceCode,
+      city: shippingSnapshot.city,
+    });
+
+    return res.json({
+      shippingFee,
+      destination: {
+        provinceCode: shippingSnapshot.provinceCode,
+        districtCode: shippingSnapshot.districtCode,
+        wardCode: shippingSnapshot.wardCode,
+        city: shippingSnapshot.city,
+        district: shippingSnapshot.district,
+        ward: shippingSnapshot.ward,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("POST /orders/shipping-quote failed:", error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to calculate shipping fee",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
 router.post("/", requireAuth, async (req, res) => {
   const validationError = validateOrderPayload(req.body);
   if (validationError) {
@@ -736,6 +789,33 @@ function validateAddressChangePayload(body) {
     if (addressError) {
       return addressError;
     }
+  }
+
+  return null;
+}
+
+function validateShippingQuotePayload(body) {
+  if (!body || typeof body !== "object") {
+    return "Request body is required";
+  }
+
+  const hasAddressId = body.addressId != null;
+  const hasNewAddress = body.newAddress != null;
+
+  if (hasAddressId && hasNewAddress) {
+    return "Use either addressId or newAddress, not both";
+  }
+
+  if (!hasAddressId && !hasNewAddress) {
+    return "addressId or newAddress is required";
+  }
+
+  if (hasAddressId && (!Number.isInteger(body.addressId) || body.addressId <= 0)) {
+    return "addressId must be a positive integer";
+  }
+
+  if (hasNewAddress) {
+    return validateShippingAddressPayload(body.newAddress);
   }
 
   return null;

@@ -119,12 +119,6 @@ export default function RegisterScreen({ navigation }) {
               autoCapitalize="none"
             />
 
-            <View style={styles.noteBox}>
-              <Text style={styles.noteText}>
-                💡 Thông tin này sẽ được dùng để xác nhận đơn hàng và giao hàng.
-              </Text>
-            </View>
-
             <TouchableOpacity
               style={[styles.registerBtn, isLoading && styles.btnDisabled]}
               onPress={handleRegister}
@@ -214,16 +208,6 @@ const styles = StyleSheet.create({
   },
   inputError: { borderColor: COLORS.danger, backgroundColor: "#FFF5F5" },
   errorText: { fontSize: 12, color: COLORS.danger, marginTop: 4, marginLeft: 4 },
-
-  noteBox: {
-    backgroundColor: COLORS.primaryBg,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.primary,
-  },
-  noteText: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 20 },
 
   registerBtn: {
     height: 56,

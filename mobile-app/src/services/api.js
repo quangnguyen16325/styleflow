@@ -126,6 +126,11 @@ export async function createOrder(orderPayload) {
   return res.data;
 }
 
+export async function getShippingQuote(payload) {
+  const res = await api.post("/orders/shipping-quote", payload);
+  return res.data;
+}
+
 export async function getOrders() {
   const res = await api.get("/orders");
   return res.data;

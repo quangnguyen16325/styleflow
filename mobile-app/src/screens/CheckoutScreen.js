@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -14,22 +14,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCart } from "../context/CartContext";
-import api, { createOrder, formatPrice } from "../services/api";
-
-const SHIPPING_OPTIONS = [
-  {
-    key: "standard",
-    label: "Giao tiêu chuẩn",
-    note: "Phù hợp đơn thông thường",
-    price: 15000,
-  },
-  {
-    key: "express",
-    label: "Giao nhanh",
-    note: "Ưu tiên xử lý sớm hơn",
-    price: 25000,
-  },
-];
+import api, { createOrder, formatPrice, getShippingQuote } from "../services/api";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop";
@@ -104,24 +89,6 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose,
   );
 }
 
-function ShippingOptionRow({ option, selected, onSelect }) {
-  return (
-    <TouchableOpacity
-      style={[styles.shippingRow, selected && styles.shippingRowSelected]}
-      onPress={() => onSelect(option.key)}
-      activeOpacity={0.88}
-    >
-      <View style={styles.shippingInfo}>
-        <Text style={[styles.shippingLabel, selected && styles.shippingLabelSelected]}>
-          {option.label}
-        </Text>
-        <Text style={styles.shippingNote}>{option.note}</Text>
-      </View>
-      <Text style={styles.shippingPrice}>{formatPrice(option.price)}</Text>
-    </TouchableOpacity>
-  );
-}
-
 function CheckoutItemRow({ item }) {
   return (
     <View style={styles.itemRow}>
@@ -141,10 +108,11 @@ export default function CheckoutScreen({ navigation }) {
   const { items, subtotal, clearCart } = useCart();
   const [apiAddresses, setApiAddresses] = useState([]);
   const [shippingAddressId, setShippingAddressId] = useState(null);
-  const [selectedShipping, setSelectedShipping] = useState("standard");
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [shippingCost, setShippingCost] = useState(0);
+  const [loadingShippingQuote, setLoadingShippingQuote] = useState(false);
 
   const loadAddresses = useCallback(async () => {
     try {
@@ -203,9 +171,41 @@ export default function CheckoutScreen({ navigation }) {
     [apiAddresses, shippingAddressId],
   );
 
-  const shippingOption = SHIPPING_OPTIONS.find((option) => option.key === selectedShipping);
-  const shippingCost = shippingOption?.price ?? 0;
   const totalAmount = subtotal + shippingCost;
+
+  useEffect(() => {
+    let active = true;
+
+    const loadShippingQuote = async () => {
+      if (!shippingAddressId) {
+        setShippingCost(0);
+        return;
+      }
+
+      try {
+        setLoadingShippingQuote(true);
+        const quote = await getShippingQuote({ addressId: shippingAddressId });
+        if (active) {
+          setShippingCost(Number(quote.shippingFee ?? 0));
+        }
+      } catch (error) {
+        if (active) {
+          setShippingCost(0);
+        }
+        console.warn("Lỗi tải phí vận chuyển:", error);
+      } finally {
+        if (active) {
+          setLoadingShippingQuote(false);
+        }
+      }
+    };
+
+    loadShippingQuote();
+
+    return () => {
+      active = false;
+    };
+  }, [shippingAddressId]);
 
   const handlePlaceOrder = async () => {
     if (items.length === 0) {
@@ -222,7 +222,6 @@ export default function CheckoutScreen({ navigation }) {
     const payload = {
       items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
       addressId: shippingAddressId,
-      shippingFee: shippingCost,
     };
 
     try {
@@ -250,10 +249,6 @@ export default function CheckoutScreen({ navigation }) {
         <View style={styles.heroCard}>
           <Text style={styles.heroEyebrow}>Checkout</Text>
           <Text style={styles.heroTitle}>Xác nhận đơn hàng</Text>
-          <Text style={styles.heroText}>
-            Màn này đang bám đúng backend hiện tại: backend tạo đơn từ danh sách sản phẩm, địa chỉ
-            giao hàng và phí ship gửi lên.
-          </Text>
         </View>
 
         <View style={styles.sectionCard}>
@@ -304,18 +299,16 @@ export default function CheckoutScreen({ navigation }) {
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Phí vận chuyển</Text>
-          {SHIPPING_OPTIONS.map((option) => (
-            <ShippingOptionRow
-              key={option.key}
-              option={option}
-              selected={selectedShipping === option.key}
-              onSelect={setSelectedShipping}
-            />
-          ))}
-          <Text style={styles.shippingHelper}>
-            Backend hiện nhận `shippingFee` trực tiếp từ client khi tạo order, nên số tiền hiển thị
-            ở đây là số tiền sẽ được gửi lên API.
-          </Text>
+          <View style={styles.shippingQuoteCard}>
+            <View style={styles.shippingQuoteInfo}>
+              <Text style={styles.shippingQuoteLabel}>Phí giao hàng tạm tính</Text>
+            </View>
+            {loadingShippingQuote ? (
+              <ActivityIndicator size="small" color="#9B4B1F" />
+            ) : (
+              <Text style={styles.shippingQuotePrice}>{formatPrice(shippingCost)}</Text>
+            )}
+          </View>
         </View>
 
         <View style={styles.sectionCard}>
@@ -334,15 +327,6 @@ export default function CheckoutScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.backendNoteCard}>
-          <Text style={styles.backendNoteTitle}>Lưu ý backend</Text>
-          <Text style={styles.backendNoteText}>
-            Hiện backend chưa xử lý voucher, phương thức thanh toán hay ghi chú giao hàng trong
-            `POST /orders`. Vì vậy màn thanh toán này chỉ hiển thị và gửi những gì backend thật sự
-            dùng.
-          </Text>
-        </View>
-
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
@@ -354,10 +338,10 @@ export default function CheckoutScreen({ navigation }) {
         <TouchableOpacity
           style={[
             styles.placeOrderBtn,
-            (isPlacingOrder || items.length === 0) && styles.disabledBtn,
+            (isPlacingOrder || items.length === 0 || loadingShippingQuote) && styles.disabledBtn,
           ]}
           onPress={handlePlaceOrder}
-          disabled={isPlacingOrder || items.length === 0}
+          disabled={isPlacingOrder || items.length === 0 || loadingShippingQuote}
           activeOpacity={0.88}
         >
           {isPlacingOrder ? (
@@ -413,12 +397,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     lineHeight: 32,
     fontWeight: "900",
-    marginBottom: 10,
-  },
-  heroText: {
-    color: "rgba(255,248,238,0.76)",
-    fontSize: 14,
-    lineHeight: 22,
   },
   sectionCard: {
     backgroundColor: "#FFFFFF",
@@ -535,48 +513,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
-  shippingRow: {
+  shippingQuoteCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
-    marginBottom: 10,
     backgroundColor: "#FCF9F4",
     borderWidth: 1,
     borderColor: "#E6DBCE",
   },
-  shippingRowSelected: {
-    backgroundColor: "#F5ECE3",
-    borderColor: "#D69A65",
-  },
-  shippingInfo: {
+  shippingQuoteInfo: {
     flex: 1,
-    marginRight: 14,
+    marginRight: 16,
   },
-  shippingLabel: {
+  shippingQuoteLabel: {
     color: "#1E1815",
     fontSize: 15,
     fontWeight: "700",
-    marginBottom: 2,
   },
-  shippingLabelSelected: {
+  shippingQuotePrice: {
     color: "#9B4B1F",
-  },
-  shippingNote: {
-    color: "#7A685B",
-    fontSize: 12,
-  },
-  shippingPrice: {
-    color: "#9B4B1F",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "800",
-  },
-  shippingHelper: {
-    marginTop: 4,
-    color: "#78695C",
-    fontSize: 12,
-    lineHeight: 18,
   },
   summaryRow: {
     flexDirection: "row",
@@ -608,22 +567,6 @@ const styles = StyleSheet.create({
     color: "#9B4B1F",
     fontSize: 18,
     fontWeight: "900",
-  },
-  backendNoteCard: {
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: "#F5ECE3",
-  },
-  backendNoteTitle: {
-    color: "#241A13",
-    fontSize: 14,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-  backendNoteText: {
-    color: "#76675B",
-    fontSize: 13,
-    lineHeight: 20,
   },
   emptyStateText: {
     color: "#78695C",
