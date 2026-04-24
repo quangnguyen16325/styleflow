@@ -1,120 +1,103 @@
 /* eslint-disable react/prop-types */
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { COLORS } from "../constants/colors";
 
-// Lấy lời chào theo giờ hiện tại
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "Chào buổi sáng ☀️";
-  if (hour >= 12 && hour < 18) return "Chào buổi chiều 🌤️";
-  if (hour >= 18 && hour < 22) return "Chào buổi tối 🌆";
-  return "Khuya rồi nhé 🌙";
+  if (hour >= 5 && hour < 12) return "Buổi sáng";
+  if (hour >= 12 && hour < 18) return "Buổi chiều";
+  if (hour >= 18 && hour < 22) return "Buổi tối";
+  return "Đêm muộn";
 }
 
-/**
- * HeaderBar — dùng trên tất cả màn hình MainApp
- * - Trái: Logo "ecloria" + lời chào + tên user
- * - Phải: Nút cài đặt ⚙️
- */
 export default function HeaderBar({ onSettingsPress }) {
   const { displayName } = useAuth();
   const greeting = getGreeting();
+  const firstName = displayName?.trim()?.split(" ")?.slice(-1)?.[0] || "Bạn";
 
   return (
-    <View style={styles.container}>
-      {/* Left — Logo + Greeting */}
-      <View style={styles.left}>
-        {/* Logo pill */}
-        <View style={styles.logoPill}>
-          <Text style={styles.logoText}>ecloria</Text>
-        </View>
-        {/* Greeting block */}
-        <View style={styles.greetingBlock}>
-          <Text style={styles.greeting} numberOfLines={1}>
-            {greeting}
-          </Text>
-          <Text style={styles.userName} numberOfLines={1}>
-            {displayName} 👋
+    <View style={styles.shell}>
+      <View style={styles.brandBlock}>
+        <View style={styles.copyBlock}>
+          <Text style={styles.brandWordmark}>Ecloria</Text>
+          <Text style={styles.eyebrow}>{greeting}</Text>
+          <Text style={styles.title} numberOfLines={1}>
+            {firstName}, chọn outfit hôm nay
           </Text>
         </View>
       </View>
 
-      {/* Right — Settings gear */}
       <TouchableOpacity
         style={styles.settingsBtn}
         onPress={onSettingsPress}
-        activeOpacity={0.7}
+        activeOpacity={0.82}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Text style={styles.settingsIcon}>⚙️</Text>
+        <Text style={styles.settingsIcon}>⚙</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  shell: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 14,
-    paddingBottom: 14,
-    backgroundColor: COLORS.bgPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+    paddingBottom: 12,
+    backgroundColor: "#FCF9F4",
   },
-  left: {
+  brandBlock: {
     flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    gap: 12,
-  },
-  logoPill: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
-  },
-  logoText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: 1,
-  },
-  greetingBlock: {
+    alignItems: "flex-start",
     flex: 1,
   },
-  greeting: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: "400",
-    lineHeight: 16,
+  copyBlock: {
+    flex: 1,
   },
-  userName: {
+  brandWordmark: {
+    color: "#1E1815",
+    fontSize: 24,
+    fontFamily: Platform.select({
+      ios: "Georgia",
+      android: "serif",
+      default: "serif",
+    }),
+    fontWeight: "600",
+    fontStyle: "italic",
+    letterSpacing: 0.2,
+    marginBottom: 1,
+  },
+  eyebrow: {
+    color: "#9D7A60",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  title: {
+    color: "#241A13",
     fontSize: 15,
     fontWeight: "700",
-    color: COLORS.textPrimary,
     lineHeight: 20,
   },
   settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.bgInput,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   settingsIcon: {
     fontSize: 20,
+    color: "#6F5847",
+    fontWeight: "700",
   },
 });

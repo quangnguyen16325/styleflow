@@ -45,10 +45,16 @@ export default function RegisterScreen({ navigation }) {
 
   const handleRegister = async () => {
     if (!validate()) return;
-    const result = await register(form);
-    if (result.success) {
-      navigation.replace("MainApp");
-    } else {
+    try {
+      const result = await register(form);
+      if (result.success) {
+        Alert.alert("Thành công", "Tài khoản đã được tạo. Vui lòng đăng nhập để tiếp tục.", [
+          { text: "OK", onPress: () => navigation.replace("Login") },
+        ]);
+      } else {
+        Alert.alert("Lỗi", "Đăng ký thất bại. Vui lòng thử lại.");
+      }
+    } catch {
       Alert.alert("Lỗi", "Đăng ký thất bại. Vui lòng thử lại.");
     }
   };

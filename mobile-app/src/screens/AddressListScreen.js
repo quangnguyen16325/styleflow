@@ -11,9 +11,6 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../services/api";
-import { COLORS } from "../constants/colors";
-
-// ── Address Card Component ───────────────────────────────────────────────────
 
 function AddressCard({ address, onEdit, onDelete, onSetDefault }) {
   const fullAddr = [address.addressLine, address.ward, address.district, address.city]
@@ -29,48 +26,42 @@ function AddressCard({ address, onEdit, onDelete, onSetDefault }) {
 
   return (
     <View style={[styles.card, address.isDefault && styles.cardDefault]}>
-      {/* Label + Default badge */}
       <View style={styles.cardHeader}>
-        <View style={styles.labelWrap}>
-          <View style={styles.labelDot} />
-          <Text style={styles.labelText}>{labelName}</Text>
+        <View style={styles.labelPill}>
+          <Text style={styles.labelPillText}>{labelName}</Text>
         </View>
-        {address.isDefault && (
+        {address.isDefault ? (
           <View style={styles.defaultBadge}>
             <Text style={styles.defaultBadgeText}>Mặc định</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {/* Receiver info */}
       <Text style={styles.receiverName}>{address.receiverName}</Text>
       <Text style={styles.receiverPhone}>{address.receiverPhone}</Text>
       <Text style={styles.addressText}>{fullAddr}</Text>
-      {address.postalCode && (
+      {address.postalCode ? (
         <Text style={styles.postalCode}>Mã bưu chính: {address.postalCode}</Text>
-      )}
+      ) : null}
 
-      {/* Actions */}
       <View style={styles.cardActions}>
-        {!address.isDefault && (
-          <TouchableOpacity style={styles.setDefaultBtn} onPress={() => onSetDefault(address)}>
-            <Text style={styles.setDefaultText}>Đặt mặc định</Text>
+        {!address.isDefault ? (
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => onSetDefault(address)}>
+            <Text style={styles.secondaryBtnText}>Đặt mặc định</Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(address)}>
-          <Text style={styles.editBtnText}>Sửa</Text>
+        ) : null}
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => onEdit(address)}>
+          <Text style={styles.primaryBtnText}>Chỉnh sửa</Text>
         </TouchableOpacity>
-        {!address.isDefault && (
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(address)}>
-            <Text style={styles.deleteBtnText}>Xóa</Text>
+        {!address.isDefault ? (
+          <TouchableOpacity style={styles.ghostBtn} onPress={() => onDelete(address)}>
+            <Text style={styles.ghostBtnText}>Xóa</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );
 }
-
-// ── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function AddressListScreen({ navigation }) {
   const [addresses, setAddresses] = useState([]);
@@ -134,7 +125,7 @@ export default function AddressListScreen({ navigation }) {
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color="#9B4B1F" />
       </View>
     );
   }
@@ -153,124 +144,205 @@ export default function AddressListScreen({ navigation }) {
           />
         )}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <View style={styles.headerBlock}>
+            <Text style={styles.headerEyebrow}>Address book</Text>
+            <Text style={styles.headerTitle}>Sổ địa chỉ giao hàng</Text>
+            <Text style={styles.headerText}>
+              Quản lý địa chỉ nhận hàng để checkout nhanh hơn và đổi địa chỉ thuận tiện hơn.
+            </Text>
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyIcon}>◎</Text>
             <Text style={styles.emptyTitle}>Chưa có địa chỉ nào</Text>
-            <Text style={styles.emptyDesc}>Thêm địa chỉ giao hàng để đặt hàng nhanh hơn</Text>
+            <Text style={styles.emptyDesc}>Thêm địa chỉ giao hàng để đặt hàng nhanh hơn.</Text>
           </View>
         }
       />
 
-      {/* Add button */}
-      <TouchableOpacity style={styles.addBtn} onPress={handleAdd} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.addBtn} onPress={handleAdd} activeOpacity={0.88}>
         <Text style={styles.addBtnText}>+ Thêm địa chỉ mới</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bgSecondary },
-  center: { justifyContent: "center", alignItems: "center" },
-  listContent: { padding: 16, paddingBottom: 100 },
-
+  container: {
+    flex: 1,
+    backgroundColor: "#FCF9F4",
+  },
+  center: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  listContent: {
+    padding: 20,
+    paddingBottom: 120,
+  },
+  headerBlock: {
+    marginBottom: 18,
+  },
+  headerEyebrow: {
+    color: "#9D7A60",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  headerTitle: {
+    color: "#1E1815",
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: -0.6,
+    marginBottom: 8,
+  },
+  headerText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+  },
   card: {
-    backgroundColor: COLORS.bgPrimary,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: "#201812",
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     elevation: 2,
-    borderWidth: 1.5,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#EFE3D6",
   },
   cardDefault: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryBg,
+    backgroundColor: "#F5ECE3",
+    borderColor: "#E4C9AD",
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  labelWrap: { flexDirection: "row", alignItems: "center" },
-  labelIcon: { fontSize: 18, marginRight: 6 },
-  labelText: {
-    fontSize: 14,
+  labelPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#F3E4D6",
+  },
+  labelPillText: {
+    color: "#8A6548",
+    fontSize: 12,
     fontWeight: "700",
-    color: COLORS.textPrimary,
-    textTransform: "capitalize",
   },
   defaultBadge: {
-    backgroundColor: COLORS.primary,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#1E1815",
   },
-  defaultBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  defaultBadgeText: {
+    color: "#FFF8EE",
+    fontSize: 11,
+    fontWeight: "800",
+  },
   receiverName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    marginBottom: 2,
+    color: "#1E1815",
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 3,
   },
-  receiverPhone: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 6 },
-  addressText: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 19 },
-  postalCode: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
-  cardActions: { flexDirection: "row", marginTop: 12, gap: 8 },
-  setDefaultBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.bgInput,
-  },
-  setDefaultText: { fontSize: 12, fontWeight: "600", color: COLORS.primary },
-  editBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.info,
-  },
-  editBtnText: { fontSize: 12, fontWeight: "600", color: "#fff" },
-  deleteBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#FFF0F0",
-  },
-  deleteBtnText: { fontSize: 12, fontWeight: "600", color: COLORS.danger },
-
-  emptyWrap: { alignItems: "center", paddingVertical: 60 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 4 },
-  emptyDesc: {
+  receiverPhone: {
+    color: "#7C6B5F",
     fontSize: 13,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-    paddingHorizontal: 40,
+    marginBottom: 8,
   },
-
+  addressText: {
+    color: "#55483D",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  postalCode: {
+    color: "#8F7A6B",
+    fontSize: 12,
+    marginTop: 6,
+  },
+  cardActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 14,
+  },
+  secondaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#F7EFE7",
+  },
+  secondaryBtnText: {
+    color: "#9B4B1F",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  primaryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#1E1815",
+  },
+  primaryBtnText: {
+    color: "#FFF8EE",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  ghostBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#FFF2EE",
+  },
+  ghostBtnText: {
+    color: "#C24A3A",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  emptyWrap: {
+    alignItems: "center",
+    paddingVertical: 70,
+  },
+  emptyTitle: {
+    color: "#1E1815",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  emptyDesc: {
+    color: "#76675B",
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 30,
+  },
   addBtn: {
     position: "absolute",
-    bottom: 30,
+    bottom: 26,
     left: 20,
     right: 20,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#D99152",
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 18,
     alignItems: "center",
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.3,
+    shadowColor: "#9B4B1F",
+    shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  addBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  addBtnText: {
+    color: "#FFFDF9",
+    fontSize: 16,
+    fontWeight: "800",
+  },
 });

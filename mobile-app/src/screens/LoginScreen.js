@@ -40,7 +40,7 @@ export default function LoginScreen({ navigation }) {
     try {
       const result = await login(form);
       if (result.success) {
-        navigation.replace("MainApp");
+        return;
       }
     } catch (err) {
       Alert.alert("Lỗi", err.message || "Đăng nhập thất bại. Vui lòng thử lại.");

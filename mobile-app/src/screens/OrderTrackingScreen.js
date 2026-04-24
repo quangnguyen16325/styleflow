@@ -72,17 +72,9 @@ export default function OrderTrackingScreen({ route, navigation }) {
       try {
         const resOrder = await api.get(`/orders/${orderId}`);
         setOrder(resOrder.data);
-
-        // Chuẩn bị sẵn (future-proof) gọi API timeline lúc backend tung ra cho Customer
-        // Dùng try-catch nội bộ riêng để nếu backend trả 403/404 chưa mở API thì luồng order không bị gãy
-        try {
-          const resEvents = await api.get(`/orders/${orderId}/delivery-events`);
-          if (Array.isArray(resEvents.data) && resEvents.data.length > 0) {
-            setTimelineEvents(resEvents.data);
-          }
-        } catch {
-          // Chưa có API thì fallback mảng rỗng
-        }
+        setTimelineEvents(
+          Array.isArray(resOrder.data?.deliveryEvents) ? resOrder.data.deliveryEvents : [],
+        );
       } catch (err) {
         console.warn("Lỗi tải đơn hàng:", err);
       } finally {
