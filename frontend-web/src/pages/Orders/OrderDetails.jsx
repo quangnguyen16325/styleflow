@@ -6,6 +6,9 @@ import ErrorMessage from '../../components/ui/ErrorMessage';
 import StatusBadge from '../../components/ui/StatusBadge';
 import EmptyState from '../../components/ui/EmptyState';
 
+const N8N_DELIVERY_WEBHOOK = 'https://n8n.ecloria.co.uk/webhook/delivery-callback';
+const DELIVERY_FAIL_REASONS = ['CUSTOMER_UNREACHABLE', 'WRONG_ADDRESS', 'REFUSED_DELIVERY', 'OTHER'];
+
 const ALL_STATUSES = [
   'pending', 'awaiting_payment', 'paid', 'processing',
   'shipping', 'completed', 'cancelled', 'failed',
@@ -32,6 +35,13 @@ export default function OrderDetails() {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+
+  // Delivery failure simulation state
+  const [deliveryFailReason, setDeliveryFailReason] = useState('CUSTOMER_UNREACHABLE');
+  const [deliveryFailAttempt, setDeliveryFailAttempt] = useState(1);
+  const [deliveryFailLoading, setDeliveryFailLoading] = useState(false);
+  const [deliveryFailError, setDeliveryFailError] = useState(null);
+  const [deliveryFailSuccess, setDeliveryFailSuccess] = useState(null);
 
   // Address change decision state
   const [addressDecision, setAddressDecision] = useState('approved');
@@ -95,6 +105,38 @@ export default function OrderDetails() {
       setUpdating(false);
     }
   }, [id, newStatus, order]);
+
+  const handleSimulateDeliveryFail = useCallback(async () => {
+    const attemptStr = String(deliveryFailAttempt).padStart(3, '0');
+    const externalEventId = `prod_n8n_ev_${attemptStr}_${id}`;
+    setDeliveryFailLoading(true);
+    setDeliveryFailError(null);
+    setDeliveryFailSuccess(null);
+    try {
+      await fetch(N8N_DELIVERY_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: Number(id),
+          status: 'FAILED',
+          reason: deliveryFailReason,
+          partner: 'GHN',
+          externalEventId,
+        }),
+      });
+      
+      setDeliveryFailSuccess({ attempt: deliveryFailAttempt, externalEventId });
+      if (deliveryFailAttempt < 3) setDeliveryFailAttempt((prev) => prev + 1);
+      
+      // Refresh delivery events
+      const events = await ApiService.getOrderDeliveryEvents(id);
+      setDeliveryEvents(Array.isArray(events) ? events : []);
+    } catch (err) {
+      setDeliveryFailError(err?.message || 'Webhook call failed');
+    } finally {
+      setDeliveryFailLoading(false);
+    }
+  }, [id, deliveryFailAttempt, deliveryFailReason]);
 
   const handleAddressChangeDecision = useCallback(async () => {
     setAddressDecisionLoading(true);
@@ -361,6 +403,57 @@ export default function OrderDetails() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Simulate Delivery Failure */}
+      <div className="card" style={{ overflow: 'hidden', marginBottom: 'var(--spacing-xl)' }}>
+        <h3 style={{ margin: 0, padding: 'var(--spacing-lg) var(--spacing-xl)', backgroundColor: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
+          Simulate Delivery Failure
+        </h3>
+        <div style={{ padding: 'var(--spacing-lg) var(--spacing-xl)' }}>
+          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)', marginTop: 0 }}>
+            Gửi webhook báo giao hàng thất bại lên n8n. Gửi đủ 3 lần sẽ kích hoạt luồng hoàn kho.
+          </p>
+          <div style={{ display: 'flex', gap: 'var(--spacing-md)', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+              <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>Reason</label>
+              <select value={deliveryFailReason} onChange={(e) => setDeliveryFailReason(e.target.value)} className="form-select" style={{ width: '220px' }} disabled={deliveryFailLoading}>
+                {DELIVERY_FAIL_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+              <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>Attempt #</label>
+              <select value={deliveryFailAttempt} onChange={(e) => setDeliveryFailAttempt(Number(e.target.value))} className="form-select" style={{ width: '90px' }} disabled={deliveryFailLoading}>
+                {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+              <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)' }}>External Event ID</label>
+              <code style={{ fontSize: 'var(--font-size-sm)', padding: '7px 10px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-secondary)' }}>
+                prod_n8n_ev_{String(deliveryFailAttempt).padStart(3, '0')}_{id}
+              </code>
+            </div>
+            <button
+              className="btn-primary"
+              onClick={handleSimulateDeliveryFail}
+              disabled={deliveryFailLoading}
+              style={deliveryFailAttempt === 3 ? { background: '#dc2626' } : {}}
+            >
+              {deliveryFailLoading ? 'Sending...' : deliveryFailAttempt === 3 ? 'Send Attempt 3 — Return to Warehouse' : `Send Attempt ${deliveryFailAttempt}`}
+            </button>
+          </div>
+          {deliveryFailSuccess && (
+            <div style={{ padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--color-success-bg)', color: 'var(--color-success)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)' }}>
+              ✓ Attempt {deliveryFailSuccess.attempt} sent — <code>{deliveryFailSuccess.externalEventId}</code>
+              {deliveryFailSuccess.attempt === 3 && ' — Đơn đã về kho.'}
+            </div>
+          )}
+          {deliveryFailError && (
+            <div style={{ padding: 'var(--spacing-sm) var(--spacing-md)', background: '#fef2f2', color: '#dc2626', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)' }}>
+              ✗ {deliveryFailError}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="card" style={{ overflow: 'hidden', marginBottom: 'var(--spacing-xl)' }}>
