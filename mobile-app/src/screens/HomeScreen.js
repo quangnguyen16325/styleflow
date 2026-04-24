@@ -16,18 +16,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import HeaderBar from "../components/HeaderBar";
 import { COLORS } from "../constants/colors";
 import { getProducts, formatPrice } from "../services/api";
+import { useWishlist } from "../context/WishlistContext";
 
 const { width } = Dimensions.get("window");
 
 // ── Static data ──────────────────────────────────────────────────────────────
 
 const TOP_CATEGORIES = [
-  { id: "1", name: "Dresses", icon: "👗" },
-  { id: "2", name: "T-Shirts", icon: "👕" },
-  { id: "3", name: "Skirts", icon: "🥻" },
-  { id: "4", name: "Shoes", icon: "👟" },
-  { id: "5", name: "Bags", icon: "👜" },
-  { id: "6", name: "Hoodies", icon: "🧥" },
+  { id: "1", name: "Dresses", image: "https://cdn-icons-png.flaticon.com/512/3252/3252923.png" },
+  { id: "2", name: "T-Shirts", image: "https://cdn-icons-png.flaticon.com/512/863/863684.png" },
+  { id: "3", name: "Skirts", image: "https://cdn-icons-png.flaticon.com/512/2806/2806085.png" },
+  { id: "4", name: "Shoes", image: "https://cdn-icons-png.flaticon.com/512/2553/2553641.png" },
+  { id: "5", name: "Bags", image: "https://cdn-icons-png.flaticon.com/512/1040/1040224.png" },
+  { id: "6", name: "Hoodies", image: "https://cdn-icons-png.flaticon.com/512/5496/5496350.png" },
 ];
 
 const FLASH_SALE_PRODUCTS = [
@@ -69,8 +70,9 @@ const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=400&auto=format&fit=crop",
 ];
 
-function getProductImage(index) {
-  return PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length];
+function getProductImage(product, fallbackIndex) {
+  if (product && product.imageUrl) return product.imageUrl;
+  return PLACEHOLDER_IMAGES[fallbackIndex % PLACEHOLDER_IMAGES.length];
 }
 
 // ── Home Screen ──────────────────────────────────────────────────────────────
@@ -81,6 +83,12 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
   const [apiError, setApiError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const { isInWishlist, toggleWishlist } = useWishlist();
+
+  // Local filter: nếu có searchQuery, filter sản phẩm theo tên
+  const filteredProducts = searchQuery.trim()
+    ? products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : products;
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -125,7 +133,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
       onPress={() => navigateToList(item.name)}
     >
       <View style={styles.categoryIconContainer}>
-        <Text style={styles.categoryIconText}>{item.icon}</Text>
+        <Image source={{ uri: item.image }} style={styles.catImgIcon} resizeMode="contain" />
       </View>
       <Text style={styles.categoryName}>{item.name}</Text>
     </TouchableOpacity>
@@ -157,7 +165,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
       onPress={() => navigation.navigate("ProductDetail", { productId: item.id })}
       activeOpacity={0.85}
     >
-      <Image source={{ uri: getProductImage(index) }} style={styles.apiProductImage} />
+      <Image source={{ uri: getProductImage(item, index) }} style={styles.apiProductImage} />
       {item.availableQty === 0 && (
         <View style={styles.outOfStockBadge}>
           <Text style={styles.outOfStockText}>Hết hàng</Text>
@@ -169,6 +177,14 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
         </Text>
         <Text style={styles.apiProductPrice}>{formatPrice(item.basePrice)}</Text>
       </View>
+      <TouchableOpacity
+        style={styles.wishlistBtn}
+        onPress={() => toggleWishlist(item)}
+      >
+        <Text style={[styles.wishlistIcon, isInWishlist(item.id) && styles.wishlistActive]}>
+          {isInWishlist(item.id) ? "♥" : "♡"}
+        </Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -180,7 +196,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
       onPress={() => navigation.navigate("ProductDetail", { productId: item.id })}
       activeOpacity={0.85}
     >
-      <Image source={{ uri: getProductImage(index + 2) }} style={styles.gridImage} />
+      <Image source={{ uri: getProductImage(item, index + 2) }} style={styles.gridImage} />
       {item.availableQty === 0 && (
         <View style={styles.outOfStockBadge}>
           <Text style={styles.outOfStockText}>Hết hàng</Text>
@@ -192,6 +208,14 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
         </Text>
         <Text style={styles.gridPrice}>{formatPrice(item.basePrice)}</Text>
       </View>
+      <TouchableOpacity
+        style={styles.wishlistBtnGrid}
+        onPress={() => toggleWishlist(item)}
+      >
+        <Text style={[styles.wishlistIcon, isInWishlist(item.id) && styles.wishlistActive]}>
+          {isInWishlist(item.id) ? "♥" : "♡"}
+        </Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -214,7 +238,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
         {/* Search Bar */}
         <View style={styles.searchWrapper}>
           <View style={styles.searchContainer}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <Text style={styles.searchIcon}>○</Text>
             <TextInput
               style={styles.searchInput}
               placeholder="Tìm kiếm sản phẩm..."
@@ -265,7 +289,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
         {/* Flash Sale */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Flash Sale 🔥</Text>
+            <Text style={styles.sectionTitle}>Flash Sale</Text>
             <View style={styles.timerRow}>
               <View style={styles.timerBox}>
                 <Text style={styles.timerNum}>00</Text>
@@ -301,7 +325,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
             <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 20 }} />
           ) : apiError ? (
             <View style={styles.errorBox}>
-              <Text style={styles.errorText}>⚠️ {apiError}</Text>
+              <Text style={styles.errorText}>{apiError}</Text>
               <TouchableOpacity onPress={fetchProducts}>
                 <Text style={styles.retryBtn}>Thử lại</Text>
               </TouchableOpacity>
@@ -312,17 +336,17 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.hList}
             >
-              {products.slice(0, 6).map((p, i) => renderApiProductItem(p, i))}
+              {filteredProducts.slice(0, 6).map((p, i) => renderApiProductItem(p, i))}
             </ScrollView>
           )}
         </View>
 
         {/* Just For You — Grid 2 cột từ API */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Just For You ⭐</Text>
-          {!loadingProducts && products.length > 0 && (
+          <Text style={styles.sectionTitle}>Just For You</Text>
+          {!loadingProducts && filteredProducts.length > 0 && (
             <View style={styles.gridContainer}>
-              {products.slice(0, 4).map((p, i) => renderGridItem(p, i))}
+              {filteredProducts.slice(0, 4).map((p, i) => renderGridItem(p, i))}
             </View>
           )}
         </View>
@@ -555,4 +579,20 @@ const styles = StyleSheet.create({
   errorBox: { alignItems: "center", paddingVertical: 20, gap: 8 },
   errorText: { fontSize: 14, color: COLORS.textSecondary },
   retryBtn: { color: COLORS.primary, fontWeight: "700", fontSize: 15 },
+
+  // Wishlist button on cards
+  wishlistBtn: {
+    position: "absolute", top: 8, right: 8,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center", alignItems: "center",
+  },
+  wishlistBtnGrid: {
+    position: "absolute", top: 8, right: 8,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center", alignItems: "center",
+  },
+  wishlistIcon: { fontSize: 16, color: "#999" },
+  wishlistActive: { color: "#e53e3e" },
 });

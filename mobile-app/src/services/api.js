@@ -2,7 +2,10 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Contract: Base URL — dùng IP máy Mac khi test thật trên iPhone
-const BASE_URL = "http://192.168.1.3:5000";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+//TEST
+console.log("🛠 THIẾT BỊ ĐANG GỌI ĐẾN URL:", BASE_URL);
 
 const api = axios.create({
   baseURL: BASE_URL,

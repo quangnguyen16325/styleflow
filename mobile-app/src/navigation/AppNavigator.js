@@ -23,8 +23,11 @@ import ProductListScreen from "../screens/ProductListScreen";
 import ProductDetailScreen from "../screens/ProductDetailScreen";
 import CheckoutScreen from "../screens/CheckoutScreen";
 import SuccessScreen from "../screens/SuccessScreen";
-import OrderDetailScreen from "../screens/OrderDetailScreen";
+import OrderScreen from "../screens/OrderScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import AddressListScreen from "../screens/AddressListScreen";
+import AddressFormScreen from "../screens/AddressFormScreen";
+import ReturnRequestScreen from "../screens/ReturnRequestScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -45,7 +48,7 @@ function AuthStack() {
 const TAB_SCREENS = {
   Home: HomeScreen,
   Wishlist: WishlistScreen,
-  Track: OrderDetailScreen, // Dùng OrderDetailScreen làm danh sách đơn hàng (Tab)
+  Track: OrderScreen, // Dùng OrderScreen cho danh sách đơn hàng (Tab)
   Cart: CartScreen,
   Profile: ProfileScreen,
 };
@@ -96,7 +99,7 @@ function MainAppStack() {
         options={{
           headerShown: true,
           title: "Sản phẩm",
-          headerTintColor: "#6C3CE1",
+          headerTintColor: "#0055ff",
           headerBackTitle: "Quay lại",
         }}
       />
@@ -106,7 +109,7 @@ function MainAppStack() {
         options={{
           headerShown: true,
           title: "Chi tiết",
-          headerTintColor: "#6C3CE1",
+          headerTintColor: "#0055ff",
           headerBackTitle: "Quay lại",
         }}
       />
@@ -116,7 +119,7 @@ function MainAppStack() {
         options={{
           headerShown: true,
           title: "Giỏ hàng",
-          headerTintColor: "#6C3CE1",
+          headerTintColor: "#0055ff",
           headerBackTitle: "Quay lại",
         }}
       />
@@ -126,7 +129,7 @@ function MainAppStack() {
         options={{
           headerShown: true,
           title: "Thanh toán",
-          headerTintColor: "#6C3CE1",
+          headerTintColor: "#0055ff",
           headerBackTitle: "Quay lại",
         }}
       />
@@ -144,7 +147,37 @@ function MainAppStack() {
         options={{
           headerShown: true,
           title: "Cài đặt",
-          headerTintColor: "#6C3CE1",
+          headerTintColor: "#0055ff",
+          headerBackTitle: "Quay lại",
+        }}
+      />
+      <Stack.Screen
+        name="AddressList"
+        component={AddressListScreen}
+        options={{
+          headerShown: true,
+          title: "Sổ địa chỉ",
+          headerTintColor: "#0055ff",
+          headerBackTitle: "Quay lại",
+        }}
+      />
+      <Stack.Screen
+        name="AddressForm"
+        component={AddressFormScreen}
+        options={{
+          headerShown: true,
+          title: "Thêm địa chỉ",
+          headerTintColor: "#0055ff",
+          headerBackTitle: "Quay lại",
+        }}
+      />
+      <Stack.Screen
+        name="ReturnRequest"
+        component={ReturnRequestScreen}
+        options={{
+          headerShown: true,
+          title: "Yêu cầu trả hàng",
+          headerTintColor: "#0055ff",
           headerBackTitle: "Quay lại",
         }}
       />

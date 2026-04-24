@@ -148,10 +148,39 @@ export default function OrderTrackingScreen({ route, navigation }) {
           <View>
             <Text style={styles.trackingTitle}>Tracking Number</Text>
             <Text style={styles.trackingVal}>
-              {order.trackingNumber || `LGS-${Math.floor(Date.now() / 10000)}`}
+              {order.trackingNumber || `LGS-${String(orderId || "").slice(-10).toUpperCase() || 'UNKNOWN'}`}
             </Text>
           </View>
           <Text style={styles.trackingIcon}>📋</Text>
+        </View>
+
+        {/* ── Sản phẩm trong đơn (Products details) ── */}
+        <View style={styles.productsSection}>
+          <Text style={styles.sectionTitle}>Ordered Items</Text>
+          <View style={styles.productsList}>
+            {(order?.items || [order?.product]).filter(Boolean).map((it, idx) => {
+               const img = it.productImage || it.product?.image || it.product?.imageUrl || "https://via.placeholder.com/150";
+               const name = it.productName || it.product?.name || "Lorem ipsum dolor sit amet";
+               const price = it.price || it.basePrice || 0;
+               const qty = it.quantity || 1;
+               
+               return (
+                 <View key={idx} style={styles.productItem}>
+                   <Image source={{ uri: img }} style={styles.prodImg} />
+                   <View style={styles.prodInfo}>
+                     <Text style={styles.prodName} numberOfLines={2}>{name}</Text>
+                     <Text style={styles.prodVariant}>Pink, Size M</Text>
+                     <View style={styles.prodBotRow}>
+                       <Text style={styles.prodPrice}>$ {Number(price).toFixed(2).replace('.', ',')}</Text>
+                       <View style={styles.prodQtyBadge}>
+                         <Text style={styles.prodQtyText}>Qty: {qty}</Text>
+                       </View>
+                     </View>
+                   </View>
+                 </View>
+               );
+            })}
+          </View>
         </View>
 
         {/* ── Timeline Chi tiết ── */}
@@ -368,10 +397,24 @@ const styles = StyleSheet.create({
   trackingVal: { fontSize: 14, color: COLORS.textSecondary },
   trackingIcon: { fontSize: 20, color: COLORS.info },
 
-  // Timeline
-  timelineContainer: {
-    flex: 1,
-  },
+  // Products Section
+productsSection: { marginTop: 15, paddingHorizontal: 20 },
+sectionTitle: { fontSize: 18, fontWeight: "800", color: "#111", marginBottom: 15 },
+productsList: { backgroundColor: "#fff", borderRadius: 16, padding: 15, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
+productItem: { flexDirection: "row", marginBottom: 15, borderBottomWidth: 1, borderBottomColor: "#F5F5F5", paddingBottom: 15 },
+prodImg: { width: 75, height: 75, borderRadius: 10, backgroundColor: "#eee" },
+prodInfo: { flex: 1, marginLeft: 15, justifyContent: "space-between" },
+prodName: { fontSize: 14, fontWeight: "600", color: "#222" },
+prodVariant: { fontSize: 13, color: "#666", marginTop: 4 },
+prodBotRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+prodPrice: { fontSize: 16, fontWeight: "800", color: "#111" },
+prodQtyBadge: { backgroundColor: "#EFF2FE", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+prodQtyText: { fontSize: 13, fontWeight: "700", color: "#0055ff" },
+
+// Timeline chi tiết
+timelineContainer: { marginHorizontal: 20, marginTop: 25, marginBottom: 50 },
+timelineRow: { flexDirection: "row", marginBottom: 25 },
+  // Timeline (Tiếp tục)
   eventRow: {
     flexDirection: "row",
     justifyContent: "space-between",

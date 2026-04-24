@@ -12,6 +12,7 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { getProductById, formatPrice } from "../services/api";
 import { useCart } from "../context/CartContext";
+import { useWishlist } from "../context/WishlistContext";
 import { COLORS } from "../constants/colors";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -29,7 +30,8 @@ export default function ProductDetailScreen() {
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState("M");
   const [quantity, setQuantity] = useState(1);
-  const [liked, setLiked] = useState(false);
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const liked = product ? isInWishlist(product.id || product._id) : false;
 
   const colorVariants = [
     { name: "Pink", hex: "#F9A8D4" },
@@ -84,7 +86,7 @@ export default function ProductDetailScreen() {
 
   // Fallback data
   const title = product?.name || "White Blouse Shirt";
-  const price = product?.price != null ? formatPrice(product.price) : "$17,00";
+  const price = product?.price != null ? formatPrice(product.price) : formatPrice(17000);
   const description =
     product?.description ||
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam arcu mauris, scelerisque eu mauris id, pretium pulvinar sapien.";
@@ -320,7 +322,7 @@ export default function ProductDetailScreen() {
 
       {/* ── FIXED BOTTOM BAR ── */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.heartBtn} onPress={() => setLiked(!liked)}>
+        <TouchableOpacity style={styles.heartBtn} onPress={() => { if (product) toggleWishlist(product); }}>
           <Text style={[styles.heartIcon, liked && styles.heartActive]}>{liked ? "♥" : "♡"}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.85} onPress={handleAddToCart}>

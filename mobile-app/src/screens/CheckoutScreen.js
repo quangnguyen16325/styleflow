@@ -10,7 +10,7 @@
  *  - Thành công → clearCart() → navigate("Success")
  *  - KHÔNG sửa App.js
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -21,55 +21,34 @@ import {
   ActivityIndicator,
   Modal,
   SafeAreaView,
+  Image,
 } from "react-native";
 import { useCart } from "../context/CartContext";
-import api from "../services/api";
+import api, { formatPrice } from "../services/api";
 import { COLORS } from "../constants/colors";
 
-// ── Mock address book (sẽ replace bằng API GET /addresses ở Commit 6) ────────
-
-const MOCK_ADDRESSES = [
-  {
-    id: 1,
-    label: "Nhà riêng",
-    fullAddress: "26, Duong So 2, Thao Dien Ward, An Phu, District 2, Ho Chi Minh city",
-    phone: "+84932000000",
-    email: "amandamorgan@example.com",
-    isDefault: true,
-  },
-  {
-    id: 2,
-    label: "Văn phòng",
-    fullAddress:
-      "Magadi Main Rd, next to Prasanna Theatre, Cholourpalya, Bengaluru, Karnataka 560023",
-    phone: "+919987654321",
-    email: "gmail@example.com",
-    isDefault: false,
-  },
-];
+// MOCK_ADDRESSES removed — will load from API
 
 // ── Danh sách phương thức thanh toán ─────────────────────────────────────────
 
 const PAYMENT_METHODS = [
-  { key: "CARD", label: "Card", sublabel: "Thẻ Tín dụng / Ghi nợ", icon: "💳" },
-  { key: "COD", label: "COD", sublabel: "Thanh toán khi nhận hàng", icon: "💵" },
-  { key: "MOMO", label: "MoMo", sublabel: "Ví điện tử MoMo", icon: "🟣" },
-  { key: "BANK_TRANSFER", label: "Bank Transfer", sublabel: "Chuyển khoản ngân hàng", icon: "🏦" },
-  { key: "PAYPAL", label: "PayPal", sublabel: "Thanh toán qua PayPal", icon: "🅿️" },
+  { key: "CARD", label: "Card", sublabel: "Thẻ Tín dụng / Ghi nợ", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png" },
+  { key: "COD", label: "COD", sublabel: "Thanh toán khi nhận hàng", image: "https://cdn-icons-png.flaticon.com/512/1554/1554401.png" },
+  { key: "MOMO", label: "MoMo", sublabel: "Ví điện tử MoMo", image: "https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" },
+  { key: "BANK_TRANSFER", label: "Bank Transfer", sublabel: "Chuyển khoản ngân hàng", image: "https://cdn-icons-png.flaticon.com/512/2830/2830284.png" },
+  { key: "PAYPAL", label: "PayPal", sublabel: "Thanh toán qua PayPal", image: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Paypal_2014_logo.png" },
 ];
 
 // ── Shipping options ──────────────────────────────────────────────────────────
 
 const SHIPPING_OPTIONS = [
-  { key: "standard", label: "Standard", duration: "5–7 days", priceLabel: "FREE", price: 0 },
-  { key: "express", label: "Express", duration: "1–2 days", priceLabel: "$12,00", price: 12 },
+  { key: "standard", label: "Giao hàng tiêu chuẩn", duration: "5–7 ngày", priceLabel: "Miễn phí", price: 0 },
+  { key: "express", label: "Giao hàng hỏa tốc", duration: "1–2 ngày", priceLabel: formatPrice(25000), price: 25000 },
 ];
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
-function formatUSD(amount) {
-  return "$" + amount.toFixed(2).replace(".", ",");
-}
+// Removed formatUSD, using formatPrice from api
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -92,7 +71,7 @@ function AddressCard({ address, onEdit }) {
         </View>
       </View>
       <TouchableOpacity style={styles.editCircleBtn} onPress={onEdit}>
-        <Text style={styles.editCircleIcon}>✎</Text>
+        <Text style={styles.editCircleIcon}>›</Text>
       </TouchableOpacity>
     </View>
   );
@@ -128,7 +107,7 @@ function PaymentMethodRow({ method, selected, onSelect }) {
       onPress={() => onSelect(method.key)}
       activeOpacity={0.8}
     >
-      <Text style={styles.paymentIcon}>{method.icon}</Text>
+      <Image source={{ uri: method.image }} style={styles.paymentLogo} resizeMode="contain" />
       <View style={styles.paymentInfo}>
         <Text style={[styles.paymentLabel, selected && styles.paymentLabelSelected]}>
           {method.label}
@@ -151,7 +130,7 @@ function CartItemSummaryRow({ item }) {
       <Text style={styles.summaryItemName} numberOfLines={2}>
         {item.name}
       </Text>
-      <Text style={styles.summaryItemPrice}>{formatUSD(item.basePrice)}</Text>
+      <Text style={styles.summaryItemPrice}>{formatPrice(item.basePrice)}</Text>
     </View>
   );
 }
@@ -165,33 +144,41 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose 
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Chọn địa chỉ giao hàng</Text>
-          {addresses.map((addr) => (
-            <TouchableOpacity
-              key={addr.id}
-              style={[styles.addrOption, selectedId === addr.id && styles.addrOptionSelected]}
-              onPress={() => {
-                onSelect(addr.id);
-                onClose();
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.addrOptionLeft}>
-                <Text style={styles.addrOptionLabel}>{addr.label}</Text>
-                <Text style={styles.addrOptionText} numberOfLines={2}>
-                  {addr.fullAddress}
-                </Text>
-                <Text style={styles.addrOptionPhone}>{addr.phone}</Text>
-              </View>
-              {selectedId === addr.id && (
-                <View style={styles.addrOptionCheck}>
-                  <Text style={styles.addrOptionCheckIcon}>✓</Text>
+          <ScrollView 
+            style={{ maxHeight: "75%" }} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
+            {addresses.map((addr) => (
+              <TouchableOpacity
+                key={addr.id}
+                style={[styles.addrOption, selectedId === addr.id && styles.addrOptionSelected]}
+                onPress={() => {
+                  onSelect(addr.id);
+                  onClose();
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={styles.addrOptionLeft}>
+                  <Text style={styles.addrOptionLabel}>{addr.label}</Text>
+                  <Text style={styles.addrOptionText} numberOfLines={2}>
+                    {addr.fullAddress}
+                  </Text>
+                  <Text style={styles.addrOptionPhone}>{addr.phone}</Text>
                 </View>
-              )}
+                {selectedId === addr.id && (
+                  <View style={styles.addrOptionCheck}>
+                    <Text style={styles.addrOptionCheckIcon}>✓</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={{ flexDirection: "row", gap: 10, paddingTop: 10 }}>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
+              <Text style={styles.modalCloseBtnText}>Đóng</Text>
             </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
-            <Text style={styles.modalCloseBtnText}>Đóng</Text>
-          </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -203,9 +190,9 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose 
 export default function CheckoutScreen({ navigation }) {
   const { items, subtotal, clearCart } = useCart();
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  const defaultAddr = MOCK_ADDRESSES.find((a) => a.isDefault) || MOCK_ADDRESSES[0];
-  const [shippingAddressId, setShippingAddressId] = useState(defaultAddr.id);
+  // ── State ───────────────
+  const [apiAddresses, setApiAddresses] = useState([]);
+  const [shippingAddressId, setShippingAddressId] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("CARD");
   const [selectedShipping, setSelectedShipping] = useState("standard");
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -214,7 +201,32 @@ export default function CheckoutScreen({ navigation }) {
   const [voucherCode, setVoucherCode] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  const selectedAddress = MOCK_ADDRESSES.find((a) => a.id === shippingAddressId) || defaultAddr;
+  // Load addresses from API on mount
+  useEffect(() => {
+    const loadAddresses = async () => {
+      try {
+        const res = await api.get("/me/addresses");
+        const list = Array.isArray(res.data) ? res.data : [];
+        // Transform API format to match AddressCard component
+        const mapped = list.map((a) => ({
+          id: a.id,
+          label: a.label || "Khác",
+          fullAddress: [a.addressLine, a.ward, a.district, a.city, a.country].filter(Boolean).join(", "),
+          phone: a.receiverPhone || "",
+          email: "",
+          isDefault: a.isDefault || false,
+        }));
+        setApiAddresses(mapped);
+        const def = mapped.find((a) => a.isDefault) || mapped[0];
+        if (def) setShippingAddressId(def.id);
+      } catch (err) {
+        console.warn("Lỗi tải địa chỉ:", err);
+      }
+    };
+    loadAddresses();
+  }, []);
+
+  const selectedAddress = apiAddresses.find((a) => a.id === shippingAddressId) || apiAddresses[0] || { id: null, label: "", fullAddress: "Chưa có địa chỉ", phone: "", email: "" };
   const shippingOption = SHIPPING_OPTIONS.find((s) => s.key === selectedShipping);
   const shippingCost = shippingOption?.price ?? 0;
   const grandTotal = subtotal + shippingCost;
@@ -230,8 +242,8 @@ export default function CheckoutScreen({ navigation }) {
 
     const payload = {
       items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-      addressId: 1,
-      shippingFee: 15,
+      addressId: shippingAddressId || 1,
+      shippingFee: shippingCost > 0 ? shippingCost * 1000 : 15000,
     };
 
     console.log("[CheckoutScreen] Gửi payload tạo đơn:", JSON.stringify(payload, null, 2));
@@ -325,7 +337,7 @@ export default function CheckoutScreen({ navigation }) {
             style={styles.editCircleBtnSmall}
             onPress={() => setPaymentModalVisible(true)}
           >
-            <Text style={styles.editCircleIcon}>✎</Text>
+            <Text style={styles.editCircleIcon}>›</Text>
           </TouchableOpacity>
         </View>
         <View style={{ flexDirection: "row", marginTop: 10 }}>
@@ -341,17 +353,17 @@ export default function CheckoutScreen({ navigation }) {
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryRowLabel}>Subtotal</Text>
-            <Text style={styles.summaryRowValue}>{formatUSD(subtotal)}</Text>
+            <Text style={styles.summaryRowValue}>{formatPrice(subtotal)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryRowLabel}>Shipping</Text>
             <Text style={[styles.summaryRowValue, shippingCost === 0 && styles.freeLabel]}>
-              {shippingCost === 0 ? "FREE" : formatUSD(shippingCost)}
+              {shippingCost === 0 ? "FREE" : formatPrice(shippingCost)}
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.summaryRowTotal]}>
             <Text style={styles.summaryTotalLabel}>Total</Text>
-            <Text style={styles.summaryTotalValue}>{formatUSD(grandTotal)}</Text>
+            <Text style={styles.summaryTotalValue}>{formatPrice(grandTotal)}</Text>
           </View>
         </View>
 
@@ -362,7 +374,7 @@ export default function CheckoutScreen({ navigation }) {
       <View style={styles.bottomBar}>
         <View style={styles.totalWrap}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalAmount}>{formatUSD(grandTotal)}</Text>
+          <Text style={styles.totalAmount}>{formatPrice(grandTotal)}</Text>
         </View>
         <TouchableOpacity
           style={[styles.payBtn, (isPlacingOrder || items.length === 0) && styles.payBtnDisabled]}
@@ -381,7 +393,7 @@ export default function CheckoutScreen({ navigation }) {
       {/* ── Address Picker Modal ─────────────────────────────────────────── */}
       <AddressPickerModal
         visible={addressModalVisible}
-        addresses={MOCK_ADDRESSES}
+        addresses={apiAddresses}
         selectedId={shippingAddressId}
         onSelect={setShippingAddressId}
         onClose={() => setAddressModalVisible(false)}
@@ -434,7 +446,7 @@ export default function CheckoutScreen({ navigation }) {
               </View>
               <View style={styles.voucherBody}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.voucherTitle}>🛍 First Purchase</Text>
+                  <Text style={styles.voucherTitle}>First Purchase</Text>
                   <Text style={styles.voucherDesc}>5% off for your next order</Text>
                 </View>
                 <View style={styles.applyBtn}>
@@ -456,7 +468,7 @@ export default function CheckoutScreen({ navigation }) {
               </View>
               <View style={styles.voucherBody}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.voucherTitle}>🎁 Gift From Customer Care</Text>
+                  <Text style={styles.voucherTitle}>Gift From Customer Care</Text>
                   <Text style={styles.voucherDesc}>15% off your next purchase</Text>
                 </View>
                 <View style={styles.applyBtn}>
@@ -776,8 +788,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.info,
     backgroundColor: "#EFF6FF",
   },
-  paymentIcon: {
-    fontSize: 24,
+  paymentLogo: {
+    width: 30,
+    height: 24,
     marginRight: 14,
   },
   paymentInfo: { flex: 1 },
