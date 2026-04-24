@@ -103,8 +103,15 @@ export default function OrderScreen({ navigation }) {
 
   const handleAddressChange = async (addressId) => {
     try {
-      await api.post(`/orders/${addressModal}/address-change-request`, { addressId });
-      Alert.alert("Thành công", "Yêu cầu đổi địa chỉ đã được gửi!");
+      const res = await api.post(`/orders/${addressModal}/address-change-request`, { addressId });
+      const action = res?.data?.action;
+
+      if (action === "updated_same_city") {
+        Alert.alert("Thành công", "Địa chỉ giao hàng đã được cập nhật ngay.");
+      } else {
+        Alert.alert("Thành công", "Yêu cầu đổi địa chỉ đã được gửi để chờ duyệt.");
+      }
+
       setAddressModal(null);
     } catch (err) {
       Alert.alert("Lỗi", err?.message || "Đã có yêu cầu đổi địa chỉ đang xử lý.");

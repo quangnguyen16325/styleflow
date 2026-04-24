@@ -1,16 +1,8 @@
-/* eslint-disable react/prop-types */
-import React, { useEffect } from "react";
+import React from "react";
 import { View, Text, StyleSheet, StatusBar } from "react-native";
 import { COLORS } from "../constants/colors";
 
-export default function SplashScreen({ navigation }) {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.replace("Login");
-    }, 2200);
-    return () => clearTimeout(timer);
-  }, [navigation]);
-
+export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />

@@ -1,11 +1,11 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Contract: Base URL — dùng IP máy Mac khi test thật trên iPhone
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-
-//TEST
-console.log("🛠 THIẾT BỊ ĐANG GỌI ĐẾN URL:", BASE_URL);
+// Prefer the shared repo env name, keep the older key as fallback for compatibility.
+const BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  process.env.EXPO_PUBLIC_API_URL ||
+  "https://api.ecloria.co.uk";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -94,6 +94,26 @@ export async function getProducts() {
 
 export async function getProductById(id) {
   const res = await api.get(`/products/${id}`);
+  return res.data;
+}
+
+export async function getCategories() {
+  const res = await api.get("/categories");
+  return res.data;
+}
+
+export async function getVietnamProvinces() {
+  const res = await api.get("/locations/provinces");
+  return res.data;
+}
+
+export async function getVietnamDistricts(provinceCode) {
+  const res = await api.get(`/locations/provinces/${provinceCode}/districts`);
+  return res.data;
+}
+
+export async function getVietnamWards(districtCode) {
+  const res = await api.get(`/locations/districts/${districtCode}/wards`);
   return res.data;
 }
 
