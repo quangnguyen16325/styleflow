@@ -48,23 +48,35 @@ export default function AddressFormScreen({ route, navigation }) {
   const { mode, address } = route.params || {};
   const isEdit = mode === "edit" && address;
 
-  const [label, setLabel] = useState(isEdit ? (address.label || "home") : "home");
-  const [receiverName, setReceiverName] = useState(isEdit ? (address.receiverName || "") : "");
-  const [receiverPhone, setReceiverPhone] = useState(isEdit ? (address.receiverPhone || "") : "");
-  const [addressLine, setAddressLine] = useState(isEdit ? (address.addressLine || "") : "");
-  const [ward, setWard] = useState(isEdit ? (address.ward || "") : "");
-  const [district, setDistrict] = useState(isEdit ? (address.district || "") : "");
-  const [city, setCity] = useState(isEdit ? (address.city || "") : "Ho Chi Minh City");
-  const country = isEdit ? (address.country || "Vietnam") : "Vietnam";
-  const [postalCode, setPostalCode] = useState(isEdit ? (address.postalCode || "") : "");
-  const [isDefault, setIsDefault] = useState(isEdit ? (address.isDefault || false) : false);
+  const [label, setLabel] = useState(isEdit ? address.label || "home" : "home");
+  const [receiverName, setReceiverName] = useState(isEdit ? address.receiverName || "" : "");
+  const [receiverPhone, setReceiverPhone] = useState(isEdit ? address.receiverPhone || "" : "");
+  const [addressLine, setAddressLine] = useState(isEdit ? address.addressLine || "" : "");
+  const [ward, setWard] = useState(isEdit ? address.ward || "" : "");
+  const [district, setDistrict] = useState(isEdit ? address.district || "" : "");
+  const [city, setCity] = useState(isEdit ? address.city || "" : "Ho Chi Minh City");
+  const country = isEdit ? address.country || "Vietnam" : "Vietnam";
+  const [postalCode, setPostalCode] = useState(isEdit ? address.postalCode || "" : "");
+  const [isDefault, setIsDefault] = useState(isEdit ? address.isDefault || false : false);
   const [saving, setSaving] = useState(false);
 
   const validate = () => {
-    if (!receiverName.trim()) { Alert.alert("Lỗi", "Vui lòng nhập tên người nhận"); return false; }
-    if (!receiverPhone.trim()) { Alert.alert("Lỗi", "Vui lòng nhập số điện thoại"); return false; }
-    if (!addressLine.trim()) { Alert.alert("Lỗi", "Vui lòng nhập địa chỉ"); return false; }
-    if (!city.trim()) { Alert.alert("Lỗi", "Vui lòng nhập tỉnh/thành phố"); return false; }
+    if (!receiverName.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập tên người nhận");
+      return false;
+    }
+    if (!receiverPhone.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập số điện thoại");
+      return false;
+    }
+    if (!addressLine.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập địa chỉ");
+      return false;
+    }
+    if (!city.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập tỉnh/thành phố");
+      return false;
+    }
     return true;
   };
 
@@ -196,11 +208,7 @@ export default function AddressFormScreen({ route, navigation }) {
         </View>
 
         <Text style={styles.inputLabel}>Quốc gia</Text>
-        <TextInput
-          style={[styles.input, styles.inputDisabled]}
-          value={country}
-          editable={false}
-        />
+        <TextInput style={[styles.input, styles.inputDisabled]} value={country} editable={false} />
 
         {/* Default toggle */}
         <View style={styles.defaultRow}>
@@ -231,9 +239,7 @@ export default function AddressFormScreen({ route, navigation }) {
           {saving ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.saveBtnText}>
-              {isEdit ? "Lưu thay đổi" : "Thêm địa chỉ"}
-            </Text>
+            <Text style={styles.saveBtnText}>{isEdit ? "Lưu thay đổi" : "Thêm địa chỉ"}</Text>
           )}
         </TouchableOpacity>
       </View>

@@ -39,20 +39,16 @@ export default function WishlistScreen({ navigation }) {
         style={styles.cardImage}
       />
       <View style={styles.cardBody}>
-        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.cardName} numberOfLines={2}>
+          {item.name}
+        </Text>
         {item.category ? <Text style={styles.cardCategory}>{item.category}</Text> : null}
         <Text style={styles.cardPrice}>{formatMoney(item.basePrice)}</Text>
         <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={styles.addCartBtn}
-            onPress={() => handleAddToCart(item)}
-          >
+          <TouchableOpacity style={styles.addCartBtn} onPress={() => handleAddToCart(item)}>
             <Text style={styles.addCartText}>+ Giỏ hàng</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.removeBtn}
-            onPress={() => removeFromWishlist(item.id)}
-          >
+          <TouchableOpacity style={styles.removeBtn} onPress={() => removeFromWishlist(item.id)}>
             <Text style={styles.removeIcon}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -72,10 +68,7 @@ export default function WishlistScreen({ navigation }) {
           </View>
           <Text style={styles.emptyTitle}>Chưa có sản phẩm yêu thích</Text>
           <Text style={styles.emptySub}>Bấm ♡ trên sản phẩm để thêm vào đây</Text>
-          <TouchableOpacity
-            style={styles.shopBtn}
-            onPress={() => navigation.navigate("Home")}
-          >
+          <TouchableOpacity style={styles.shopBtn} onPress={() => navigation.navigate("Home")}>
             <Text style={styles.shopBtnText}>Khám phá ngay</Text>
           </TouchableOpacity>
         </View>
@@ -106,25 +99,38 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
 
   headerBar: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
   headerTitle: { fontSize: 24, fontWeight: "900", color: "#111" },
   countBadge: {
-    marginLeft: 12, backgroundColor: "#EFF2FE",
-    width: 30, height: 30, borderRadius: 15,
-    justifyContent: "center", alignItems: "center",
+    marginLeft: 12,
+    backgroundColor: "#EFF2FE",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
   },
   countText: { fontSize: 14, fontWeight: "800", color: "#0055ff" },
 
   list: { padding: 20, paddingBottom: 40 },
 
   card: {
-    flexDirection: "row", backgroundColor: "#fff",
-    borderRadius: 16, marginBottom: 20, overflow: "hidden",
-    shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 }, elevation: 3,
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    marginBottom: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   cardImage: { width: 120, height: 140, backgroundColor: "#eee" },
   cardBody: { flex: 1, padding: 14, justifyContent: "space-between" },
@@ -133,31 +139,53 @@ const styles = StyleSheet.create({
   cardPrice: { fontSize: 18, fontWeight: "900", color: "#0055ff", marginTop: 6 },
 
   cardActions: {
-    flexDirection: "row", justifyContent: "space-between",
-    alignItems: "center", marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
   },
   addCartBtn: {
-    backgroundColor: "#0055ff", paddingHorizontal: 16, paddingVertical: 8,
+    backgroundColor: "#0055ff",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
   },
   addCartText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   removeBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    borderWidth: 1.5, borderColor: "#ddd",
-    justifyContent: "center", alignItems: "center",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#ddd",
+    justifyContent: "center",
+    alignItems: "center",
   },
   removeIcon: { fontSize: 14, color: "#999" },
 
   // Empty
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
   emptyCircle: {
-    width: 80, height: 80, borderRadius: 40,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: "rgba(0, 85, 255, 0.08)",
-    justifyContent: "center", alignItems: "center", marginBottom: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
   },
   emptyIcon: { fontSize: 36, color: "#0055ff" },
   emptyTitle: { fontSize: 20, fontWeight: "800", color: "#111", marginBottom: 8 },
   emptySub: { fontSize: 14, color: "#666", textAlign: "center", marginBottom: 28 },
-  shopBtn: { backgroundColor: "#0055ff", paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
+  shopBtn: {
+    backgroundColor: "#0055ff",
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
   shopBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });

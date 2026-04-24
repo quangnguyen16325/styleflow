@@ -322,7 +322,12 @@ export default function ProductDetailScreen() {
 
       {/* ── FIXED BOTTOM BAR ── */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.heartBtn} onPress={() => { if (product) toggleWishlist(product); }}>
+        <TouchableOpacity
+          style={styles.heartBtn}
+          onPress={() => {
+            if (product) toggleWishlist(product);
+          }}
+        >
           <Text style={[styles.heartIcon, liked && styles.heartActive]}>{liked ? "♥" : "♡"}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.85} onPress={handleAddToCart}>

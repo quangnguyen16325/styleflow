@@ -1,6 +1,14 @@
 /* eslint-disable react/prop-types */
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  Alert,
+} from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { COLORS } from "../constants/colors";
 
@@ -36,7 +44,6 @@ export default function SettingsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        
         {/* Nhóm Tài khoản */}
         <SectionTitle title="Tài khoản" />
         <View style={styles.group}>
@@ -45,11 +52,7 @@ export default function SettingsScreen({ navigation }) {
             label="Thông tin cá nhân"
             onPress={() => Alert.alert("Thông báo", "Tính năng đang bảo trì.")}
           />
-          <MenuRow
-            icon="▽"
-            label="Sổ địa chỉ"
-            onPress={() => navigation.navigate("AddressList")}
-          />
+          <MenuRow icon="▽" label="Sổ địa chỉ" onPress={() => navigation.navigate("AddressList")} />
           <MenuRow
             icon="□"
             label="Bảo mật & Mật khẩu"
@@ -65,13 +68,21 @@ export default function SettingsScreen({ navigation }) {
             icon="○"
             label="Chế độ tối"
             onPress={() => setDarkMode(!darkMode)}
-            renderRight={() => <Text style={{ color: COLORS.primary, fontWeight: "700" }}>{darkMode ? "Bật" : "Tắt"}</Text>}
+            renderRight={() => (
+              <Text style={{ color: COLORS.primary, fontWeight: "700" }}>
+                {darkMode ? "Bật" : "Tắt"}
+              </Text>
+            )}
           />
           <MenuRow
             icon="◑"
             label="Thông báo"
             onPress={() => setNotifications(!notifications)}
-            renderRight={() => <Text style={{ color: COLORS.primary, fontWeight: "700" }}>{notifications ? "Bật" : "Tắt"}</Text>}
+            renderRight={() => (
+              <Text style={{ color: COLORS.primary, fontWeight: "700" }}>
+                {notifications ? "Bật" : "Tắt"}
+              </Text>
+            )}
             isLast
           />
         </View>

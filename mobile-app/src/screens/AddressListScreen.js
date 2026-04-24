@@ -20,7 +20,12 @@ function AddressCard({ address, onEdit, onDelete, onSetDefault }) {
     .filter(Boolean)
     .join(", ");
 
-  const labelName = address.label === "home" ? "Nhà" : address.label === "office" ? "Văn phòng" : address.label || "Khác";
+  const labelName =
+    address.label === "home"
+      ? "Nhà"
+      : address.label === "office"
+        ? "Văn phòng"
+        : address.label || "Khác";
 
   return (
     <View style={[styles.card, address.isDefault && styles.cardDefault]}>
@@ -119,14 +124,10 @@ export default function AddressListScreen({ navigation }) {
   const handleSetDefault = async (address) => {
     try {
       await api.patch(`/me/addresses/${address.id}`, { isDefault: true });
-      setAddresses((prev) =>
-        prev.map((a) => ({ ...a, isDefault: a.id === address.id })),
-      );
+      setAddresses((prev) => prev.map((a) => ({ ...a, isDefault: a.id === address.id })));
     } catch (err) {
       console.warn("Lỗi set default:", err);
-      setAddresses((prev) =>
-        prev.map((a) => ({ ...a, isDefault: a.id === address.id })),
-      );
+      setAddresses((prev) => prev.map((a) => ({ ...a, isDefault: a.id === address.id })));
     }
   };
 
@@ -249,7 +250,12 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: "center", paddingVertical: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 4 },
-  emptyDesc: { fontSize: 13, color: COLORS.textSecondary, textAlign: "center", paddingHorizontal: 40 },
+  emptyDesc: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
 
   addBtn: {
     position: "absolute",

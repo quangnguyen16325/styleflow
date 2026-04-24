@@ -16,7 +16,6 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import api, { formatPrice } from "../services/api";
 
-
 // Helper: Format Ngày tháng đẹp
 const formatDate = (dateString) => {
   if (!dateString) return "Không rõ ngày";
@@ -58,7 +57,7 @@ export default function OrderScreen({ navigation }) {
             if (ordersRes && Array.isArray(ordersRes.data)) {
               // Sắp xếp mới nhất lên đầu
               const sorted = ordersRes.data.sort(
-                (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+                (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
               );
               setOrders(sorted);
             }
@@ -75,7 +74,7 @@ export default function OrderScreen({ navigation }) {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, []),
   );
 
   // Filter Logic
@@ -123,10 +122,8 @@ export default function OrderScreen({ navigation }) {
     const s = (status || "").toLowerCase();
     if (["shipping", "shipped", "packed"].includes(s))
       return { text: "Đang giao", color: "#F08C00" }; // Cam
-    if (["delivered", "completed"].includes(s))
-      return { text: "Hoàn thành", color: "#0055ff" }; // Xanh
-    if (["cancelled", "failed"].includes(s))
-      return { text: "Đã huỷ", color: "#e53e3e" }; // Đỏ
+    if (["delivered", "completed"].includes(s)) return { text: "Hoàn thành", color: "#0055ff" }; // Xanh
+    if (["cancelled", "failed"].includes(s)) return { text: "Đã huỷ", color: "#e53e3e" }; // Đỏ
     return { text: "Đang xử lý", color: "#666" }; // Xám
   };
 
@@ -136,17 +133,20 @@ export default function OrderScreen({ navigation }) {
     if (count === 0) {
       return <View style={styles.gridBox} />;
     }
-    
+
     // Nếu có 1 hình
     if (count === 1) {
       const img = items[0].productImage || items[0].product?.image || items[0].product?.imageUrl;
       return (
         <View style={styles.gridBox}>
-          <Image source={{ uri: img || "https://via.placeholder.com/150" }} style={styles.gridImgFull} />
+          <Image
+            source={{ uri: img || "https://via.placeholder.com/150" }}
+            style={styles.gridImgFull}
+          />
         </View>
       );
     }
-    
+
     // Nếu có nhiều hính => Grid 2x2 (Hiển thị max 4 hình)
     const displayItems = items.slice(0, 4);
     return (
@@ -155,7 +155,10 @@ export default function OrderScreen({ navigation }) {
           const img = it.productImage || it.product?.image || it.product?.imageUrl;
           return (
             <View key={idx} style={styles.gridCell}>
-              <Image source={{ uri: img || "https://via.placeholder.com/150" }} style={styles.gridImgCell} />
+              <Image
+                source={{ uri: img || "https://via.placeholder.com/150" }}
+                style={styles.gridImgCell}
+              />
             </View>
           );
         })}
@@ -172,28 +175,30 @@ export default function OrderScreen({ navigation }) {
     return (
       <View style={styles.cardInfo}>
         <OrderImageGrid items={orderItems} />
-        
+
         <View style={styles.cardRight}>
           {/* Top Row: ID + Item Count */}
           <View style={styles.cardTopRow}>
-            <Text style={styles.orderIdText}>Order #{item.id || item._id?.slice(-8).toUpperCase()}</Text>
+            <Text style={styles.orderIdText}>
+              Order #{item.id || item._id?.slice(-8).toUpperCase()}
+            </Text>
             <View style={styles.itemCountBadge}>
               <Text style={styles.itemCountText}>{itemsCount} items</Text>
             </View>
           </View>
-          
+
           {/* Middle: Thông tin Ngày / Tổng tiền */}
           <View style={styles.cardMidRow}>
             <Text style={styles.cardDate}>{formatDate(item.createdAt)}</Text>
-            <Text style={styles.cardTotal}>{formatPrice(item.totalAmount || item.total_amount || 0)}</Text>
+            <Text style={styles.cardTotal}>
+              {formatPrice(item.totalAmount || item.total_amount || 0)}
+            </Text>
           </View>
-          
+
           {/* Bottom Row: Status + Action Btns */}
           <View style={styles.cardBotRow}>
             <View style={styles.statusWrap}>
-              <Text style={[styles.statusText, { color: sDisplay.color }]}>
-                {sDisplay.text}
-              </Text>
+              <Text style={[styles.statusText, { color: sDisplay.color }]}>{sDisplay.text}</Text>
               {isCompleted && (
                 <View style={styles.checkCircle}>
                   <Text style={styles.checkIcon}>✓</Text>
@@ -204,7 +209,7 @@ export default function OrderScreen({ navigation }) {
             <View style={styles.actionBtnsRow}>
               {/* Đổi địa chỉ cho đơn đang xử lý */}
               {["pending", "processing", "confirmed"].includes(item.status) && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.btnAddressChange}
                   onPress={() => openAddressChange(item.id || item._id)}
                 >
@@ -214,19 +219,21 @@ export default function OrderScreen({ navigation }) {
 
               {/* Trả hàng cho đơn hoàn thành trong 7 ngày */}
               {isCompleted && isWithin7Days(item.createdAt) && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.btnReturn}
-                  onPress={() => navigation.navigate("ReturnRequest", { 
-                    orderId: item.id || item._id,
-                    orderItems: orderItems,
-                  })}
+                  onPress={() =>
+                    navigation.navigate("ReturnRequest", {
+                      orderId: item.id || item._id,
+                      orderItems: orderItems,
+                    })
+                  }
                 >
                   <Text style={styles.txtReturn}>↩ Trả hàng</Text>
                 </TouchableOpacity>
               )}
 
               {/* Track / Review */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionBtn, isCompleted ? styles.btnReview : styles.btnTrack]}
                 onPress={() => {
                   if (isCompleted) {
@@ -251,11 +258,13 @@ export default function OrderScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      
       {/* ── HEADER ────────────────────────────────────────── */}
       <View style={styles.headerArea}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.avatarCircle} onPress={() => navigation.navigate("Profile")}>
+          <TouchableOpacity
+            style={styles.avatarCircle}
+            onPress={() => navigation.navigate("Profile")}
+          >
             {userProfile?.avatar ? (
               <Image source={{ uri: userProfile.avatar }} style={styles.avatarImg} />
             ) : (
@@ -269,7 +278,10 @@ export default function OrderScreen({ navigation }) {
         </View>
 
         <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconCircle} onPress={() => navigation.navigate("Settings")}>
+          <TouchableOpacity
+            style={styles.iconCircle}
+            onPress={() => navigation.navigate("Settings")}
+          >
             <Text style={styles.hdrIcon}>⚙</Text>
           </TouchableOpacity>
         </View>
@@ -277,21 +289,21 @@ export default function OrderScreen({ navigation }) {
 
       {/* ── TABS ────────────────────────────────────────── */}
       <View>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabsContainer}
         >
           {TABS.map((tab) => {
             const isActive = activeTab === tab;
             return (
-               <TouchableOpacity 
-                 key={tab} 
-                 style={[styles.tabBtn, isActive && styles.tabBtnActive]}
-                 onPress={() => setActiveTab(tab)}
-               >
-                 <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab}</Text>
-               </TouchableOpacity>
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab}</Text>
+              </TouchableOpacity>
             );
           })}
         </ScrollView>
@@ -330,31 +342,44 @@ export default function OrderScreen({ navigation }) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.reviewList}>
-               {(reviewOrder?.items || [reviewOrder?.product]).filter(Boolean).map((it, idx) => {
-                  const img = it.productImage || it.product?.image || it.product?.imageUrl || "https://via.placeholder.com/150";
-                  const name = it.productName || it.product?.name || "Lorem ipsum dolor sit amet";
+              {(reviewOrder?.items || [reviewOrder?.product]).filter(Boolean).map((it, idx) => {
+                const img =
+                  it.productImage ||
+                  it.product?.image ||
+                  it.product?.imageUrl ||
+                  "https://via.placeholder.com/150";
+                const name = it.productName || it.product?.name || "Lorem ipsum dolor sit amet";
 
-                  return (
-                    <View key={idx} style={styles.reviewCard}>
-                      <Image source={{ uri: img }} style={styles.reviewImg} />
-                      <View style={styles.reviewInfo}>
-                        <Text style={styles.reviewItemName} numberOfLines={2}>{name}</Text>
-                        <Text style={styles.reviewOrderId}>Order #{reviewOrder.id || reviewOrder._id?.slice(-8).toUpperCase()}</Text>
-                        <View style={styles.reviewActionRow}>
-                          <View style={styles.reviewDateBadge}>
-                            <Text style={styles.reviewDateText}>{formatDate(reviewOrder.createdAt).split(' - ')[1]}</Text>
-                          </View>
-                          <TouchableOpacity style={styles.btnReviewItem} onPress={() => {
+                return (
+                  <View key={idx} style={styles.reviewCard}>
+                    <Image source={{ uri: img }} style={styles.reviewImg} />
+                    <View style={styles.reviewInfo}>
+                      <Text style={styles.reviewItemName} numberOfLines={2}>
+                        {name}
+                      </Text>
+                      <Text style={styles.reviewOrderId}>
+                        Order #{reviewOrder.id || reviewOrder._id?.slice(-8).toUpperCase()}
+                      </Text>
+                      <View style={styles.reviewActionRow}>
+                        <View style={styles.reviewDateBadge}>
+                          <Text style={styles.reviewDateText}>
+                            {formatDate(reviewOrder.createdAt).split(" - ")[1]}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.btnReviewItem}
+                          onPress={() => {
                             setReviewOrder(null);
                             alert("Chức năng Review đang phát triển!");
-                          }}>
-                            <Text style={styles.txtReviewItem}>Review</Text>
-                          </TouchableOpacity>
-                        </View>
+                          }}
+                        >
+                          <Text style={styles.txtReviewItem}>Review</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                  );
-               })}
+                  </View>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -378,7 +403,10 @@ export default function OrderScreen({ navigation }) {
                 <Text style={{ color: "#666", marginBottom: 16 }}>Chưa có địa chỉ nào.</Text>
                 <TouchableOpacity
                   style={styles.submitBtn}
-                  onPress={() => { setAddressModal(null); navigation.navigate("AddressForm"); }}
+                  onPress={() => {
+                    setAddressModal(null);
+                    navigation.navigate("AddressForm");
+                  }}
                 >
                   <Text style={styles.submitBtnText}>+ Thêm địa chỉ mới</Text>
                 </TouchableOpacity>
@@ -394,9 +422,14 @@ export default function OrderScreen({ navigation }) {
                     <View style={styles.addressCardLeft}>
                       <Text style={styles.addressLabel}>{addr.label || "Khác"}</Text>
                       <Text style={styles.addressLine} numberOfLines={2}>
-                        {addr.addressLine}{addr.ward ? `, ${addr.ward}` : ""}{addr.district ? `, ${addr.district}` : ""}{addr.city ? `, ${addr.city}` : ""}
+                        {addr.addressLine}
+                        {addr.ward ? `, ${addr.ward}` : ""}
+                        {addr.district ? `, ${addr.district}` : ""}
+                        {addr.city ? `, ${addr.city}` : ""}
                       </Text>
-                      {addr.receiverPhone && <Text style={styles.addressPhone}>{addr.receiverPhone}</Text>}
+                      {addr.receiverPhone && (
+                        <Text style={styles.addressPhone}>{addr.receiverPhone}</Text>
+                      )}
                     </View>
                     {addr.isDefault && (
                       <View style={styles.defaultBadge}>
@@ -407,7 +440,10 @@ export default function OrderScreen({ navigation }) {
                 ))}
                 <TouchableOpacity
                   style={[styles.submitBtn, { marginTop: 12 }]}
-                  onPress={() => { setAddressModal(null); navigation.navigate("AddressForm"); }}
+                  onPress={() => {
+                    setAddressModal(null);
+                    navigation.navigate("AddressForm");
+                  }}
                 >
                   <Text style={styles.submitBtnText}>+ Thêm địa chỉ mới</Text>
                 </TouchableOpacity>
@@ -416,7 +452,6 @@ export default function OrderScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -427,66 +462,120 @@ const styles = StyleSheet.create({
 
   // Header
   headerArea: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
   },
   headerLeft: { flexDirection: "row", alignItems: "center" },
-  avatarCircle: { 
-    width: 48, height: 48, borderRadius: 24, 
-    backgroundColor: "#F28C8C", justifyContent: "center", alignItems: "center",
-    marginRight: 12
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F28C8C",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
   avatarImg: { width: 48, height: 48, borderRadius: 24 },
   avatarInitial: { fontSize: 20, color: "#fff", fontWeight: "900" },
   headerTexts: { justifyContent: "center" },
   headerTitle: { fontSize: 24, fontWeight: "900", color: "#111" },
   headerSub: { fontSize: 13, color: "#666", marginTop: 2 },
-  
+
   headerIcons: { flexDirection: "row", gap: 8 },
   iconCircle: {
-    width: 38, height: 38, borderRadius: 19, backgroundColor: "#EFF2FE",
-    justifyContent: "center", alignItems: "center", position: "relative"
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#EFF2FE",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
   hdrIcon: { fontSize: 18, color: "#0055ff", fontWeight: "600" },
   dotIndicator: {
-    position: "absolute", top: 8, right: 8, width: 8, height: 8, 
-    borderRadius: 4, backgroundColor: "#e53e3e"
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#e53e3e",
   },
 
   // Tabs
   tabsContainer: {
-    flexDirection: "row", paddingHorizontal: 20, marginBottom: 15, gap: 10,
-    borderBottomWidth: 1, borderBottomColor: "#F0F0F0", paddingBottom: 10
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    marginBottom: 15,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+    paddingBottom: 10,
   },
-  tabBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, backgroundColor: "#f5f5f5" },
+  tabBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: "#f5f5f5",
+  },
   tabBtnActive: { backgroundColor: "#0055ff" },
   tabText: { fontSize: 13, fontWeight: "600", color: "#666" },
   tabTextActive: { color: "#fff" },
 
   // Orders List
   listContainer: { paddingHorizontal: 20, paddingBottom: 30 },
-  
-  cardInfo: { 
-    flexDirection: "row", alignItems: "stretch", 
-    marginBottom: 20, backgroundColor: "#fff" 
+
+  cardInfo: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    marginBottom: 20,
+    backgroundColor: "#fff",
   },
   // Box ẢNH CHÍNH
   gridBox: {
-    width: 100, height: 100, backgroundColor: "#fff", 
-    borderRadius: 12, overflow: "hidden",
-    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3
+    width: 100,
+    height: 100,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   gridImgFull: { width: "100%", height: "100%", resizeMode: "cover" },
-  gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", alignContent: "space-between", padding: 2 },
-  gridCell: { width: "48.5%", height: "48.5%", borderRadius: 6, overflow: "hidden", backgroundColor: "#eee" },
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignContent: "space-between",
+    padding: 2,
+  },
+  gridCell: {
+    width: "48.5%",
+    height: "48.5%",
+    borderRadius: 6,
+    overflow: "hidden",
+    backgroundColor: "#eee",
+  },
   gridImgCell: { width: "100%", height: "100%", resizeMode: "cover" },
-  
+
   // Nửa Phải CARD
   cardRight: { flex: 1, marginLeft: 16, justifyContent: "space-between", paddingVertical: 4 },
-  
+
   cardTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   orderIdText: { fontSize: 15, fontWeight: "800", color: "#111", flex: 1, marginRight: 10 },
-  itemCountBadge: { backgroundColor: "#f5f5f5", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  itemCountBadge: {
+    backgroundColor: "#f5f5f5",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
   itemCountText: { fontSize: 12, fontWeight: "600", color: "#444" },
 
   cardMidRow: { marginTop: 4 },
@@ -497,13 +586,24 @@ const styles = StyleSheet.create({
   statusWrap: { flexDirection: "row", alignItems: "center" },
   statusText: { fontSize: 16, fontWeight: "800" },
   checkCircle: {
-    width: 18, height: 18, borderRadius: 9, backgroundColor: "#0055ff",
-    justifyContent: "center", alignItems: "center", marginLeft: 6
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#0055ff",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 6,
   },
   checkIcon: { color: "#fff", fontSize: 10, fontWeight: "bold" },
-  
+
   actionBtn: { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8 },
-  btnReviewItem: { borderWidth: 1.5, borderColor: "#0055ff", borderRadius: 8, paddingHorizontal: 20, paddingVertical: 6 },
+  btnReviewItem: {
+    borderWidth: 1.5,
+    borderColor: "#0055ff",
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+  },
   txtReviewItem: { color: "#0055ff", fontWeight: "700", fontSize: 14 },
 
   btnTrack: { backgroundColor: "#0055ff" },
@@ -517,53 +617,114 @@ const styles = StyleSheet.create({
 
   // Modal Review
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  modalContent: { 
-    backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, 
-    padding: 24, paddingBottom: 40, maxHeight: "80%" 
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+    maxHeight: "80%",
   },
 
   // Action buttons row
-  actionBtnsRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12, width: "100%", justifyContent: "flex-end" },
+  actionBtnsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 12,
+    width: "100%",
+    justifyContent: "flex-end",
+  },
   btnAddressChange: {
-    borderWidth: 1.5, borderColor: "#F08C00", borderRadius: 8,
-    paddingHorizontal: 16, paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: "#F08C00",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   txtAddressChange: { color: "#F08C00", fontWeight: "700", fontSize: 13 },
   btnReturn: {
-    borderWidth: 1.5, borderColor: "#e53e3e", borderRadius: 8,
-    paddingHorizontal: 16, paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: "#e53e3e",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   txtReturn: { color: "#e53e3e", fontWeight: "700", fontSize: 13 },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   modalTitle: { fontSize: 20, fontWeight: "900", color: "#111" },
   modalCloseText: { fontSize: 24, color: "#666", fontWeight: "300" },
   reviewList: { marginTop: 10 },
-  reviewCard: { 
-    flexDirection: "row", marginBottom: 20, backgroundColor: "#fff", 
-    padding: 12, borderRadius: 12, 
-    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 
+  reviewCard: {
+    flexDirection: "row",
+    marginBottom: 20,
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   reviewImg: { width: 90, height: 90, borderRadius: 8, backgroundColor: "#eee" },
   reviewInfo: { flex: 1, marginLeft: 16, justifyContent: "space-between" },
   reviewItemName: { fontSize: 14, color: "#222" },
   reviewOrderId: { fontSize: 13, fontWeight: "800", color: "#111", marginTop: 4 },
-  reviewActionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10 },
-  reviewDateBadge: { backgroundColor: "#f5f5f5", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  reviewActionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 10,
+  },
+  reviewDateBadge: {
+    backgroundColor: "#f5f5f5",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
   reviewDateText: { fontSize: 12, fontWeight: "600", color: "#666" },
 
   // Address card in modal
   addressCard: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#fff", padding: 16, borderRadius: 12, marginBottom: 12,
-    borderWidth: 1, borderColor: "#F0F0F0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
   },
   addressCardLeft: { flex: 1 },
-  addressLabel: { fontSize: 14, fontWeight: "800", color: "#111", marginBottom: 4, textTransform: "capitalize" },
+  addressLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111",
+    marginBottom: 4,
+    textTransform: "capitalize",
+  },
   addressLine: { fontSize: 13, color: "#555", lineHeight: 18 },
   addressPhone: { fontSize: 12, color: "#888", marginTop: 4 },
-  defaultBadge: { backgroundColor: "#EFF2FE", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  defaultBadge: {
+    backgroundColor: "#EFF2FE",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
   defaultBadgeText: { fontSize: 11, fontWeight: "700", color: "#0055ff" },
 
-  submitBtn: { backgroundColor: "#0055ff", paddingVertical: 14, borderRadius: 12, alignItems: "center" },
+  submitBtn: {
+    backgroundColor: "#0055ff",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
   submitBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });

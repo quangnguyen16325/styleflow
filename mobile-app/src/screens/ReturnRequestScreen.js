@@ -99,7 +99,7 @@ export default function ReturnRequestScreen({ route, navigation }) {
       Alert.alert(
         "Gửi thành công",
         "Yêu cầu trả hàng đã được ghi nhận. Chúng tôi sẽ xem xét và phản hồi trong vòng 24 giờ.",
-        [{ text: "OK", onPress: () => navigation.goBack() }]
+        [{ text: "OK", onPress: () => navigation.goBack() }],
       );
     } catch (err) {
       const msg = err?.message || "Không thể gửi yêu cầu. Vui lòng thử lại.";
@@ -111,13 +111,10 @@ export default function ReturnRequestScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      
       {/* Order Info */}
       <View style={styles.orderInfoCard}>
         <Text style={styles.orderInfoTitle}>Đơn hàng #{orderId}</Text>
-        <Text style={styles.orderInfoSub}>
-          {(orderItems || []).length} sản phẩm trong đơn
-        </Text>
+        <Text style={styles.orderInfoSub}>{(orderItems || []).length} sản phẩm trong đơn</Text>
       </View>
 
       {/* Sản phẩm trong đơn */}
@@ -125,13 +122,19 @@ export default function ReturnRequestScreen({ route, navigation }) {
         <View style={styles.itemsSection}>
           <Text style={styles.sectionLabel}>SẢN PHẨM TRONG ĐƠN</Text>
           {orderItems.map((it, idx) => {
-            const img = it.productImage || it.product?.imageUrl || it.product?.image || "https://via.placeholder.com/60";
+            const img =
+              it.productImage ||
+              it.product?.imageUrl ||
+              it.product?.image ||
+              "https://via.placeholder.com/60";
             const name = it.productName || it.product?.name || "Sản phẩm";
             return (
               <View key={idx} style={styles.itemRow}>
                 <Image source={{ uri: img }} style={styles.itemImg} />
                 <View style={styles.itemInfoCol}>
-                  <Text style={styles.itemName} numberOfLines={1}>{name}</Text>
+                  <Text style={styles.itemName} numberOfLines={1}>
+                    {name}
+                  </Text>
                   <Text style={styles.itemQty}>Số lượng: {it.quantity || 1}</Text>
                 </View>
               </View>
@@ -158,9 +161,7 @@ export default function ReturnRequestScreen({ route, navigation }) {
               <Text style={[styles.reasonLabel, isSelected && styles.reasonLabelSelected]}>
                 {reason.label}
               </Text>
-              {reason.requiresPhoto && (
-                <Text style={styles.photoTag}>Cần ảnh</Text>
-              )}
+              {reason.requiresPhoto && <Text style={styles.photoTag}>Cần ảnh</Text>}
             </TouchableOpacity>
           );
         })}
@@ -192,10 +193,7 @@ export default function ReturnRequestScreen({ route, navigation }) {
           {imageUri ? (
             <View style={styles.previewWrap}>
               <Image source={{ uri: imageUri }} style={styles.previewImage} />
-              <TouchableOpacity
-                style={styles.removePhotoBtn}
-                onPress={() => setImageUri(null)}
-              >
+              <TouchableOpacity style={styles.removePhotoBtn} onPress={() => setImageUri(null)}>
                 <Text style={styles.removePhotoText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -237,16 +235,26 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FA", padding: 20 },
 
   orderInfoCard: {
-    backgroundColor: "#fff", borderRadius: 16, padding: 20, marginBottom: 20,
-    shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 8, elevation: 2,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   orderInfoTitle: { fontSize: 18, fontWeight: "900", color: "#111" },
   orderInfoSub: { fontSize: 13, color: "#666", marginTop: 4 },
 
   itemsSection: { marginBottom: 20 },
   itemRow: {
-    flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
-    padding: 12, borderRadius: 12, marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   itemImg: { width: 50, height: 50, borderRadius: 8, backgroundColor: "#eee" },
   itemInfoCol: { flex: 1, marginLeft: 12 },
@@ -254,23 +262,40 @@ const styles = StyleSheet.create({
   itemQty: { fontSize: 12, color: "#888", marginTop: 2 },
 
   sectionLabel: {
-    fontSize: 12, fontWeight: "700", color: "#999", letterSpacing: 0.5,
-    marginBottom: 10, marginLeft: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#999",
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    marginLeft: 4,
   },
 
   reasonsGroup: {
-    backgroundColor: "#fff", borderRadius: 16, overflow: "hidden",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden",
     marginBottom: 20,
-    shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 8, elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   reasonRow: {
-    flexDirection: "row", alignItems: "center", padding: 16,
-    borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
   reasonRowSelected: { backgroundColor: "#F0F4FF" },
   radioOuter: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 2,
-    borderColor: "#ccc", justifyContent: "center", alignItems: "center",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 14,
   },
   radioOuterSelected: { borderColor: "#0055ff" },
@@ -278,38 +303,66 @@ const styles = StyleSheet.create({
   reasonLabel: { flex: 1, fontSize: 15, color: "#333" },
   reasonLabelSelected: { fontWeight: "700", color: "#111" },
   photoTag: {
-    fontSize: 11, color: "#0055ff", fontWeight: "700",
-    backgroundColor: "#EFF2FE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+    fontSize: 11,
+    color: "#0055ff",
+    fontWeight: "700",
+    backgroundColor: "#EFF2FE",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
 
   customReasonWrap: { marginBottom: 20 },
   customInput: {
-    backgroundColor: "#fff", borderRadius: 14, padding: 16, fontSize: 15,
-    color: "#111", minHeight: 100, borderWidth: 1, borderColor: "#E8E8E8",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 15,
+    color: "#111",
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
   },
 
   photoSection: { marginBottom: 24 },
   photoActions: { flexDirection: "row", gap: 12 },
   photoBtn: {
-    flex: 1, backgroundColor: "#fff", borderRadius: 14, padding: 20,
-    alignItems: "center", borderWidth: 1.5, borderColor: "#E8E8E8", borderStyle: "dashed",
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#E8E8E8",
+    borderStyle: "dashed",
   },
   photoBtnIcon: { fontSize: 28, color: "#0055ff", marginBottom: 8 },
   photoBtnText: { fontSize: 13, fontWeight: "600", color: "#666" },
 
   previewWrap: { position: "relative" },
   previewImage: {
-    width: "100%", height: 200, borderRadius: 14, backgroundColor: "#eee",
+    width: "100%",
+    height: 200,
+    borderRadius: 14,
+    backgroundColor: "#eee",
   },
   removePhotoBtn: {
-    position: "absolute", top: 10, right: 10,
-    width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center", alignItems: "center",
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   removePhotoText: { color: "#fff", fontSize: 14, fontWeight: "bold" },
 
   submitBtn: {
-    backgroundColor: "#0055ff", paddingVertical: 18, borderRadius: 14,
+    backgroundColor: "#0055ff",
+    paddingVertical: 18,
+    borderRadius: 14,
     alignItems: "center",
   },
   submitBtnDisabled: { opacity: 0.6 },

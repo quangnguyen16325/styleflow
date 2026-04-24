@@ -19,18 +19,19 @@ import api, { formatPrice } from "../services/api";
 
 const { width } = Dimensions.get("window");
 
-
-
 export default function CartScreen({ navigation }) {
   const { items, updateQuantity, removeFromCart, addToCart } = useCart();
-  
+
   const [defaultAddress, setDefaultAddress] = useState(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [apiAddresses, setApiAddresses] = useState([]);
   const { items: wishlistItems, removeFromWishlist } = useWishlist();
-  
+
   // Tổng thanh toán cục bộ
-  const subtotal = items.reduce((sum, item) => sum + ((item.basePrice || item.price || 0) * item.quantity), 0);
+  const subtotal = items.reduce(
+    (sum, item) => sum + (item.basePrice || item.price || 0) * item.quantity,
+    0,
+  );
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   useFocusEffect(
@@ -45,7 +46,9 @@ export default function CartScreen({ navigation }) {
             const mapped = list.map((a) => ({
               id: a.id,
               label: a.label || "Khác",
-              fullAddress: [a.addressLine, a.ward, a.district, a.city, a.country].filter(Boolean).join(", "),
+              fullAddress: [a.addressLine, a.ward, a.district, a.city, a.country]
+                .filter(Boolean)
+                .join(", "),
               phone: a.receiverPhone || "",
               isDefault: a.isDefault || false,
             }));
@@ -59,7 +62,7 @@ export default function CartScreen({ navigation }) {
       };
 
       loadData();
-    }, [])
+    }, []),
   );
 
   const handleCheckout = () => {
@@ -85,9 +88,7 @@ export default function CartScreen({ navigation }) {
   const displayWishlistItems = wishlistItems.slice(0, 4);
 
   // Address Display String
-  const addressString = defaultAddress
-    ? defaultAddress.fullAddress
-    : "No address selected";
+  const addressString = defaultAddress ? defaultAddress.fullAddress : "No address selected";
 
   // --- RENDERS ---
 
@@ -100,7 +101,10 @@ export default function CartScreen({ navigation }) {
       <View style={styles.cartItem}>
         <View style={styles.imageWrap}>
           <Image source={{ uri: imageUri }} style={styles.itemImage} />
-          <TouchableOpacity style={styles.trashCircle} onPress={() => removeFromCart(item.productId || item.id)}>
+          <TouchableOpacity
+            style={styles.trashCircle}
+            onPress={() => removeFromCart(item.productId || item.id)}
+          >
             {/* Outline red circle inner */}
             <View style={styles.trashOutline}>
               <Text style={styles.trashIcon}>🗑</Text>
@@ -113,10 +117,10 @@ export default function CartScreen({ navigation }) {
             {item.name || "Lorem ipsum dolor sit amet consectetur."}
           </Text>
           <Text style={styles.itemVariant}>Pink, Size M</Text>
-          
+
           <View style={styles.itemBotRow}>
             <Text style={styles.itemPrice}>{formatPrice(priceRaw)}</Text>
-            
+
             <View style={styles.qtyBox}>
               <TouchableOpacity
                 style={styles.qtyBtnBorder}
@@ -127,7 +131,7 @@ export default function CartScreen({ navigation }) {
               >
                 <Text style={styles.qtyBtnIconText}>-</Text>
               </TouchableOpacity>
-              
+
               <View style={styles.qtyValueWrap}>
                 <Text style={styles.qtyValueText}>{qty}</Text>
               </View>
@@ -168,20 +172,22 @@ export default function CartScreen({ navigation }) {
 
           <View style={styles.wishlistBotRow}>
             <View style={{ flexDirection: "row", gap: 10 }}>
-               <View style={styles.variantChip}><Text style={styles.variantText}>Pink</Text></View>
-               <View style={styles.variantChip}><Text style={styles.variantText}>M</Text></View>
+              <View style={styles.variantChip}>
+                <Text style={styles.variantText}>Pink</Text>
+              </View>
+              <View style={styles.variantChip}>
+                <Text style={styles.variantText}>M</Text>
+              </View>
             </View>
             <TouchableOpacity onPress={() => handleAddToCart(product)}>
-               {/* Add to cart icon blue outline style */}
-               <Text style={styles.addCartIcon}>🛍+</Text>
+              {/* Add to cart icon blue outline style */}
+              <Text style={styles.addCartIcon}>🛍+</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
     );
   };
-
-
 
   // Khối rỗng - Cart 0
   const renderEmptyContent = () => (
@@ -204,10 +210,8 @@ export default function CartScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      
       {/* Scrollable Body */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.mainScroll}>
-        
         {/* Header: Cart 2 */}
         <View style={styles.headerRow}>
           <Text style={styles.mainHeading}>Cart</Text>
@@ -224,8 +228,8 @@ export default function CartScreen({ navigation }) {
               {addressString}
             </Text>
           </View>
-          <TouchableOpacity 
-            style={styles.addrEditCircle} 
+          <TouchableOpacity
+            style={styles.addrEditCircle}
             onPress={() => setAddressModalVisible(true)}
           >
             <Text style={styles.addrEditPencil}>✎</Text>
@@ -249,8 +253,9 @@ export default function CartScreen({ navigation }) {
               </View>
             )}
           </>
-        ) : renderEmptyContent()}
-
+        ) : (
+          renderEmptyContent()
+        )}
       </ScrollView>
 
       {/* Sticky Total Footer */}
@@ -259,7 +264,7 @@ export default function CartScreen({ navigation }) {
           <Text style={styles.totalLbl}>Total</Text>
           <Text style={styles.totalVal}>{formatPrice(subtotal)}</Text>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.checkoutBtn, items.length === 0 && styles.checkoutDisabled]}
           onPress={handleCheckout}
           activeOpacity={items.length === 0 ? 1 : 0.8}
@@ -270,19 +275,29 @@ export default function CartScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-
       {/* ── Address Picker Modal ─────────────────────────────────────────── */}
-      <Modal visible={addressModalVisible} animationType="slide" transparent onRequestClose={() => setAddressModalVisible(false)}>
+      <Modal
+        visible={addressModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAddressModalVisible(false)}
+      >
         <View style={styles.modalBg}>
           <View style={styles.modalContent}>
             <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 15 }}>Chọn địa chỉ</Text>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: Dimensions.get("window").height * 0.5 }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: Dimensions.get("window").height * 0.5 }}
+            >
               {apiAddresses.map((addr) => (
                 <TouchableOpacity
                   key={addr.id}
                   style={[
                     styles.addressCard,
-                    { borderWidth: 2, borderColor: defaultAddress?.id === addr.id ? "#0055ff" : "transparent" },
+                    {
+                      borderWidth: 2,
+                      borderColor: defaultAddress?.id === addr.id ? "#0055ff" : "transparent",
+                    },
                   ]}
                   onPress={() => {
                     setDefaultAddress(addr);
@@ -290,7 +305,9 @@ export default function CartScreen({ navigation }) {
                   }}
                 >
                   <View style={styles.addrLeftDiv}>
-                    <Text style={[styles.addrTitle, { textTransform: 'capitalize' }]}>{addr.label}</Text>
+                    <Text style={[styles.addrTitle, { textTransform: "capitalize" }]}>
+                      {addr.label}
+                    </Text>
                     <Text style={styles.addrText} numberOfLines={2}>
                       {addr.fullAddress}
                     </Text>
@@ -302,13 +319,15 @@ export default function CartScreen({ navigation }) {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setAddressModalVisible(false)}>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setAddressModalVisible(false)}
+            >
               <Text style={{ color: "#fff", fontWeight: "bold" }}>Đóng</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -316,122 +335,229 @@ export default function CartScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
   mainScroll: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 },
-  
+
   headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
   mainHeading: { fontSize: 28, fontWeight: "900", color: "#111" },
-  cartCountBadge: { 
-    marginLeft: 12, backgroundColor: "#EFF2FE", 
-    width: 32, height: 32, borderRadius: 16, 
-    justifyContent: "center", alignItems: "center" 
+  cartCountBadge: {
+    marginLeft: 12,
+    backgroundColor: "#EFF2FE",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
   cartCountText: { fontSize: 16, fontWeight: "800", color: "#111" },
 
   addressCard: {
-    flexDirection: "row", alignItems: "center", 
-    backgroundColor: "#F8F9FA", padding: 18, 
-    borderRadius: 12, marginBottom: 25
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
+    padding: 18,
+    borderRadius: 12,
+    marginBottom: 25,
   },
   addrLeftDiv: { flex: 1, marginRight: 15 },
   addrTitle: { fontSize: 16, fontWeight: "700", color: "#111", marginBottom: 6 },
   addrText: { fontSize: 13, color: "#666", lineHeight: 18 },
-  addrEditCircle: { 
-    width: 40, height: 40, borderRadius: 20, 
-    backgroundColor: "#0055ff", justifyContent: "center", alignItems: "center"
+  addrEditCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#0055ff",
+    justifyContent: "center",
+    alignItems: "center",
   },
   addrEditPencil: { color: "#fff", fontSize: 18 },
 
   // ITEM CART LIST
   cartItem: {
-    flexDirection: "row", marginBottom: 24, alignItems: "stretch"
+    flexDirection: "row",
+    marginBottom: 24,
+    alignItems: "stretch",
   },
   imageWrap: { position: "relative", width: 110, height: 110 },
   itemImage: { width: 110, height: 110, borderRadius: 12, backgroundColor: "#eee" },
-  trashCircle: { 
-    position: "absolute", bottom: -5, left: -5,
-    width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff",
-    justifyContent: "center", alignItems: "center",
-    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 5, elevation: 4
+  trashCircle: {
+    position: "absolute",
+    bottom: -5,
+    left: -5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 4,
   },
   trashOutline: {
-    width: 30, height: 30, borderRadius: 15,
-    borderWidth: 1, borderColor: "#ff4d4f",
-    justifyContent: "center", alignItems: "center"
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#ff4d4f",
+    justifyContent: "center",
+    alignItems: "center",
   },
   trashIcon: { color: "#ff4d4f", fontSize: 14 },
 
   itemInfo: { flex: 1, marginLeft: 20, justifyContent: "space-between" },
   itemName: { fontSize: 15, fontWeight: "500", color: "#222" },
   itemVariant: { fontSize: 13, color: "#444", marginTop: 4 },
-  itemBotRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
+  itemBotRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
   itemPrice: { fontSize: 18, fontWeight: "900", color: "#111" },
-  
+
   qtyBox: { flexDirection: "row", alignItems: "center" },
-  qtyBtnBorder: { 
-    width: 32, height: 32, borderRadius: 16, 
-    borderWidth: 1.5, borderColor: "#0055ff",
-    justifyContent: "center", alignItems: "center"
+  qtyBtnBorder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#0055ff",
+    justifyContent: "center",
+    alignItems: "center",
   },
   qtyBtnIconText: { fontSize: 20, color: "#0055ff", fontWeight: "600", marginTop: -2 },
-  qtyValueWrap: { 
-    width: 36, height: 32, backgroundColor: "#EFF2FE", 
-    marginHorizontal: 8, borderRadius: 8, 
-    justifyContent: "center", alignItems: "center" 
+  qtyValueWrap: {
+    width: 36,
+    height: 32,
+    backgroundColor: "#EFF2FE",
+    marginHorizontal: 8,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   qtyValueText: { fontSize: 16, fontWeight: "700", color: "#111" },
 
   // WISHLIST
   sectionWrap: { marginTop: 10, paddingBottom: 20 },
   sectionTitle: { fontSize: 24, fontWeight: "800", color: "#111", marginBottom: 20 },
-  wishlistBotRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10 },
-  variantChip: { backgroundColor: "#EFF2FE", paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 },
+  wishlistBotRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginTop: 10,
+  },
+  variantChip: {
+    backgroundColor: "#EFF2FE",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
   variantText: { color: "#333", fontWeight: "500", fontSize: 14 },
   addCartIcon: { fontSize: 28, color: "#0055ff" },
 
   // EMPTY STATE //
   emptyCircleBag: { alignItems: "center", marginVertical: 30 },
-  emptyCircleBlue: { 
-    width: 140, height: 140, borderRadius: 70, 
-    backgroundColor: "#fff", 
-    shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 20, elevation: 8,
-    justifyContent: "center", alignItems: "center", position: "relative"
+  emptyCircleBlue: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
   emptyBagWhiteIco: { fontSize: 60, color: "#0055ff" },
-  emptyBagS: { 
-    position: "absolute", top: 70, fontSize: 32, fontWeight: "900", color: "#fff"
+  emptyBagS: {
+    position: "absolute",
+    top: 70,
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#fff",
   },
 
   // POPULAR ITEMS
-  popularHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  popularHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   seeAllBtn: { flexDirection: "row", alignItems: "center" },
   seeAllText: { fontSize: 16, fontWeight: "800", color: "#111", marginRight: 8 },
-  seeAllCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#0055ff", justifyContent: "center", alignItems: "center" },
+  seeAllCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#0055ff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   seeAllArrow: { color: "#fff", fontWeight: "bold", fontSize: 16 },
   popScrollList: { paddingRight: 20, gap: 15 },
   popularCard: { width: width * 0.4, paddingRight: 10 },
   popCardImg: { width: "100%", height: 160, borderRadius: 12, backgroundColor: "#eee" },
-  popCardBot: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
+  popCardBot: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
   popHeartText: { fontSize: 16, fontWeight: "900", color: "#111" },
   popBadge: { fontSize: 14, color: "#666" },
 
   // FOOTER
-  footerWrap: { 
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    backgroundColor: "#fff", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 35,
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    borderTopWidth: 1, borderTopColor: "#eee"
+  footerWrap: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 35,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
   },
   footerPriceCol: { flexDirection: "row", alignItems: "center" },
   totalLbl: { fontSize: 20, fontWeight: "900", color: "#111", marginRight: 10 },
   totalVal: { fontSize: 20, fontWeight: "900", color: "#111" },
-  checkoutBtn: { 
-    backgroundColor: "#0055ff", paddingVertical: 16, paddingHorizontal: 40, borderRadius: 12
+  checkoutBtn: {
+    backgroundColor: "#0055ff",
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    borderRadius: 12,
   },
   checkoutBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  checkoutDisabled: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd", paddingHorizontal: 39, paddingVertical: 15 },
+  checkoutDisabled: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    paddingHorizontal: 39,
+    paddingVertical: 15,
+  },
   checkoutTxtDis: { color: "#666" },
 
   // Modal styles
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalContent: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
-  modalCloseBtn: { backgroundColor: "#0055ff", padding: 15, borderRadius: 12, alignItems: "center", marginTop: 15 },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modalCloseBtn: {
+    backgroundColor: "#0055ff",
+    padding: 15,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 15,
+  },
 });

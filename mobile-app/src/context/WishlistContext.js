@@ -32,10 +32,7 @@ export function WishlistProvider({ children }) {
     setItems((prev) => prev.filter((i) => i.id !== productId));
   }, []);
 
-  const isInWishlist = useCallback(
-    (productId) => items.some((i) => i.id === productId),
-    [items],
-  );
+  const isInWishlist = useCallback((productId) => items.some((i) => i.id === productId), [items]);
 
   const toggleWishlist = useCallback(
     (product) => {

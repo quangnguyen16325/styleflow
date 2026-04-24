@@ -32,18 +32,56 @@ import { COLORS } from "../constants/colors";
 // ── Danh sách phương thức thanh toán ─────────────────────────────────────────
 
 const PAYMENT_METHODS = [
-  { key: "CARD", label: "Card", sublabel: "Thẻ Tín dụng / Ghi nợ", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png" },
-  { key: "COD", label: "COD", sublabel: "Thanh toán khi nhận hàng", image: "https://cdn-icons-png.flaticon.com/512/1554/1554401.png" },
-  { key: "MOMO", label: "MoMo", sublabel: "Ví điện tử MoMo", image: "https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" },
-  { key: "BANK_TRANSFER", label: "Bank Transfer", sublabel: "Chuyển khoản ngân hàng", image: "https://cdn-icons-png.flaticon.com/512/2830/2830284.png" },
-  { key: "PAYPAL", label: "PayPal", sublabel: "Thanh toán qua PayPal", image: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Paypal_2014_logo.png" },
+  {
+    key: "CARD",
+    label: "Card",
+    sublabel: "Thẻ Tín dụng / Ghi nợ",
+    image:
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png",
+  },
+  {
+    key: "COD",
+    label: "COD",
+    sublabel: "Thanh toán khi nhận hàng",
+    image: "https://cdn-icons-png.flaticon.com/512/1554/1554401.png",
+  },
+  {
+    key: "MOMO",
+    label: "MoMo",
+    sublabel: "Ví điện tử MoMo",
+    image: "https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png",
+  },
+  {
+    key: "BANK_TRANSFER",
+    label: "Bank Transfer",
+    sublabel: "Chuyển khoản ngân hàng",
+    image: "https://cdn-icons-png.flaticon.com/512/2830/2830284.png",
+  },
+  {
+    key: "PAYPAL",
+    label: "PayPal",
+    sublabel: "Thanh toán qua PayPal",
+    image: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Paypal_2014_logo.png",
+  },
 ];
 
 // ── Shipping options ──────────────────────────────────────────────────────────
 
 const SHIPPING_OPTIONS = [
-  { key: "standard", label: "Giao hàng tiêu chuẩn", duration: "5–7 ngày", priceLabel: "Miễn phí", price: 0 },
-  { key: "express", label: "Giao hàng hỏa tốc", duration: "1–2 ngày", priceLabel: formatPrice(25000), price: 25000 },
+  {
+    key: "standard",
+    label: "Giao hàng tiêu chuẩn",
+    duration: "5–7 ngày",
+    priceLabel: "Miễn phí",
+    price: 0,
+  },
+  {
+    key: "express",
+    label: "Giao hàng hỏa tốc",
+    duration: "1–2 ngày",
+    priceLabel: formatPrice(25000),
+    price: 25000,
+  },
 ];
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -144,8 +182,8 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose 
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Chọn địa chỉ giao hàng</Text>
-          <ScrollView 
-            style={{ maxHeight: "75%" }} 
+          <ScrollView
+            style={{ maxHeight: "75%" }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
           >
@@ -211,7 +249,9 @@ export default function CheckoutScreen({ navigation }) {
         const mapped = list.map((a) => ({
           id: a.id,
           label: a.label || "Khác",
-          fullAddress: [a.addressLine, a.ward, a.district, a.city, a.country].filter(Boolean).join(", "),
+          fullAddress: [a.addressLine, a.ward, a.district, a.city, a.country]
+            .filter(Boolean)
+            .join(", "),
           phone: a.receiverPhone || "",
           email: "",
           isDefault: a.isDefault || false,
@@ -226,7 +266,14 @@ export default function CheckoutScreen({ navigation }) {
     loadAddresses();
   }, []);
 
-  const selectedAddress = apiAddresses.find((a) => a.id === shippingAddressId) || apiAddresses[0] || { id: null, label: "", fullAddress: "Chưa có địa chỉ", phone: "", email: "" };
+  const selectedAddress = apiAddresses.find((a) => a.id === shippingAddressId) ||
+    apiAddresses[0] || {
+      id: null,
+      label: "",
+      fullAddress: "Chưa có địa chỉ",
+      phone: "",
+      email: "",
+    };
   const shippingOption = SHIPPING_OPTIONS.find((s) => s.key === selectedShipping);
   const shippingCost = shippingOption?.price ?? 0;
   const grandTotal = subtotal + shippingCost;

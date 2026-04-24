@@ -177,10 +177,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
         </Text>
         <Text style={styles.apiProductPrice}>{formatPrice(item.basePrice)}</Text>
       </View>
-      <TouchableOpacity
-        style={styles.wishlistBtn}
-        onPress={() => toggleWishlist(item)}
-      >
+      <TouchableOpacity style={styles.wishlistBtn} onPress={() => toggleWishlist(item)}>
         <Text style={[styles.wishlistIcon, isInWishlist(item.id) && styles.wishlistActive]}>
           {isInWishlist(item.id) ? "♥" : "♡"}
         </Text>
@@ -208,10 +205,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
         </Text>
         <Text style={styles.gridPrice}>{formatPrice(item.basePrice)}</Text>
       </View>
-      <TouchableOpacity
-        style={styles.wishlistBtnGrid}
-        onPress={() => toggleWishlist(item)}
-      >
+      <TouchableOpacity style={styles.wishlistBtnGrid} onPress={() => toggleWishlist(item)}>
         <Text style={[styles.wishlistIcon, isInWishlist(item.id) && styles.wishlistActive]}>
           {isInWishlist(item.id) ? "♥" : "♡"}
         </Text>
@@ -582,16 +576,26 @@ const styles = StyleSheet.create({
 
   // Wishlist button on cards
   wishlistBtn: {
-    position: "absolute", top: 8, right: 8,
-    width: 28, height: 28, borderRadius: 14,
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.9)",
-    justifyContent: "center", alignItems: "center",
+    justifyContent: "center",
+    alignItems: "center",
   },
   wishlistBtnGrid: {
-    position: "absolute", top: 8, right: 8,
-    width: 30, height: 30, borderRadius: 15,
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: "rgba(255,255,255,0.9)",
-    justifyContent: "center", alignItems: "center",
+    justifyContent: "center",
+    alignItems: "center",
   },
   wishlistIcon: { fontSize: 16, color: "#999" },
   wishlistActive: { color: "#e53e3e" },

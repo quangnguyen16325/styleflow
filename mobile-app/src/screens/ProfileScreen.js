@@ -40,7 +40,7 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-    }, [fetchData])
+    }, [fetchData]),
   );
 
   if (loading && !profile) {
@@ -56,12 +56,11 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        
         {/* Header & Settings Icon */}
         <View style={styles.topBar}>
           <Text style={styles.screenTitle}>Tài khoản</Text>
-          <TouchableOpacity 
-            style={styles.settingsBtn} 
+          <TouchableOpacity
+            style={styles.settingsBtn}
             onPress={onSettingsPress || (() => navigation.navigate("Settings"))}
           >
             <Text style={styles.settingsIcon}>⚙</Text>
@@ -123,22 +122,10 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
         {/* Quick Menu — Tài khoản */}
         <Text style={styles.sectionLabel}>TÀI KHOẢN</Text>
         <View style={styles.menuGroup}>
-          <MenuItem
-            icon="○"
-            label="Thông tin cá nhân"
-            sub={profile?.email || ""}
-          />
-          <MenuItem
-            icon="□"
-            label="Bảo mật & Mật khẩu"
-          />
-          <MenuItem
-            icon="◑"
-            label="Thông báo"
-            isLast
-          />
+          <MenuItem icon="○" label="Thông tin cá nhân" sub={profile?.email || ""} />
+          <MenuItem icon="□" label="Bảo mật & Mật khẩu" />
+          <MenuItem icon="◑" label="Thông báo" isLast />
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -171,27 +158,49 @@ const styles = StyleSheet.create({
   scroll: { padding: 20, paddingBottom: 60 },
 
   topBar: {
-    flexDirection: "row", justifyContent: "space-between",
-    alignItems: "center", marginBottom: 20, marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+    marginTop: 10,
   },
   screenTitle: { fontSize: 28, fontWeight: "900", color: "#111" },
   settingsBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: "#fff",
-    justifyContent: "center", alignItems: "center",
-    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 }, elevation: 3,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   settingsIcon: { fontSize: 22, color: "#111" },
 
   profileCard: {
-    flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
-    borderRadius: 24, padding: 24, marginBottom: 24,
-    shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 }, elevation: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   avatarWrap: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: "#0055ff",
-    justifyContent: "center", alignItems: "center", marginRight: 16,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#0055ff",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
   avatarText: { fontSize: 28, fontWeight: "800", color: "#fff" },
   profileInfo: { flex: 1 },
@@ -200,10 +209,16 @@ const styles = StyleSheet.create({
   phone: { fontSize: 13, color: "#888", marginTop: 2 },
 
   statsContainer: {
-    flexDirection: "row", backgroundColor: "#fff", borderRadius: 20,
-    paddingVertical: 20, marginBottom: 24,
-    shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 }, elevation: 2,
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingVertical: 20,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   statBox: { flex: 1, alignItems: "center" },
   statValue: { fontSize: 22, fontWeight: "800", color: "#0055ff", marginBottom: 6 },
@@ -211,24 +226,41 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: "100%", backgroundColor: "#EEE" },
 
   sectionLabel: {
-    fontSize: 12, fontWeight: "700", color: "#999", letterSpacing: 0.5,
-    marginBottom: 8, marginLeft: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#999",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginLeft: 4,
   },
 
   menuGroup: {
-    backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 20,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    paddingHorizontal: 20,
     marginBottom: 24,
-    shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 }, elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   menuRow: {
-    flexDirection: "row", alignItems: "center", paddingVertical: 18,
-    borderBottomWidth: 1, borderBottomColor: "#F0F0F0",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
   menuRowLast: { borderBottomWidth: 0 },
   menuIconWrap: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: "#EFF2FE",
-    justifyContent: "center", alignItems: "center", marginRight: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EFF2FE",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
   },
   menuIconText: { fontSize: 16, color: "#0055ff" },
   menuTextCol: { flex: 1 },
