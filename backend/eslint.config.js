@@ -3,7 +3,7 @@ import globals from "globals";
 import eslintConfigPrettier from "eslint-config-prettier";
 
 export default [
-  { ignores: ["node_modules/**", "test-orders.js"] },
+  { ignores: ["node_modules/**"] },
   js.configs.recommended,
   {
     files: ["src/**/*.js"],
