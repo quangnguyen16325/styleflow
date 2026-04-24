@@ -1,0 +1,176 @@
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import ApiService from '../../api';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import ErrorMessage from '../../components/ui/ErrorMessage';
+import EmptyState from '../../components/ui/EmptyState';
+import StatusBadge from '../../components/ui/StatusBadge';
+
+const ORDER_STATUSES = [
+  { value: 'ALL', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'awaiting_payment', label: 'Awaiting Payment' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipping', label: 'Shipping' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'failed', label: 'Failed' },
+];
+
+export default function OrderList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const allowedStatuses = ORDER_STATUSES.map((status) => status.value);
+  const statusFromQuery = normalizeFilterValue(searchParams.get('status'), allowedStatuses);
+  const statusFilter = statusFromQuery;
+
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    let isActive = true;
+
+    ApiService.getOrders(statusFilter)
+      .then((data) => {
+        if (!isActive) return;
+        setOrders(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!isActive) return;
+        setError(err);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [statusFilter]);
+
+  const handleStatusChange = useCallback((nextStatus) => {
+    setLoading(true);
+    setError(null);
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextStatus === 'ALL') {
+      nextParams.delete('status');
+    } else {
+      nextParams.set('status', nextStatus);
+    }
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+  }, []);
+
+  const totalAmount = useMemo(() => {
+    return orders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+  }, [orders]);
+
+  // Client-side search within server-filtered results
+  const filteredOrders = orders.filter((order) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      order.id.toString().includes(term) ||
+      (order.customer?.fullName || '').toLowerCase().includes(term) ||
+      (order.customer?.phone || '').includes(term)
+    );
+  });
+
+  if (loading) return <LoadingSpinner message="Loading orders..." />;
+  if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
+
+  return (
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <h2>Orders</h2>
+        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+          {filteredOrders.length} orders · Total: ${totalAmount.toFixed(2)}
+        </span>
+      </div>
+
+      {/* Filter Toolbar */}
+      <div style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="Search by ID, name, phone..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="form-input"
+          style={{ width: '260px' }}
+          aria-label="Search orders by ID, name, or phone"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => handleStatusChange(e.target.value)}
+          className="form-select"
+          style={{ width: '200px' }}
+          aria-label="Filter orders by status"
+        >
+          {ORDER_STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {!orders || orders.length === 0 ? (
+        <EmptyState title="No Orders Yet" description="There are no orders in the system." />
+      ) : filteredOrders.length === 0 ? (
+        <EmptyState title="No matches found" description="No orders match your search or filter criteria." />
+      ) : (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Status</th>
+                <th>Total Amount</th>
+                <th>Shipping Fee</th>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredOrders.map(order => (
+                <tr key={order.id}>
+                  <td style={{ fontWeight: 'var(--font-weight-bold)' }}>#{order.id}</td>
+                  <td><StatusBadge value={order.status} /></td>
+                  <td>{(order.totalAmount || 0).toLocaleString()} đ</td>
+                  <td>{(order.shippingFee || 0).toLocaleString()} đ</td>
+                  <td>{order.customer?.fullName || '—'}</td>
+                  <td>{order.customer?.phone || '—'}</td>
+                  <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+                    {new Date(order.createdAt).toLocaleString()}
+                  </td>
+                  <td>
+                    <Link to={`/orders/${order.id}`} className="link">
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normalizeFilterValue(value, allowedValues) {
+  if (!value) {
+    return 'ALL';
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return allowedValues.includes(normalized) ? normalized : 'ALL';
+}
