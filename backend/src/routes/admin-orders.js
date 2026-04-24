@@ -459,6 +459,8 @@ const listOrdersBaseQuery = `
     o.city,
     o.shipping_country,
     o.shipping_postal_code,
+    o.address_change_status,
+    o.address_change_payload,
     o.created_at,
     o.updated_at,
     c.id AS customer_id,
@@ -511,6 +513,8 @@ function mapOrderRow(row) {
     customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
     shippingAddress: row.shipping_address,
     city: row.city,
+    addressChangeStatus: row.address_change_status,
+    addressChangePayload: mapAddressChangePayload(row.address_change_payload),
     shipping: mapShippingRow(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -521,6 +525,27 @@ function mapOrderRow(row) {
       email: row.email,
     },
     items: row.items.map(mapOrderItemRow),
+  };
+}
+
+function mapAddressChangePayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  return {
+    receiverName: payload.receiverName ?? null,
+    receiverPhone: payload.receiverPhone ?? null,
+    addressLine: payload.addressLine ?? null,
+    ward: payload.ward ?? null,
+    district: payload.district ?? null,
+    city: payload.city ?? null,
+    fullAddress: payload.fullAddress ?? null,
+    calculatedShippingFee:
+      payload.calculatedShippingFee == null ? null : Number(payload.calculatedShippingFee),
+    processingFee: payload.processingFee == null ? null : Number(payload.processingFee),
+    currentShippingFee:
+      payload.currentShippingFee == null ? null : Number(payload.currentShippingFee),
   };
 }
 

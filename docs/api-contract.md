@@ -244,6 +244,19 @@ Notes:
   "customerAddressId": 1,
   "shippingAddress": "123 Nguyen Trai, HCMC",
   "city": "Ho Chi Minh City",
+  "addressChangeStatus": "requested",
+  "addressChangePayload": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "88 Nguyen Van Linh",
+    "ward": "Hai Chau 1",
+    "district": "Hai Chau",
+    "city": "Da Nang",
+    "fullAddress": "88 Nguyen Van Linh, Hai Chau 1, Hai Chau, Da Nang, Vietnam",
+    "calculatedShippingFee": 40000,
+    "processingFee": 10000,
+    "currentShippingFee": 40000
+  },
   "shipping": {
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
@@ -276,6 +289,10 @@ Notes:
   "updatedAt": "2026-04-02T10:15:00.000Z"
 }
 ```
+
+Notes:
+- `addressChangeStatus` and `addressChangePayload` are currently returned by admin order endpoints
+- `addressChangePayload` is `null` unless an address change request is pending or preserved on the order
 
 ## Endpoints
 
