@@ -1,0 +1,462 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import ApiService from '../../api';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import ErrorMessage from '../../components/ui/ErrorMessage';
+
+function validateSKU(sku) {
+  if (!sku || sku.trim() === '') return 'SKU is required';
+  if (!/^[A-Z0-9-]+$/.test(sku)) return 'SKU must contain only uppercase letters, numbers, and hyphens';
+  return null;
+}
+
+function validateName(name) {
+  if (!name || name.trim() === '') return 'Name is required';
+  return null;
+}
+
+function validateBasePrice(price) {
+  if (price === '' || price === null || price === undefined) return 'Base price is required';
+  const num = Number(price);
+  if (isNaN(num) || num < 0) return 'Base price must be a non-negative number';
+  if (!/^\d+(\.\d{0,2})?$/.test(String(price))) return 'Base price can have maximum 2 decimal places';
+  return null;
+}
+
+function validateStockQty(qty) {
+  if (qty === '' || qty === null || qty === undefined) return 'Stock quantity is required';
+  const num = Number(qty);
+  if (isNaN(num) || num < 0 || !Number.isInteger(num)) return 'Stock quantity must be a non-negative integer';
+  return null;
+}
+
+function validateMinStockLevel(level) {
+  if (level === '' || level === null || level === undefined) return 'Min stock level is required';
+  const num = Number(level);
+  if (isNaN(num) || num < 0 || !Number.isInteger(num)) return 'Min stock level must be a non-negative integer';
+  return null;
+}
+
+function validateCategoryId(categoryId) {
+  if (!categoryId || categoryId === '') return 'Category is required';
+  return null;
+}
+
+export default function ProductForm() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isEditMode = Boolean(id);
+
+  const [loading, setLoading] = useState(isEditMode);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  const [formData, setFormData] = useState({
+    sku: '',
+    name: '',
+    basePrice: '',
+    categoryId: '',
+    stockQty: '',
+    minStockLevel: '',
+  });
+
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  // Load categories
+  useEffect(() => {
+    let isActive = true;
+
+    ApiService.getCategories()
+      .then((data) => {
+        if (isActive) {
+          setCategories(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch((err) => {
+        if (isActive) {
+          console.error('Failed to load categories:', err);
+          setCategories([]);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setLoadingCategories(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isEditMode) {
+      let isActive = true;
+
+      ApiService.getProduct(id)
+        .then((data) => {
+          if (isActive) {
+            setFormData({
+              sku: data.sku || '',
+              name: data.name || '',
+              basePrice: data.basePrice || '',
+              categoryId: data.categoryId || '',
+              stockQty: data.stockQty || '',
+              minStockLevel: data.minStockLevel || '',
+            });
+            setError(null);
+          }
+        })
+        .catch((err) => {
+          if (isActive) {
+            if (err.code === 'NOT_FOUND') {
+              setError({ code: 'NOT_FOUND', message: 'Product not found' });
+              setTimeout(() => navigate('/products'), 2000);
+            } else {
+              setError(err);
+            }
+          }
+        })
+        .finally(() => {
+          if (isActive) {
+            setLoading(false);
+          }
+        });
+
+      return () => {
+        isActive = false;
+      };
+    }
+  }, [id, isEditMode, navigate]);
+
+  const validateField = (name, value) => {
+    switch (name) {
+      case 'sku':
+        return validateSKU(value);
+      case 'name':
+        return validateName(value);
+      case 'basePrice':
+        return validateBasePrice(value);
+      case 'categoryId':
+        return validateCategoryId(value);
+      case 'stockQty':
+        return validateStockQty(value);
+      case 'minStockLevel':
+        return validateMinStockLevel(value);
+      default:
+        return null;
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (touched[name]) {
+      const fieldError = validateField(name, value);
+      setErrors((prev) => ({ ...prev, [name]: fieldError }));
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    const fieldError = validateField(name, value);
+    setErrors((prev) => ({ ...prev, [name]: fieldError }));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    Object.keys(formData).forEach((key) => {
+      if (isEditMode && key === 'sku') return; // Skip SKU validation in edit mode
+      const error = validateField(key, formData[key]);
+      if (error) newErrors[key] = error;
+    });
+    setErrors(newErrors);
+    setTouched(Object.keys(formData).reduce((acc, key) => ({ ...acc, [key]: true }), {}));
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      const firstErrorField = Object.keys(errors).find((key) => errors[key]);
+      if (firstErrorField) {
+        document.getElementsByName(firstErrorField)[0]?.focus();
+      }
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setSuccessMessage('');
+
+    const payload = {
+      name: formData.name.trim(),
+      basePrice: Number(formData.basePrice),
+      categoryId: Number(formData.categoryId),
+      stockQty: Number(formData.stockQty),
+      minStockLevel: Number(formData.minStockLevel),
+    };
+
+    if (!isEditMode) {
+      payload.sku = formData.sku.trim();
+    }
+
+    try {
+      if (isEditMode) {
+        await ApiService.updateProduct(id, payload);
+        setSuccessMessage('Product updated successfully');
+        setTimeout(() => navigate(`/products/${id}`), 1500);
+      } else {
+        const result = await ApiService.createProduct(payload);
+        setSuccessMessage('Product created successfully');
+        setTimeout(() => navigate(`/products/${result.id}`), 1500);
+      }
+    } catch (err) {
+      console.error('Form submission error:', err);
+      setError(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (isEditMode) {
+      navigate(`/products/${id}`);
+    } else {
+      navigate('/products');
+    }
+  };
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
+  if (loading) return <LoadingSpinner message="Loading product..." />;
+  if (loadingCategories) return <LoadingSpinner message="Loading categories..." />;
+  if (error && error.code === 'NOT_FOUND') return <ErrorMessage error={error} />;
+
+  const hasErrors = Object.values(errors).some((err) => err !== null);
+
+  return (
+    <div className="animate-fadeIn">
+      <div className="page-header">
+        <div className="page-header-content">
+          <h2 className="page-title">{isEditMode ? 'Edit Product' : 'Create Product'}</h2>
+          <p className="page-subtitle">
+            {isEditMode ? 'Update product information' : 'Add a new product to inventory'}
+          </p>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{
+          marginBottom: 'var(--spacing-lg)',
+          padding: 'var(--spacing-md) var(--spacing-lg)',
+          backgroundColor: 'var(--color-danger-bg)',
+          color: 'var(--color-danger)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--font-size-sm)',
+        }}>
+          {error.message || 'An error occurred'}
+        </div>
+      )}
+
+      {successMessage && (
+        <div style={{
+          marginBottom: 'var(--spacing-lg)',
+          padding: 'var(--spacing-md) var(--spacing-lg)',
+          backgroundColor: 'var(--color-success-bg)',
+          color: 'var(--color-success)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 'var(--font-size-sm)',
+        }}>
+          {successMessage}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="card" style={{ padding: 'var(--spacing-xl)' }}>
+        <div style={{ display: 'grid', gap: 'var(--spacing-lg)' }}>
+          {/* SKU */}
+          <div>
+            <label htmlFor="sku" className="form-label">
+              SKU {!isEditMode && <span style={{ color: 'var(--color-danger)' }}>*</span>}
+            </label>
+            <input
+              type="text"
+              id="sku"
+              name="sku"
+              value={formData.sku}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={isEditMode || submitting}
+              className="form-input"
+              style={{ width: '100%' }}
+              placeholder="e.g., TSHIRT-001"
+            />
+            {errors.sku && touched.sku && (
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.sku}</div>
+            )}
+            {isEditMode && (
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>SKU cannot be changed</div>
+            )}
+          </div>
+
+          {/* Name */}
+          <div>
+            <label htmlFor="name" className="form-label">
+              Name <span style={{ color: 'var(--color-danger)' }}>*</span>
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={submitting}
+              className="form-input"
+              style={{ width: '100%' }}
+              placeholder="e.g., Classic T-Shirt"
+            />
+            {errors.name && touched.name && (
+              <div style={{ marginTop: '4px', fontSize: '13px', color: '#c62828' }}>{errors.name}</div>
+            )}
+          </div>
+
+          {/* Category */}
+          <div>
+            <label htmlFor="categoryId" className="form-label">
+              Category <span style={{ color: 'var(--color-danger)' }}>*</span>
+            </label>
+            <select
+              id="categoryId"
+              name="categoryId"
+              value={formData.categoryId}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={submitting || categories.length === 0}
+              className="form-select"
+              style={{ width: '100%' }}
+            >
+              <option value="">Select a category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {errors.categoryId && touched.categoryId && (
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.categoryId}</div>
+            )}
+            {categories.length === 0 && (
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)' }}>
+                No categories available. Please create a category first.
+              </div>
+            )}
+          </div>
+
+          {/* Base Price */}
+          <div>
+            <label htmlFor="basePrice" className="form-label">
+              Base Price (đ) <span style={{ color: 'var(--color-danger)' }}>*</span>
+            </label>
+            <input
+              type="number"
+              id="basePrice"
+              name="basePrice"
+              value={formData.basePrice}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={submitting}
+              className="form-input"
+              style={{ width: '100%' }}
+              placeholder="e.g., 199000"
+              step="0.01"
+              min="0"
+            />
+            {errors.basePrice && touched.basePrice && (
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.basePrice}</div>
+            )}
+          </div>
+
+          {/* Stock Quantity */}
+          <div>
+            <label htmlFor="stockQty" className="form-label">
+              Stock Quantity <span style={{ color: 'var(--color-danger)' }}>*</span>
+            </label>
+            <input
+              type="number"
+              id="stockQty"
+              name="stockQty"
+              value={formData.stockQty}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={submitting}
+              className="form-input"
+              style={{ width: '100%' }}
+              placeholder="e.g., 20"
+              step="1"
+              min="0"
+            />
+            {errors.stockQty && touched.stockQty && (
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.stockQty}</div>
+            )}
+          </div>
+
+          {/* Min Stock Level */}
+          <div>
+            <label htmlFor="minStockLevel" className="form-label">
+              Min Stock Level <span style={{ color: 'var(--color-danger)' }}>*</span>
+            </label>
+            <input
+              type="number"
+              id="minStockLevel"
+              name="minStockLevel"
+              value={formData.minStockLevel}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              disabled={submitting}
+              className="form-input"
+              style={{ width: '100%' }}
+              placeholder="e.g., 5"
+              step="1"
+              min="0"
+            />
+            {errors.minStockLevel && touched.minStockLevel && (
+              <div style={{ marginTop: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)' }}>{errors.minStockLevel}</div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ marginTop: 'var(--spacing-2xl)', display: 'flex', gap: 'var(--spacing-sm)', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={submitting}
+            className="btn-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting || hasErrors}
+            className="btn-primary"
+          >
+            {submitting ? 'Saving...' : isEditMode ? 'Update Product' : 'Create Product'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

@@ -1,13 +1,23 @@
 import React from "react";
-import { SafeAreaView, View, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { NavigationContainer } from "@react-navigation/native";
+import { AuthProvider } from "./src/context/AuthContext";
+import { CartProvider } from "./src/context/CartContext";
+import { WishlistProvider } from "./src/context/WishlistContext";
+import AppNavigator from "./src/navigation/AppNavigator";
 
 export default function App() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <Text style={{ fontSize: 24, fontWeight: "700", marginBottom: 8 }}>Mobile App Base</Text>
-        <Text style={{ textAlign: "center", color: "#6b7280" }}>Clean Expo base.</Text>
-      </View>
+      <AuthProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <NavigationContainer>
+              <AppNavigator />
+            </NavigationContainer>
+          </CartProvider>
+        </WishlistProvider>
+      </AuthProvider>
     </SafeAreaView>
   );
 }
