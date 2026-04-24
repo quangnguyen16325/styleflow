@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS refund_requests (
   id BIGSERIAL PRIMARY KEY,
   order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-  image_url TEXT NOT NULL,
+  image_url TEXT,
   reason TEXT NOT NULL DEFAULT '',
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
     status IN (
@@ -471,6 +471,9 @@ WHERE de.id > older.id
 
 ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS review_note TEXT;
+
+ALTER TABLE refund_requests
+ALTER COLUMN image_url DROP NOT NULL;
 
 ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS reason TEXT;

@@ -42,6 +42,11 @@ export function buildProductImageKey(productId, fileName) {
   return `products/${productId}/main-${Date.now()}.${ext}`;
 }
 
+export function buildRefundEvidenceKey({ customerId, orderId, fileName }) {
+  const ext = normalizeImageExtension(fileName);
+  return `refund-evidence/customer-${customerId}/order-${orderId}-${Date.now()}.${ext}`;
+}
+
 export async function createProductImageUploadUrl({ productId, fileName, contentType }) {
   const config = getR2Config();
   if (!config) {
@@ -49,6 +54,43 @@ export async function createProductImageUploadUrl({ productId, fileName, content
   }
 
   const key = buildProductImageKey(productId, fileName);
+  const client = new S3Client({
+    region: "auto",
+    endpoint: config.endpoint,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+  });
+
+  const command = new PutObjectCommand({
+    Bucket: config.bucketName,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  const uploadUrl = await getSignedUrl(client, command, { expiresIn: 300 });
+
+  return {
+    uploadUrl,
+    objectKey: key,
+    publicUrl: `${config.publicBaseUrl}/${key}`,
+    expiresIn: 300,
+  };
+}
+
+export async function createRefundEvidenceUploadUrl({
+  customerId,
+  orderId,
+  fileName,
+  contentType,
+}) {
+  const config = getR2Config();
+  if (!config) {
+    throw new Error("R2 upload is not configured");
+  }
+
+  const key = buildRefundEvidenceKey({ customerId, orderId, fileName });
   const client = new S3Client({
     region: "auto",
     endpoint: config.endpoint,

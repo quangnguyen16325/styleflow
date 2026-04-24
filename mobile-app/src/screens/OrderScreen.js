@@ -1,44 +1,201 @@
 /* eslint-disable react/prop-types */
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   SafeAreaView,
-  Image,
+  ScrollView,
   ActivityIndicator,
   Modal,
-  ScrollView,
   Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import api, { formatPrice } from "../services/api";
+import api, { formatPrice, ORDER_STATUS_LABEL } from "../services/api";
 
-// Helper: Format Ngày tháng đẹp
-const formatDate = (dateString) => {
+const ADDRESS_CHANGE_WEBHOOK_URL =
+  process.env.EXPO_PUBLIC_N8N_ADDRESS_CHANGE_WEBHOOK_URL ||
+  "https://n8n.ecloria.co.uk/webhook/address-change-request";
+
+const TABS = [
+  { key: "all", label: "Tất cả" },
+  { key: "processing", label: "Đang xử lý" },
+  { key: "shipping", label: "Đang giao" },
+  { key: "done", label: "Hoàn tất" },
+];
+
+function formatDate(dateString) {
   if (!dateString) return "Không rõ ngày";
-  const d = new Date(dateString);
-  const ho = d.getHours().toString().padStart(2, "0");
-  const mi = d.getMinutes().toString().padStart(2, "0");
-  const dd = d.getDate().toString().padStart(2, "0");
-  const mm = (d.getMonth() + 1).toString().padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${ho}:${mi} - ${dd}/${mm}/${yyyy}`;
-};
+  return new Date(dateString).toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function getOrderStatusMeta(status) {
+  const normalized = String(status || "").toLowerCase();
+
+  if (["pending", "confirmed", "processing"].includes(normalized)) {
+    return { label: "Đang xử lý", tone: "#B66A1E", bg: "#F6E6D7" };
+  }
+
+  if (["shipping", "shipped", "ready_to_ship"].includes(normalized)) {
+    return { label: "Đang giao", tone: "#005A9C", bg: "#E5EDF8" };
+  }
+
+  if (["completed", "delivered"].includes(normalized)) {
+    return { label: "Hoàn tất", tone: "#1C7C54", bg: "#E4F2EA" };
+  }
+
+  if (["cancelled", "failed"].includes(normalized)) {
+    return { label: "Đã huỷ", tone: "#B33939", bg: "#F8E4E4" };
+  }
+
+  return { label: ORDER_STATUS_LABEL[normalized] || "Đơn hàng", tone: "#65574C", bg: "#F3ECE5" };
+}
+
+function isCompletedStatus(status) {
+  return ["completed", "delivered"].includes(String(status || "").toLowerCase());
+}
+
+function canChangeAddress(status) {
+  return ["pending", "processing", "confirmed", "shipping", "shipped", "ready_to_ship"].includes(
+    String(status || "").toLowerCase(),
+  );
+}
+
+function isWithin7Days(dateStr) {
+  if (!dateStr) return false;
+  const diff = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24);
+  return diff <= 7;
+}
+
+function AddressPickerModal({
+  visible,
+  addresses,
+  loading,
+  selectedAddressId,
+  currentOrderAddressId,
+  submitting,
+  onClose,
+  onSelect,
+  onConfirm,
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Đổi địa chỉ giao hàng</Text>
+          <ScrollView
+            style={styles.modalScroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modalScrollContent}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#9B4B1F" style={{ marginVertical: 24 }} />
+            ) : addresses.length === 0 ? (
+              <View style={styles.modalEmptyCard}>
+                <Text style={styles.modalEmptyTitle}>Chưa có địa chỉ nào</Text>
+                <Text style={styles.modalEmptyText}>
+                  Hãy thêm địa chỉ trong sổ địa chỉ trước khi đổi nơi nhận hàng.
+                </Text>
+              </View>
+            ) : (
+              addresses.map((addr) => {
+                const isCurrentAddress = currentOrderAddressId === addr.id;
+
+                return (
+                  <TouchableOpacity
+                    key={addr.id}
+                    style={[
+                      styles.modalOption,
+                      isCurrentAddress && styles.modalOptionDisabled,
+                      selectedAddressId === addr.id && styles.modalOptionSelected,
+                    ]}
+                    onPress={() => onSelect(addr.id)}
+                    activeOpacity={isCurrentAddress ? 1 : 0.88}
+                    disabled={isCurrentAddress}
+                  >
+                    <Text style={styles.modalOptionLabel}>{addr.label || "Địa chỉ"}</Text>
+                    <Text style={styles.modalOptionText}>{addr.receiverName}</Text>
+                    <Text style={styles.modalOptionSub}>{addr.receiverPhone}</Text>
+                    <Text style={styles.modalOptionSub}>
+                      {[addr.addressLine, addr.ward, addr.district, addr.city, addr.country]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </Text>
+                    {isCurrentAddress ? (
+                      <Text style={styles.modalOptionCurrent}>Địa chỉ hiện tại</Text>
+                    ) : null}
+                    {selectedAddressId === addr.id ? (
+                      <Text style={styles.modalOptionCheck}>Đã chọn</Text>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.modalSecondaryBtn}
+              onPress={onClose}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.modalSecondaryBtnText}>Huỷ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modalCloseBtn,
+                (!selectedAddressId || submitting) && styles.modalCloseBtnDisabled,
+              ]}
+              onPress={onConfirm}
+              activeOpacity={selectedAddressId && !submitting ? 0.88 : 1}
+              disabled={!selectedAddressId || submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#FFFDF9" />
+              ) : (
+                <Text style={styles.modalCloseBtnText}>Xác nhận</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function OrderItemSummary({ items }) {
+  return (
+    <View style={styles.itemSummaryRow}>
+      {items.slice(0, 3).map((orderItem, index) => (
+        <View key={orderItem.id || `${orderItem.productId}-${index}`} style={styles.itemChip}>
+          <Text style={styles.itemChipText}>#{orderItem.productId}</Text>
+          <Text style={styles.itemChipQty}>x{orderItem.quantity}</Text>
+        </View>
+      ))}
+      {items.length > 3 ? (
+        <Text style={styles.itemMoreText}>+{items.length - 3} sản phẩm</Text>
+      ) : null}
+    </View>
+  );
+}
 
 export default function OrderScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("Tất cả");
+  const [activeTab, setActiveTab] = useState("all");
   const [userProfile, setUserProfile] = useState(null);
-  const [reviewOrder, setReviewOrder] = useState(null);
-  const [addressModal, setAddressModal] = useState(null); // holds orderId for address change
+  const [addressModalOrderId, setAddressModalOrderId] = useState(null);
   const [addresses, setAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
-
-  const TABS = ["Tất cả", "Đang xử lý", "Đang giao", "Hoàn thành"];
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [submittingAddressChange, setSubmittingAddressChange] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,16 +209,17 @@ export default function OrderScreen({ navigation }) {
             api.get("/orders").catch(() => ({ data: [] })),
           ]);
 
-          if (isActive) {
-            if (meRes && meRes.data) setUserProfile(meRes.data);
-            if (ordersRes && Array.isArray(ordersRes.data)) {
-              // Sắp xếp mới nhất lên đầu
-              const sorted = ordersRes.data.sort(
-                (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
-              );
-              setOrders(sorted);
-            }
+          if (!isActive) return;
+
+          if (meRes?.data) {
+            setUserProfile(meRes.data);
           }
+
+          const list = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+          const sorted = [...list].sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+          );
+          setOrders(sorted);
         } catch (error) {
           console.warn("Lỗi tải lịch sử đơn hàng:", error);
         } finally {
@@ -77,661 +235,580 @@ export default function OrderScreen({ navigation }) {
     }, []),
   );
 
-  // Filter Logic
-  const filteredOrders = orders.filter((order) => {
-    if (activeTab === "Tất cả") return true;
-    const s = order.status || "";
-    if (activeTab === "Đang xử lý") return ["pending", "confirmed", "processing"].includes(s);
-    if (activeTab === "Đang giao") return ["shipping", "shipped", "packed"].includes(s); // Mockup uses Packed
-    if (activeTab === "Hoàn thành") return ["delivered", "completed"].includes(s);
-    return true;
-  });
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const status = String(order.status || "").toLowerCase();
 
-  // Load addresses when address modal opens
+      if (activeTab === "all") return true;
+      if (activeTab === "processing") {
+        return ["pending", "confirmed", "processing"].includes(status);
+      }
+      if (activeTab === "shipping") {
+        return ["shipping", "shipped", "ready_to_ship"].includes(status);
+      }
+      if (activeTab === "done") {
+        return ["completed", "delivered"].includes(status);
+      }
+      return true;
+    });
+  }, [activeTab, orders]);
+
+  const activeAddressOrder = useMemo(
+    () => orders.find((order) => order.id === addressModalOrderId) || null,
+    [addressModalOrderId, orders],
+  );
+
   const openAddressChange = async (orderId) => {
-    setAddressModal(orderId);
+    setAddressModalOrderId(orderId);
+    setSelectedAddressId(null);
     setLoadingAddresses(true);
     try {
       const res = await api.get("/me/addresses");
       setAddresses(Array.isArray(res.data) ? res.data : []);
-    } catch {
+    } catch (error) {
+      console.warn("Lỗi tải danh sách địa chỉ:", error);
       setAddresses([]);
     } finally {
       setLoadingAddresses(false);
     }
   };
 
-  const handleAddressChange = async (addressId) => {
-    try {
-      const res = await api.post(`/orders/${addressModal}/address-change-request`, { addressId });
-      const action = res?.data?.action;
+  const handleAddressChange = async () => {
+    if (!selectedAddressId) {
+      return;
+    }
 
-      if (action === "updated_same_city") {
-        Alert.alert("Thành công", "Địa chỉ giao hàng đã được cập nhật ngay.");
-      } else {
-        Alert.alert("Thành công", "Yêu cầu đổi địa chỉ đã được gửi để chờ duyệt.");
+    try {
+      setSubmittingAddressChange(true);
+      const res = await api.post(`/orders/${addressModalOrderId}/address-change-request`, {
+        addressId: selectedAddressId,
+      });
+      const action = res?.data?.action;
+      const requiresApproval = action === "pending_approval";
+
+      try {
+        await fetch(ADDRESS_CHANGE_WEBHOOK_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: addressModalOrderId,
+            requiresApproval,
+          }),
+        });
+      } catch (webhookError) {
+        console.warn("Lỗi gửi webhook address-change-request:", webhookError);
       }
 
-      setAddressModal(null);
+      if (requiresApproval) {
+        Alert.alert("Thành công", "Yêu cầu đổi địa chỉ đã được gửi.");
+      } else {
+        Alert.alert("Thành công", "Địa chỉ giao hàng đã được cập nhật.");
+      }
+
+      setAddressModalOrderId(null);
+      setSelectedAddressId(null);
     } catch (err) {
-      Alert.alert("Lỗi", err?.message || "Đã có yêu cầu đổi địa chỉ đang xử lý.");
+      Alert.alert("Lỗi", err?.message || "Không thể đổi địa chỉ cho đơn hàng này.");
+    } finally {
+      setSubmittingAddressChange(false);
     }
-  };
-
-  // Kiểm tra đơn hàng còn trong 7 ngày không
-  const isWithin7Days = (dateStr) => {
-    if (!dateStr) return false;
-    const diff = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24);
-    return diff <= 7;
-  };
-
-  const getStatusDisplay = (status) => {
-    const s = (status || "").toLowerCase();
-    if (["shipping", "shipped", "packed"].includes(s))
-      return { text: "Đang giao", color: "#F08C00" }; // Cam
-    if (["delivered", "completed"].includes(s)) return { text: "Hoàn thành", color: "#0055ff" }; // Xanh
-    if (["cancelled", "failed"].includes(s)) return { text: "Đã huỷ", color: "#e53e3e" }; // Đỏ
-    return { text: "Đang xử lý", color: "#666" }; // Xám
-  };
-
-  // Component hiển thị Grid Ảnh
-  const OrderImageGrid = ({ items = [] }) => {
-    const count = items.length;
-    if (count === 0) {
-      return <View style={styles.gridBox} />;
-    }
-
-    // Nếu có 1 hình
-    if (count === 1) {
-      const img = items[0].productImage || items[0].product?.image || items[0].product?.imageUrl;
-      return (
-        <View style={styles.gridBox}>
-          <Image
-            source={{ uri: img || "https://via.placeholder.com/150" }}
-            style={styles.gridImgFull}
-          />
-        </View>
-      );
-    }
-
-    // Nếu có nhiều hính => Grid 2x2 (Hiển thị max 4 hình)
-    const displayItems = items.slice(0, 4);
-    return (
-      <View style={[styles.gridBox, styles.gridContainer]}>
-        {displayItems.map((it, idx) => {
-          const img = it.productImage || it.product?.image || it.product?.imageUrl;
-          return (
-            <View key={idx} style={styles.gridCell}>
-              <Image
-                source={{ uri: img || "https://via.placeholder.com/150" }}
-                style={styles.gridImgCell}
-              />
-            </View>
-          );
-        })}
-      </View>
-    );
-  };
-
-  const renderOrderCard = ({ item }) => {
-    const sDisplay = getStatusDisplay(item.status);
-    const isCompleted = sDisplay.text === "Hoàn thành";
-    const orderItems = Array.isArray(item.items) ? item.items : [item.product].filter(Boolean);
-    const itemsCount = orderItems.reduce((sum, i) => sum + (i.quantity || 1), 0);
-
-    return (
-      <View style={styles.cardInfo}>
-        <OrderImageGrid items={orderItems} />
-
-        <View style={styles.cardRight}>
-          {/* Top Row: ID + Item Count */}
-          <View style={styles.cardTopRow}>
-            <Text style={styles.orderIdText}>
-              Order #{item.id || item._id?.slice(-8).toUpperCase()}
-            </Text>
-            <View style={styles.itemCountBadge}>
-              <Text style={styles.itemCountText}>{itemsCount} items</Text>
-            </View>
-          </View>
-
-          {/* Middle: Thông tin Ngày / Tổng tiền */}
-          <View style={styles.cardMidRow}>
-            <Text style={styles.cardDate}>{formatDate(item.createdAt)}</Text>
-            <Text style={styles.cardTotal}>
-              {formatPrice(item.totalAmount || item.total_amount || 0)}
-            </Text>
-          </View>
-
-          {/* Bottom Row: Status + Action Btns */}
-          <View style={styles.cardBotRow}>
-            <View style={styles.statusWrap}>
-              <Text style={[styles.statusText, { color: sDisplay.color }]}>{sDisplay.text}</Text>
-              {isCompleted && (
-                <View style={styles.checkCircle}>
-                  <Text style={styles.checkIcon}>✓</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.actionBtnsRow}>
-              {/* Đổi địa chỉ cho đơn đang xử lý */}
-              {["pending", "processing", "confirmed"].includes(item.status) && (
-                <TouchableOpacity
-                  style={styles.btnAddressChange}
-                  onPress={() => openAddressChange(item.id || item._id)}
-                >
-                  <Text style={styles.txtAddressChange}>Đổi địa chỉ</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Trả hàng cho đơn hoàn thành trong 7 ngày */}
-              {isCompleted && isWithin7Days(item.createdAt) && (
-                <TouchableOpacity
-                  style={styles.btnReturn}
-                  onPress={() =>
-                    navigation.navigate("ReturnRequest", {
-                      orderId: item.id || item._id,
-                      orderItems: orderItems,
-                    })
-                  }
-                >
-                  <Text style={styles.txtReturn}>↩ Trả hàng</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Track / Review */}
-              <TouchableOpacity
-                style={[styles.actionBtn, isCompleted ? styles.btnReview : styles.btnTrack]}
-                onPress={() => {
-                  if (isCompleted) {
-                    setReviewOrder(item);
-                  } else {
-                    navigation.navigate("OrderTracking", { orderId: item.id || item._id });
-                  }
-                }}
-              >
-                <Text style={[styles.btnText, isCompleted ? styles.txtReview : styles.txtTrack]}>
-                  {isCompleted ? "Review" : "Track"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    );
   };
 
   const currentInitial = userProfile?.fullName ? userProfile.fullName.charAt(0).toUpperCase() : "U";
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ── HEADER ────────────────────────────────────────── */}
-      <View style={styles.headerArea}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={styles.avatarCircle}
-            onPress={() => navigation.navigate("Profile")}
-          >
-            {userProfile?.avatar ? (
-              <Image source={{ uri: userProfile.avatar }} style={styles.avatarImg} />
-            ) : (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.avatarCircle}>
               <Text style={styles.avatarInitial}>{currentInitial}</Text>
-            )}
-          </TouchableOpacity>
-          <View style={styles.headerTexts}>
-            <Text style={styles.headerTitle}>To Receive</Text>
-            <Text style={styles.headerSub}>My Orders</Text>
+            </View>
+            <View style={styles.heroTextWrap}>
+              <Text style={styles.heroEyebrow}>Orders</Text>
+              <Text style={styles.heroTitle}>Lịch sử đơn hàng</Text>
+            </View>
           </View>
+          <Text style={styles.heroSubtext}>
+            Theo dõi tiến độ xử lý và mở lại những đơn bạn đã đặt gần đây.
+          </Text>
         </View>
 
-        <View style={styles.headerIcons}>
-          <TouchableOpacity
-            style={styles.iconCircle}
-            onPress={() => navigation.navigate("Settings")}
-          >
-            <Text style={styles.hdrIcon}>⚙</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── TABS ────────────────────────────────────────── */}
-      <View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabsContainer}
         >
           {TABS.map((tab) => {
-            const isActive = activeTab === tab;
+            const isActive = activeTab === tab.key;
             return (
               <TouchableOpacity
-                key={tab}
+                key={tab.key}
                 style={[styles.tabBtn, isActive && styles.tabBtnActive]}
-                onPress={() => setActiveTab(tab)}
+                onPress={() => setActiveTab(tab.key)}
+                activeOpacity={0.88}
               >
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab}</Text>
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
-      </View>
 
-      {/* ── LIST ────────────────────────────────────────── */}
-      {loading ? (
-        <View style={styles.centerWrap}>
-          <ActivityIndicator size="large" color="#0055ff" />
-        </View>
-      ) : filteredOrders.length === 0 ? (
-        <View style={styles.centerWrap}>
-          <Text style={styles.emptyIcon}>□</Text>
-          <Text style={styles.emptyTitle}>Chưa có đơn hàng</Text>
-          <Text style={styles.emptySub}>Danh mục {activeTab.toLowerCase()} đang trống.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredOrders}
-          keyExtractor={(item, index) => String(item.id || item._id || index)}
-          renderItem={renderOrderCard}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        {loading ? (
+          <ActivityIndicator size="large" color="#9B4B1F" style={{ marginTop: 80 }} />
+        ) : filteredOrders.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Chưa có đơn hàng phù hợp</Text>
+            <Text style={styles.emptyText}>
+              Những đơn bạn đặt sẽ xuất hiện tại đây để tiện theo dõi và xử lý.
+            </Text>
+          </View>
+        ) : (
+          filteredOrders.map((order) => {
+            const statusMeta = getOrderStatusMeta(order.status);
+            const itemCount = (order.items || []).reduce((sum, item) => sum + item.quantity, 0);
+            const completed = isCompletedStatus(order.status);
 
-      {/* ── REVIEW MODAL ────────────────────────────────────────── */}
-      <Modal visible={!!reviewOrder} transparent animationType="slide">
-        <View style={styles.modalBg}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Which item you want to review?</Text>
-              <TouchableOpacity onPress={() => setReviewOrder(null)}>
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.reviewList}>
-              {(reviewOrder?.items || [reviewOrder?.product]).filter(Boolean).map((it, idx) => {
-                const img =
-                  it.productImage ||
-                  it.product?.image ||
-                  it.product?.imageUrl ||
-                  "https://via.placeholder.com/150";
-                const name = it.productName || it.product?.name || "Lorem ipsum dolor sit amet";
-
-                return (
-                  <View key={idx} style={styles.reviewCard}>
-                    <Image source={{ uri: img }} style={styles.reviewImg} />
-                    <View style={styles.reviewInfo}>
-                      <Text style={styles.reviewItemName} numberOfLines={2}>
-                        {name}
-                      </Text>
-                      <Text style={styles.reviewOrderId}>
-                        Order #{reviewOrder.id || reviewOrder._id?.slice(-8).toUpperCase()}
-                      </Text>
-                      <View style={styles.reviewActionRow}>
-                        <View style={styles.reviewDateBadge}>
-                          <Text style={styles.reviewDateText}>
-                            {formatDate(reviewOrder.createdAt).split(" - ")[1]}
-                          </Text>
-                        </View>
-                        <TouchableOpacity
-                          style={styles.btnReviewItem}
-                          onPress={() => {
-                            setReviewOrder(null);
-                            alert("Chức năng Review đang phát triển!");
-                          }}
-                        >
-                          <Text style={styles.txtReviewItem}>Review</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+            return (
+              <View key={order.id} style={styles.orderCard}>
+                <View style={styles.orderHeader}>
+                  <View>
+                    <Text style={styles.orderId}>Đơn #{order.id}</Text>
+                    <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
                   </View>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+                  <View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusMeta.tone }]}>
+                      {statusMeta.label}
+                    </Text>
+                  </View>
+                </View>
 
-      {/* ── ADDRESS CHANGE MODAL ───────────────────────────────────── */}
-      <Modal visible={!!addressModal} transparent animationType="slide">
-        <View style={styles.modalBg}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Đổi địa chỉ giao hàng</Text>
-              <TouchableOpacity onPress={() => setAddressModal(null)}>
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
+                <OrderItemSummary items={order.items || []} />
 
-            {loadingAddresses ? (
-              <ActivityIndicator size="large" color="#0055ff" style={{ marginVertical: 30 }} />
-            ) : addresses.length === 0 ? (
-              <View style={{ alignItems: "center", paddingVertical: 30 }}>
-                <Text style={{ color: "#666", marginBottom: 16 }}>Chưa có địa chỉ nào.</Text>
-                <TouchableOpacity
-                  style={styles.submitBtn}
-                  onPress={() => {
-                    setAddressModal(null);
-                    navigation.navigate("AddressForm");
-                  }}
-                >
-                  <Text style={styles.submitBtnText}>+ Thêm địa chỉ mới</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={styles.reviewList}>
-                {addresses.map((addr) => (
+                <View style={styles.summaryBox}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Sản phẩm</Text>
+                    <Text style={styles.summaryValue}>{itemCount} món</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Tổng thanh toán</Text>
+                    <Text style={styles.summaryTotal}>{formatPrice(order.totalAmount)}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Giao đến</Text>
+                    <Text style={styles.summaryAddress} numberOfLines={2}>
+                      {order.shipping?.fullAddress || order.shippingAddress || "Chưa có địa chỉ"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.actionsRow}>
+                  {canChangeAddress(order.status) ? (
+                    <TouchableOpacity
+                      style={styles.secondaryAction}
+                      onPress={() => openAddressChange(order.id)}
+                      activeOpacity={0.88}
+                    >
+                      <Text style={styles.secondaryActionText}>Đổi địa chỉ</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {completed && isWithin7Days(order.createdAt) ? (
+                    <TouchableOpacity
+                      style={styles.secondaryAction}
+                      onPress={() =>
+                        navigation.navigate("ReturnRequest", {
+                          orderId: order.id,
+                          orderItems: order.items || [],
+                        })
+                      }
+                      activeOpacity={0.88}
+                    >
+                      <Text style={styles.secondaryActionText}>Trả hàng</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
                   <TouchableOpacity
-                    key={addr.id}
-                    style={styles.addressCard}
-                    onPress={() => handleAddressChange(addr.id)}
+                    style={styles.primaryAction}
+                    onPress={() => navigation.navigate("OrderTracking", { orderId: order.id })}
+                    activeOpacity={0.88}
                   >
-                    <View style={styles.addressCardLeft}>
-                      <Text style={styles.addressLabel}>{addr.label || "Khác"}</Text>
-                      <Text style={styles.addressLine} numberOfLines={2}>
-                        {addr.addressLine}
-                        {addr.ward ? `, ${addr.ward}` : ""}
-                        {addr.district ? `, ${addr.district}` : ""}
-                        {addr.city ? `, ${addr.city}` : ""}
-                      </Text>
-                      {addr.receiverPhone && (
-                        <Text style={styles.addressPhone}>{addr.receiverPhone}</Text>
-                      )}
-                    </View>
-                    {addr.isDefault && (
-                      <View style={styles.defaultBadge}>
-                        <Text style={styles.defaultBadgeText}>Mặc định</Text>
-                      </View>
-                    )}
+                    <Text style={styles.primaryActionText}>Xem chi tiết</Text>
                   </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[styles.submitBtn, { marginTop: 12 }]}
-                  onPress={() => {
-                    setAddressModal(null);
-                    navigation.navigate("AddressForm");
-                  }}
-                >
-                  <Text style={styles.submitBtnText}>+ Thêm địa chỉ mới</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+                </View>
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+
+      <AddressPickerModal
+        visible={addressModalOrderId != null}
+        addresses={addresses}
+        loading={loadingAddresses}
+        selectedAddressId={selectedAddressId}
+        currentOrderAddressId={activeAddressOrder?.customerAddressId ?? null}
+        submitting={submittingAddressChange}
+        onClose={() => {
+          setAddressModalOrderId(null);
+          setSelectedAddressId(null);
+        }}
+        onSelect={setSelectedAddressId}
+        onConfirm={handleAddressChange}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  centerWrap: { flex: 1, justifyContent: "center", alignItems: "center", paddingBottom: 50 },
-
-  // Header
-  headerArea: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
+  container: {
+    flex: 1,
+    backgroundColor: "#FCF9F4",
   },
-  headerLeft: { flexDirection: "row", alignItems: "center" },
-  avatarCircle: {
-    width: 48,
-    height: 48,
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 32,
+  },
+  heroCard: {
+    backgroundColor: "#1E1815",
     borderRadius: 24,
-    backgroundColor: "#F28C8C",
+    padding: 20,
+    marginBottom: 16,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#F2E2D2",
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
+    marginRight: 14,
   },
-  avatarImg: { width: 48, height: 48, borderRadius: 24 },
-  avatarInitial: { fontSize: 20, color: "#fff", fontWeight: "900" },
-  headerTexts: { justifyContent: "center" },
-  headerTitle: { fontSize: 24, fontWeight: "900", color: "#111" },
-  headerSub: { fontSize: 13, color: "#666", marginTop: 2 },
-
-  headerIcons: { flexDirection: "row", gap: 8 },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#EFF2FE",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
+  avatarInitial: {
+    color: "#9B4B1F",
+    fontSize: 18,
+    fontWeight: "900",
   },
-  hdrIcon: { fontSize: 18, color: "#0055ff", fontWeight: "600" },
-  dotIndicator: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#e53e3e",
+  heroTextWrap: {
+    flex: 1,
   },
-
-  // Tabs
-  tabsContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    marginBottom: 15,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-    paddingBottom: 10,
+  heroEyebrow: {
+    color: "#DCC4A8",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 6,
   },
-  tabBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: "#f5f5f5",
+  heroTitle: {
+    color: "#FFF8EE",
+    fontSize: 28,
+    fontWeight: "900",
+    lineHeight: 34,
   },
-  tabBtnActive: { backgroundColor: "#0055ff" },
-  tabText: { fontSize: 13, fontWeight: "600", color: "#666" },
-  tabTextActive: { color: "#fff" },
-
-  // Orders List
-  listContainer: { paddingHorizontal: 20, paddingBottom: 30 },
-
-  cardInfo: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    marginBottom: 20,
-    backgroundColor: "#fff",
-  },
-  // Box ẢNH CHÍNH
-  gridBox: {
-    width: 100,
-    height: 100,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  gridImgFull: { width: "100%", height: "100%", resizeMode: "cover" },
-  gridContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    alignContent: "space-between",
-    padding: 2,
-  },
-  gridCell: {
-    width: "48.5%",
-    height: "48.5%",
-    borderRadius: 6,
-    overflow: "hidden",
-    backgroundColor: "#eee",
-  },
-  gridImgCell: { width: "100%", height: "100%", resizeMode: "cover" },
-
-  // Nửa Phải CARD
-  cardRight: { flex: 1, marginLeft: 16, justifyContent: "space-between", paddingVertical: 4 },
-
-  cardTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  orderIdText: { fontSize: 15, fontWeight: "800", color: "#111", flex: 1, marginRight: 10 },
-  itemCountBadge: {
-    backgroundColor: "#f5f5f5",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  itemCountText: { fontSize: 12, fontWeight: "600", color: "#444" },
-
-  cardMidRow: { marginTop: 4 },
-  cardDate: { fontSize: 13, color: "#666" },
-  cardTotal: { fontSize: 15, fontWeight: "700", color: "#111", marginTop: 2 },
-
-  cardBotRow: { flexDirection: "column", alignItems: "flex-start", marginTop: 8 },
-  statusWrap: { flexDirection: "row", alignItems: "center" },
-  statusText: { fontSize: 16, fontWeight: "800" },
-  checkCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#0055ff",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 6,
-  },
-  checkIcon: { color: "#fff", fontSize: 10, fontWeight: "bold" },
-
-  actionBtn: { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8 },
-  btnReviewItem: {
-    borderWidth: 1.5,
-    borderColor: "#0055ff",
-    borderRadius: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-  },
-  txtReviewItem: { color: "#0055ff", fontWeight: "700", fontSize: 14 },
-
-  btnTrack: { backgroundColor: "#0055ff" },
-  txtTrack: { color: "#fff", fontWeight: "700", fontSize: 14 },
-  btnReview: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#0055ff" },
-  txtReview: { color: "#0055ff", fontWeight: "700", fontSize: 14 },
-
-  emptyIcon: { fontSize: 50, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: "#111", marginBottom: 8 },
-  emptySub: { fontSize: 14, color: "#666" },
-
-  // Modal Review
-  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-    maxHeight: "80%",
-  },
-
-  // Action buttons row
-  actionBtnsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 12,
-    width: "100%",
-    justifyContent: "flex-end",
-  },
-  btnAddressChange: {
-    borderWidth: 1.5,
-    borderColor: "#F08C00",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  txtAddressChange: { color: "#F08C00", fontWeight: "700", fontSize: 13 },
-  btnReturn: {
-    borderWidth: 1.5,
-    borderColor: "#e53e3e",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  txtReturn: { color: "#e53e3e", fontWeight: "700", fontSize: 13 },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  modalTitle: { fontSize: 20, fontWeight: "900", color: "#111" },
-  modalCloseText: { fontSize: 24, color: "#666", fontWeight: "300" },
-  reviewList: { marginTop: 10 },
-  reviewCard: {
-    flexDirection: "row",
-    marginBottom: 20,
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  reviewImg: { width: 90, height: 90, borderRadius: 8, backgroundColor: "#eee" },
-  reviewInfo: { flex: 1, marginLeft: 16, justifyContent: "space-between" },
-  reviewItemName: { fontSize: 14, color: "#222" },
-  reviewOrderId: { fontSize: 13, fontWeight: "800", color: "#111", marginTop: 4 },
-  reviewActionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
+  heroSubtext: {
+    color: "rgba(255,248,238,0.76)",
+    fontSize: 14,
+    lineHeight: 22,
     marginTop: 10,
   },
-  reviewDateBadge: {
-    backgroundColor: "#f5f5f5",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+  tabsContainer: {
+    paddingBottom: 8,
+    gap: 10,
   },
-  reviewDateText: { fontSize: 12, fontWeight: "600", color: "#666" },
-
-  // Address card in modal
-  addressCard: {
+  tabBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 999,
+    backgroundColor: "#F3ECE5",
+  },
+  tabBtnActive: {
+    backgroundColor: "#1E1815",
+  },
+  tabText: {
+    color: "#6D5D51",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  tabTextActive: {
+    color: "#FFF8EE",
+  },
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 22,
+    marginTop: 18,
+  },
+  emptyTitle: {
+    color: "#1E1815",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  orderCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginTop: 14,
+  },
+  orderHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  orderId: {
+    color: "#1E1815",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  orderDate: {
+    color: "#7A685B",
+    fontSize: 12,
+  },
+  statusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  itemSummaryRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#F0F0F0",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
   },
-  addressCardLeft: { flex: 1 },
-  addressLabel: {
+  itemChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F7EFE7",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  itemChipText: {
+    color: "#1E1815",
+    fontSize: 13,
+    fontWeight: "700",
+    marginRight: 6,
+  },
+  itemChipQty: {
+    color: "#8A7B6F",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  itemMoreText: {
+    color: "#7A685B",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  summaryBox: {
+    backgroundColor: "#FCF9F4",
+    borderRadius: 18,
+    padding: 14,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  summaryLabel: {
+    color: "#6D5D51",
+    fontSize: 13,
+    marginRight: 14,
+  },
+  summaryValue: {
+    color: "#1E1815",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  summaryTotal: {
+    color: "#9B4B1F",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  summaryAddress: {
+    flex: 1,
+    textAlign: "right",
+    color: "#1E1815",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 14,
+    flexWrap: "wrap",
+  },
+  secondaryAction: {
+    borderWidth: 1,
+    borderColor: "#D9C7B7",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#FCF9F4",
+  },
+  secondaryActionText: {
+    color: "#65574C",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  primaryAction: {
+    backgroundColor: "#1E1815",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  primaryActionText: {
+    color: "#FFFDF9",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(24, 18, 14, 0.32)",
+  },
+  modalSheet: {
+    backgroundColor: "#FCF9F4",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 30,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D3C4B6",
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: "#1E1815",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 16,
+  },
+  modalScroll: {
+    maxHeight: "65%",
+  },
+  modalScrollContent: {
+    paddingBottom: 8,
+  },
+  modalEmptyCard: {
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+    padding: 16,
+  },
+  modalEmptyTitle: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  modalEmptyText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  modalOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+    marginBottom: 10,
+  },
+  modalOptionSelected: {
+    borderColor: "#D69A65",
+    backgroundColor: "#F5ECE3",
+  },
+  modalOptionDisabled: {
+    opacity: 0.55,
+  },
+  modalOptionLabel: {
+    color: "#8A6548",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  modalOptionText: {
+    color: "#1E1815",
     fontSize: 14,
     fontWeight: "800",
-    color: "#111",
-    marginBottom: 4,
-    textTransform: "capitalize",
+    marginBottom: 3,
   },
-  addressLine: { fontSize: 13, color: "#555", lineHeight: 18 },
-  addressPhone: { fontSize: 12, color: "#888", marginTop: 4 },
-  defaultBadge: {
-    backgroundColor: "#EFF2FE",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  modalOptionSub: {
+    color: "#54483E",
+    fontSize: 13,
+    lineHeight: 20,
   },
-  defaultBadgeText: { fontSize: 11, fontWeight: "700", color: "#0055ff" },
-
-  submitBtn: {
-    backgroundColor: "#0055ff",
+  modalOptionCheck: {
+    color: "#9B4B1F",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  modalOptionCurrent: {
+    color: "#65574C",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 8,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+  },
+  modalSecondaryBtn: {
+    flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: "center",
+    backgroundColor: "#EFE3D6",
   },
-  submitBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  modalSecondaryBtnText: {
+    color: "#65574C",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  modalCloseBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+    backgroundColor: "#1E1815",
+  },
+  modalCloseBtnDisabled: {
+    backgroundColor: "#D8CCC1",
+  },
+  modalCloseBtnText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
+  },
 });

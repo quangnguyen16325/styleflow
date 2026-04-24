@@ -1,93 +1,128 @@
 /* eslint-disable react/prop-types */
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
   ActivityIndicator,
   SafeAreaView,
-  Image,
 } from "react-native";
-import api from "../services/api";
-import { COLORS } from "../constants/colors";
+import api, { formatPrice, ORDER_STATUS_LABEL } from "../services/api";
 
-// ── Validation Helpers ──
-const getStatusStep = (status) => {
-  if (!status) return 0;
-  const s = status.toLowerCase();
-  if (["processing"].includes(s)) return 1;
-  if (["shipping", "ready_to_ship"].includes(s)) return 3;
-  if (["completed", "delivered"].includes(s)) return 4;
-  if (s === "failed" || s === "delivery_failed") return 3;
-  return 0; // pending, awaiting_payment, etc.
-};
+function formatDate(dateString) {
+  if (!dateString) return "Không rõ thời gian";
+  return new Date(dateString).toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
-const Stepper = ({ currentStep }) => {
-  const stepsCount = 5;
+function getProgressStep(status) {
+  const normalized = String(status || "").toLowerCase();
+
+  if (["pending"].includes(normalized)) return 1;
+  if (["confirmed", "processing"].includes(normalized)) return 2;
+  if (["shipping", "shipped", "ready_to_ship"].includes(normalized)) return 3;
+  if (["completed", "delivered"].includes(normalized)) return 4;
+  if (["cancelled", "failed"].includes(normalized)) return 0;
+  return 1;
+}
+
+function getStatusText(status) {
+  return ORDER_STATUS_LABEL[String(status || "").toLowerCase()] || "Đơn hàng";
+}
+
+function Stepper({ currentStep }) {
+  const steps = ["Đặt hàng", "Xử lý", "Vận chuyển", "Hoàn tất"];
+
   return (
-    <View style={styles.stepperWrap}>
-      <View style={styles.lineBg} />
-      <View
-        style={[
-          styles.lineActive,
-          { width: `${(Math.min(currentStep, stepsCount - 1) / (stepsCount - 1)) * 100}%` },
-        ]}
-      />
-      {[0, 1, 2, 3, 4].map((step) => {
-        let dotStyle = styles.dotFuture;
-        if (step < currentStep) dotStyle = styles.dotPast;
-        else if (step === currentStep) dotStyle = styles.dotCurrent;
+    <View style={styles.stepperCard}>
+      {steps.map((label, index) => {
+        const stepNumber = index + 1;
+        const isDone = stepNumber <= currentStep;
+        const isLast = index === steps.length - 1;
 
         return (
-          <View
-            key={step}
-            style={[styles.dotBase, dotStyle, { left: `${(step / (stepsCount - 1)) * 100}%` }]}
-          />
+          <View key={label} style={styles.stepperRow}>
+            <View style={styles.stepperLeft}>
+              <View style={[styles.stepDot, isDone && styles.stepDotActive]}>
+                <Text style={[styles.stepDotText, isDone && styles.stepDotTextActive]}>
+                  {stepNumber}
+                </Text>
+              </View>
+              {!isLast ? <View style={[styles.stepLine, isDone && styles.stepLineActive]} /> : null}
+            </View>
+            <View style={styles.stepperTextWrap}>
+              <Text style={[styles.stepLabel, isDone && styles.stepLabelActive]}>{label}</Text>
+            </View>
+          </View>
         );
       })}
     </View>
   );
-};
+}
+
+function OrderItemRow({ item }) {
+  return (
+    <View style={styles.orderItemRow}>
+      <View style={styles.productToken}>
+        <Text style={styles.productTokenText}>#{item.productId}</Text>
+      </View>
+      <View style={styles.orderItemInfo}>
+        <Text style={styles.orderItemName}>Sản phẩm #{item.productId}</Text>
+        <Text style={styles.orderItemMeta}>Số lượng {item.quantity}</Text>
+      </View>
+      <Text style={styles.orderItemPrice}>{formatPrice(item.priceAtPurchase * item.quantity)}</Text>
+    </View>
+  );
+}
 
 export default function OrderTrackingScreen({ route, navigation }) {
-  // Lấy orderId từ navigation params
   const { orderId } = route?.params || {};
   const [order, setOrder] = useState(null);
-  const [timelineEvents, setTimelineEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Modals state
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
-  const [failedModalVisible, setFailedModalVisible] = useState(false);
 
   useEffect(() => {
     if (!orderId) {
       setLoading(false);
       return;
     }
+
+    let active = true;
+
     const fetchOrderData = async () => {
       try {
-        const resOrder = await api.get(`/orders/${orderId}`);
-        setOrder(resOrder.data);
-        setTimelineEvents(
-          Array.isArray(resOrder.data?.deliveryEvents) ? resOrder.data.deliveryEvents : [],
-        );
-      } catch (err) {
-        console.warn("Lỗi tải đơn hàng:", err);
+        const res = await api.get(`/orders/${orderId}`);
+        if (active) {
+          setOrder(res.data);
+        }
+      } catch (error) {
+        console.warn("Lỗi tải đơn hàng:", error);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
+
     fetchOrderData();
+
+    return () => {
+      active = false;
+    };
   }, [orderId]);
+
+  const progressStep = useMemo(() => getProgressStep(order?.status), [order?.status]);
 
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, styles.center]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color="#9B4B1F" />
       </SafeAreaView>
     );
   }
@@ -95,462 +130,280 @@ export default function OrderTrackingScreen({ route, navigation }) {
   if (!order) {
     return (
       <SafeAreaView style={[styles.safeArea, styles.center]}>
-        <Text style={styles.errorText}>Order #{orderId} not found!</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Go Back</Text>
+        <Text style={styles.emptyTitle}>Không tìm thấy đơn hàng</Text>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.88}
+        >
+          <Text style={styles.backBtnText}>Quay lại</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
-  const currentStep = getStatusStep(order.status);
-  const isFailed = order.status === "failed" || order.status === "delivery_failed";
-  const isDelivered = order.status === "completed" || order.status === "delivered";
-
-  // Kết hợp data API timeline và data nội bộ
-  const deliveryEvents = timelineEvents.length > 0 ? timelineEvents : order?.deliveryEvents || [];
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <View style={styles.avatarWrap}>
-          <Text style={styles.avatarText}>ME</Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>Tracking</Text>
+          <Text style={styles.heroTitle}>Đơn hàng #{order.id}</Text>
+          <Text style={styles.heroSubtext}>
+            {getStatusText(order.status)} • cập nhật lúc{" "}
+            {formatDate(order.updatedAt || order.createdAt)}
+          </Text>
         </View>
-        <View style={styles.headerMid}>
-          <Text style={styles.headerTitle}>To Receive</Text>
-          <Text style={styles.headerSub}>Track Your Order</Text>
-        </View>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Text>📑</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Text>⚙️</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* ── Stepper (Thanh tiến trình) ── */}
-        <Stepper currentStep={currentStep} />
+        <Stepper currentStep={progressStep} />
 
-        {/* Tracking Number Block */}
-        <View style={styles.trackingBlock}>
-          <View>
-            <Text style={styles.trackingTitle}>Tracking Number</Text>
-            <Text style={styles.trackingVal}>
-              {order.trackingNumber ||
-                `LGS-${
-                  String(orderId || "")
-                    .slice(-10)
-                    .toUpperCase() || "UNKNOWN"
-                }`}
-            </Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Ngày đặt</Text>
+            <Text style={styles.summaryValue}>{formatDate(order.createdAt)}</Text>
           </View>
-          <Text style={styles.trackingIcon}>📋</Text>
-        </View>
-
-        {/* ── Sản phẩm trong đơn (Products details) ── */}
-        <View style={styles.productsSection}>
-          <Text style={styles.sectionTitle}>Ordered Items</Text>
-          <View style={styles.productsList}>
-            {(order?.items || [order?.product]).filter(Boolean).map((it, idx) => {
-              const img =
-                it.productImage ||
-                it.product?.image ||
-                it.product?.imageUrl ||
-                "https://via.placeholder.com/150";
-              const name = it.productName || it.product?.name || "Lorem ipsum dolor sit amet";
-              const price = it.price || it.basePrice || 0;
-              const qty = it.quantity || 1;
-
-              return (
-                <View key={idx} style={styles.productItem}>
-                  <Image source={{ uri: img }} style={styles.prodImg} />
-                  <View style={styles.prodInfo}>
-                    <Text style={styles.prodName} numberOfLines={2}>
-                      {name}
-                    </Text>
-                    <Text style={styles.prodVariant}>Pink, Size M</Text>
-                    <View style={styles.prodBotRow}>
-                      <Text style={styles.prodPrice}>
-                        $ {Number(price).toFixed(2).replace(".", ",")}
-                      </Text>
-                      <View style={styles.prodQtyBadge}>
-                        <Text style={styles.prodQtyText}>Qty: {qty}</Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Trạng thái</Text>
+            <Text style={styles.summaryValue}>{getStatusText(order.status)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
+            <Text style={styles.summaryValue}>{formatPrice(order.shippingFee)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tổng thanh toán</Text>
+            <Text style={styles.summaryTotal}>{formatPrice(order.totalAmount)}</Text>
           </View>
         </View>
 
-        {/* ── Timeline Chi tiết ── */}
-        <View style={styles.timelineContainer}>
-          {deliveryEvents.length > 0 ? (
-            deliveryEvents.map((evt, idx) => (
-              <View key={evt.id || idx} style={styles.eventRow}>
-                <View style={styles.eventLeft}>
-                  <Text style={styles.eventTitle}>
-                    {evt.status || evt.reason || "Event Update"}
-                  </Text>
-                  <Text style={styles.eventDesc}>{evt.partner || "Logistic Facility"}</Text>
-                </View>
-                <Text style={styles.eventTime}>
-                  {new Date(evt.createdAt).toLocaleString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <View style={styles.eventRow}>
-              <View style={styles.eventLeft}>
-                <Text style={styles.eventTitle}>
-                  {getStatusStep(order.status) === 0
-                    ? "Pending"
-                    : getStatusStep(order.status) === 1
-                      ? "Packed"
-                      : "Processing..."}
-                </Text>
-                <Text style={styles.eventDesc}>Updating delivery information from partner...</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Cảnh báo thất bại */}
-          {isFailed && (
-            <TouchableOpacity
-              style={styles.failedAlert}
-              onPress={() => setFailedModalVisible(true)}
-            >
-              <Text style={styles.failedAlertText}>
-                Attempt to deliver your parcel was not successful
-              </Text>
-              <Text style={styles.failedAlertArrow}>→</Text>
-            </TouchableOpacity>
-          )}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Địa chỉ nhận hàng</Text>
+          <Text style={styles.shippingName}>{order.shipping?.receiverName || "Người nhận"}</Text>
+          {order.shipping?.receiverPhone ? (
+            <Text style={styles.shippingPhone}>{order.shipping.receiverPhone}</Text>
+          ) : null}
+          <Text style={styles.shippingAddress}>
+            {order.shipping?.fullAddress || order.shippingAddress || "Chưa có địa chỉ"}
+          </Text>
         </View>
 
-        {/* Nút Review - Nếu Delivered */}
-        {isDelivered && (
-          <TouchableOpacity
-            style={styles.mainReviewBtn}
-            onPress={() => setReviewModalVisible(true)}
-          >
-            <Text style={styles.mainReviewBtnText}>Review your Items</Text>
-          </TouchableOpacity>
-        )}
-        <View style={{ height: 100 }} />
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Sản phẩm trong đơn</Text>
+          {(order.items || []).map((item) => (
+            <OrderItemRow key={item.id || `${item.productId}-${item.quantity}`} item={item} />
+          ))}
+        </View>
       </ScrollView>
-
-      {/* ── Modal Review (image_58) ── */}
-      <Modal visible={reviewModalVisible} transparent animationType="slide">
-        <View style={styles.modalBg}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTopTitle}>Which item you want to review?</Text>
-            <ScrollView style={{ maxHeight: 450 }} showsVerticalScrollIndicator={false}>
-              {order?.items?.map((item, idx) => (
-                <View key={item.id || idx} style={styles.reviewItemCard}>
-                  {/* Future-proof: Nếu backend trả url ảnh thì vẽ Ảnh, không thì ô xám */}
-                  {item.imageUrl ? (
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={styles.reviewImgPlaceholder}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.reviewImgPlaceholder} />
-                  )}
-                  <View style={styles.reviewItemInfo}>
-                    <Text style={styles.reviewItemText} numberOfLines={2}>
-                      {item.name || `Product #${item.productId}`}
-                    </Text>
-                    <Text style={styles.reviewItemOrder}>Order #{order.id}</Text>
-                  </View>
-                  <TouchableOpacity style={styles.reviewBtnAction}>
-                    <Text style={styles.reviewBtnText}>Review</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setReviewModalVisible(false)}>
-              <Text style={styles.closeBtnText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Modal Cảnh báo Thất bại (image_61) ── */}
-      <Modal visible={failedModalVisible} transparent animationType="fade">
-        <View style={styles.modalBg}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalFailMainTitle}>Delivery was not successful</Text>
-            <Text style={styles.modalFailSubTitle}>What should I do?</Text>
-            <Text style={styles.modalFailDesc}>
-              Don&apos;t worry, we will shortly contact you to arrange more suitable time for the
-              delivery. You can also contact us by using this number +00 000 000 000 or chat with
-              our customer care service
-            </Text>
-            <TouchableOpacity style={styles.chatBtn} onPress={() => setFailedModalVisible(false)}>
-              <Text style={styles.chatBtnText}>Chat Now</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
 
-// ── Styles ──
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.bgPrimary },
-  center: { justifyContent: "center", alignItems: "center" },
-  errorText: { fontSize: 16, color: COLORS.danger, fontWeight: "600", marginBottom: 16 },
-  backBtn: { padding: 12, backgroundColor: COLORS.bgSecondary, borderRadius: 8 },
-  backBtnText: { color: COLORS.textPrimary, fontWeight: "600" },
-
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  avatarWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFE5E5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
-  avatarText: { fontWeight: "bold", color: COLORS.primary },
-  headerMid: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: COLORS.textPrimary },
-  headerSub: { fontSize: 14, color: COLORS.textSecondary, marginTop: 2 },
-  headerIcons: { flexDirection: "row" },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.bgSecondary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 10,
-  },
-
-  scrollContainer: { flex: 1, paddingHorizontal: 20 },
-
-  // Stepper
-  stepperWrap: {
-    height: 30,
-    marginHorizontal: 15,
-    marginVertical: 24,
-    position: "relative",
-    justifyContent: "center",
-  },
-  lineBg: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 4,
-    backgroundColor: "#E5E5EB",
-    borderRadius: 2,
-  },
-  lineActive: {
-    position: "absolute",
-    left: 0,
-    height: 4,
-    backgroundColor: COLORS.info,
-    borderRadius: 2,
-    zIndex: 1,
-  },
-  dotBase: {
-    position: "absolute",
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    zIndex: 2,
-    top: "50%",
-    marginTop: -8,
-    marginLeft: -8,
-  },
-  dotPast: { backgroundColor: COLORS.primaryDark }, // Xanh đậm
-  dotCurrent: { backgroundColor: COLORS.info }, // Xanh nhạt
-  dotFuture: { backgroundColor: "#E5E5EB" },
-
-  // Tracking Block
-  trackingBlock: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: COLORS.bgSecondary,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-  },
-  trackingTitle: { fontSize: 14, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 4 },
-  trackingVal: { fontSize: 14, color: COLORS.textSecondary },
-  trackingIcon: { fontSize: 20, color: COLORS.info },
-
-  // Products Section
-  productsSection: { marginTop: 15, paddingHorizontal: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: "800", color: "#111", marginBottom: 15 },
-  productsList: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 15,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  productItem: {
-    flexDirection: "row",
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
-    paddingBottom: 15,
-  },
-  prodImg: { width: 75, height: 75, borderRadius: 10, backgroundColor: "#eee" },
-  prodInfo: { flex: 1, marginLeft: 15, justifyContent: "space-between" },
-  prodName: { fontSize: 14, fontWeight: "600", color: "#222" },
-  prodVariant: { fontSize: 13, color: "#666", marginTop: 4 },
-  prodBotRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  prodPrice: { fontSize: 16, fontWeight: "800", color: "#111" },
-  prodQtyBadge: {
-    backgroundColor: "#EFF2FE",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  prodQtyText: { fontSize: 13, fontWeight: "700", color: "#0055ff" },
-
-  // Timeline chi tiết
-  timelineContainer: { marginHorizontal: 20, marginTop: 25, marginBottom: 50 },
-  timelineRow: { flexDirection: "row", marginBottom: 25 },
-  // Timeline (Tiếp tục)
-  eventRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 24,
-  },
-  eventLeft: { flex: 1, paddingRight: 16 },
-  eventTitle: { fontSize: 16, fontWeight: "700", color: COLORS.textPrimary, marginBottom: 4 },
-  eventDesc: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 20 },
-  eventTime: { fontSize: 13, color: COLORS.textPrimary, fontWeight: "500" },
-
-  // Alert Failed
-  failedAlert: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#FFF2F2",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#FFE0E0",
-    marginTop: 10,
-  },
-  failedAlertText: {
+  safeArea: {
     flex: 1,
-    fontSize: 14,
-    color: COLORS.danger,
-    fontWeight: "700",
-    paddingRight: 10,
+    backgroundColor: "#FCF9F4",
   },
-  failedAlertArrow: { fontSize: 18, color: COLORS.danger, fontWeight: "bold" },
-
-  mainReviewBtn: {
-    marginTop: 30,
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: 25,
+  center: {
+    justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 24,
   },
-  mainReviewBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
-
-  // Modals Overlay
-  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  modalContent: {
-    backgroundColor: COLORS.bgPrimary,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
+  scrollView: {
+    flex: 1,
   },
-
-  // Review Modal items
-  modalTopTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-    marginBottom: 20,
-    textAlign: "center",
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 32,
   },
-  reviewItemCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.bgSecondary,
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  reviewImgPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: "#E5E5EA",
-    marginRight: 12,
-  },
-  reviewItemInfo: { flex: 1 },
-  reviewItemText: { fontSize: 14, fontWeight: "600", color: COLORS.textPrimary, marginBottom: 4 },
-  reviewItemOrder: { fontSize: 12, color: COLORS.textSecondary },
-  reviewBtnAction: {
-    borderWidth: 1,
-    borderColor: COLORS.info,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  reviewBtnText: { color: COLORS.info, fontSize: 13, fontWeight: "700" },
-  closeBtn: {
-    marginTop: 16,
-    alignItems: "center",
-    paddingVertical: 12,
-    backgroundColor: COLORS.bgSecondary,
-    borderRadius: 12,
-  },
-  closeBtnText: { color: COLORS.textSecondary, fontWeight: "700", fontSize: 15 },
-
-  // Fail Modal items
-  modalFailMainTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
+  heroCard: {
+    backgroundColor: "#1E1815",
+    borderRadius: 24,
+    padding: 20,
     marginBottom: 16,
   },
-  modalFailSubTitle: {
-    fontSize: 16,
+  heroEyebrow: {
+    color: "#DCC4A8",
+    fontSize: 11,
     fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginBottom: 8,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 6,
   },
-  modalFailDesc: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, marginBottom: 30 },
-  chatBtn: {
-    backgroundColor: COLORS.info,
-    paddingVertical: 14,
-    borderRadius: 25,
+  heroTitle: {
+    color: "#FFF8EE",
+    fontSize: 28,
+    fontWeight: "900",
+    lineHeight: 34,
+  },
+  heroSubtext: {
+    color: "rgba(255,248,238,0.76)",
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 10,
+  },
+  stepperCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+  },
+  stepperRow: {
+    flexDirection: "row",
+  },
+  stepperLeft: {
+    width: 30,
     alignItems: "center",
   },
-  chatBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#F3ECE5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepDotActive: {
+    backgroundColor: "#9B4B1F",
+  },
+  stepDotText: {
+    color: "#8A7B6F",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  stepDotTextActive: {
+    color: "#FFFDF9",
+  },
+  stepLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: "#E7DBCF",
+    marginVertical: 4,
+  },
+  stepLineActive: {
+    backgroundColor: "#D69A65",
+  },
+  stepperTextWrap: {
+    flex: 1,
+    paddingLeft: 12,
+    paddingBottom: 18,
+  },
+  stepLabel: {
+    color: "#7A685B",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  stepLabelActive: {
+    color: "#1E1815",
+  },
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    color: "#1E1815",
+    fontSize: 17,
+    fontWeight: "800",
+    marginBottom: 14,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  summaryLabel: {
+    color: "#6D5D51",
+    fontSize: 13,
+    marginRight: 14,
+  },
+  summaryValue: {
+    color: "#1E1815",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "right",
+    flex: 1,
+  },
+  summaryTotal: {
+    color: "#9B4B1F",
+    fontSize: 16,
+    fontWeight: "900",
+    textAlign: "right",
+    flex: 1,
+  },
+  shippingName: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  shippingPhone: {
+    color: "#7A685B",
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  shippingAddress: {
+    color: "#54483E",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  orderItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0E5D8",
+  },
+  productToken: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "#F5ECE3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  productTokenText: {
+    color: "#9B4B1F",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  orderItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  orderItemName: {
+    color: "#241A13",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  orderItemMeta: {
+    color: "#8A7B6F",
+    fontSize: 12,
+  },
+  orderItemPrice: {
+    color: "#9B4B1F",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  emptyTitle: {
+    color: "#1E1815",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 16,
+  },
+  backBtn: {
+    backgroundColor: "#1E1815",
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  backBtnText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
+  },
 });

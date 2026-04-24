@@ -141,6 +141,32 @@ export async function getOrderById(id) {
   return res.data;
 }
 
+export async function createRefundEvidenceUpload(orderId, fileName, contentType) {
+  const res = await api.post("/refund-requests/uploads/presign", {
+    orderId,
+    fileName,
+    contentType,
+  });
+  return res.data;
+}
+
+export async function uploadFileToSignedUrl(uploadUrl, fileUri, contentType) {
+  const fileResponse = await fetch(fileUri);
+  const fileBlob = await fileResponse.blob();
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType,
+    },
+    body: fileBlob,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error("Failed to upload image");
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 export function formatPrice(amount) {

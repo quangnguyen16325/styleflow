@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,9 +10,14 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  SafeAreaView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import api from "../services/api";
+import api, {
+  createRefundEvidenceUpload,
+  formatPrice,
+  uploadFileToSignedUrl,
+} from "../services/api";
 
 const RETURN_REASONS = [
   { id: "damaged", label: "Hàng bị hư hỏng / vỡ", requiresPhoto: true },
@@ -22,15 +27,64 @@ const RETURN_REASONS = [
   { id: "other", label: "Lý do khác", requiresPhoto: false },
 ];
 
+function resolveOrderItemName(item) {
+  return item?.productName || `Sản phẩm #${item?.productId ?? "?"}`;
+}
+
+function resolveImageMeta(asset) {
+  const uri = asset?.uri;
+  const mimeType = asset?.mimeType || inferContentTypeFromUri(uri);
+  const fileName =
+    asset?.fileName || `refund-evidence-${Date.now()}.${extensionFromContentType(mimeType)}`;
+
+  return {
+    uri,
+    mimeType,
+    fileName,
+  };
+}
+
+function inferContentTypeFromUri(uri) {
+  const normalized = String(uri || "").toLowerCase();
+  if (normalized.endsWith(".png")) return "image/png";
+  if (normalized.endsWith(".webp")) return "image/webp";
+  if (normalized.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
+function extensionFromContentType(contentType) {
+  switch (contentType) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    default:
+      return "jpeg";
+  }
+}
+
 export default function ReturnRequestScreen({ route, navigation }) {
   const { orderId, orderItems } = route?.params || {};
   const [selectedReason, setSelectedReason] = useState(null);
   const [customReason, setCustomReason] = useState("");
-  const [imageUri, setImageUri] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const activeReason = RETURN_REASONS.find((r) => r.id === selectedReason);
-  const needsPhoto = activeReason?.requiresPhoto || false;
+  const activeReason = RETURN_REASONS.find((reason) => reason.id === selectedReason) || null;
+  const requiresPhoto = activeReason?.requiresPhoto || false;
+
+  const totalRefundPreview = useMemo(
+    () =>
+      Array.isArray(orderItems)
+        ? orderItems.reduce(
+            (sum, item) => sum + Number(item.priceAtPurchase || 0) * Number(item.quantity || 1),
+            0,
+          )
+        : 0,
+    [orderItems],
+  );
 
   const handlePickImage = async () => {
     try {
@@ -39,17 +93,19 @@ export default function ReturnRequestScreen({ route, navigation }) {
         Alert.alert("Quyền truy cập", "Vui lòng cấp quyền truy cập thư viện ảnh.");
         return;
       }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        setImageUri(result.assets[0].uri);
+
+      if (!result.canceled && result.assets?.[0]) {
+        setSelectedImage(resolveImageMeta(result.assets[0]));
       }
-    } catch (err) {
-      console.warn("Lỗi chọn ảnh:", err);
+    } catch (error) {
+      console.warn("Lỗi chọn ảnh:", error);
     }
   };
 
@@ -60,16 +116,18 @@ export default function ReturnRequestScreen({ route, navigation }) {
         Alert.alert("Quyền truy cập", "Vui lòng cấp quyền truy cập máy ảnh.");
         return;
       }
+
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        setImageUri(result.assets[0].uri);
+
+      if (!result.canceled && result.assets?.[0]) {
+        setSelectedImage(resolveImageMeta(result.assets[0]));
       }
-    } catch (err) {
-      console.warn("Lỗi chụp ảnh:", err);
+    } catch (error) {
+      console.warn("Lỗi chụp ảnh:", error);
     }
   };
 
@@ -79,7 +137,20 @@ export default function ReturnRequestScreen({ route, navigation }) {
       return;
     }
 
-    if (needsPhoto && !imageUri) {
+    const customReasonValue = customReason.trim();
+    const reason =
+      selectedReason === "other"
+        ? customReasonValue
+        : customReasonValue
+          ? `${activeReason?.label?.trim()}: ${customReasonValue}`
+          : activeReason?.label?.trim() || "";
+
+    if (!reason) {
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập lý do trả hàng.");
+      return;
+    }
+
+    if (requiresPhoto && !selectedImage?.uri) {
       Alert.alert("Thiếu ảnh", "Vui lòng gửi ảnh minh chứng cho trường hợp này.");
       return;
     }
@@ -87,22 +158,30 @@ export default function ReturnRequestScreen({ route, navigation }) {
     try {
       setSubmitting(true);
 
-      // Gửi POST /refund-requests theo API Contract
-      // imageUrl: dùng URI tạm (tương lai sẽ upload lên cloud)
-      const payload = {
-        orderId: Number(orderId),
-        imageUrl: imageUri || "https://placeholder.ecloria.co.uk/refund-evidence.jpg",
-      };
+      let imageUrl = null;
+      if (selectedImage?.uri) {
+        const upload = await createRefundEvidenceUpload(
+          Number(orderId),
+          selectedImage.fileName,
+          selectedImage.mimeType,
+        );
+        await uploadFileToSignedUrl(upload.uploadUrl, selectedImage.uri, selectedImage.mimeType);
+        imageUrl = upload.publicUrl;
+      }
 
-      await api.post("/refund-requests", payload);
+      await api.post("/refund-requests", {
+        orderId: Number(orderId),
+        imageUrl,
+        reason,
+      });
 
       Alert.alert(
-        "Gửi thành công",
-        "Yêu cầu trả hàng đã được ghi nhận. Chúng tôi sẽ xem xét và phản hồi trong vòng 24 giờ.",
+        "Đã gửi yêu cầu",
+        "Yêu cầu trả hàng của bạn đã được ghi nhận. Chúng tôi sẽ phản hồi sớm nhất có thể.",
         [{ text: "OK", onPress: () => navigation.goBack() }],
       );
-    } catch (err) {
-      const msg = err?.message || "Không thể gửi yêu cầu. Vui lòng thử lại.";
+    } catch (error) {
+      const msg = error?.message || "Không thể gửi yêu cầu. Vui lòng thử lại.";
       Alert.alert("Lỗi", msg);
     } finally {
       setSubmitting(false);
@@ -110,261 +189,406 @@ export default function ReturnRequestScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Order Info */}
-      <View style={styles.orderInfoCard}>
-        <Text style={styles.orderInfoTitle}>Đơn hàng #{orderId}</Text>
-        <Text style={styles.orderInfoSub}>{(orderItems || []).length} sản phẩm trong đơn</Text>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>Hậu Mãi Đơn Hàng</Text>
+          <Text style={styles.heroTitle}>Yêu cầu trả hàng</Text>
+          <Text style={styles.heroText}>
+            Chọn lý do phù hợp và gửi ảnh minh chứng nếu cần để đơn được xử lý nhanh hơn.
+          </Text>
+        </View>
 
-      {/* Sản phẩm trong đơn */}
-      {Array.isArray(orderItems) && orderItems.length > 0 && (
-        <View style={styles.itemsSection}>
-          <Text style={styles.sectionLabel}>SẢN PHẨM TRONG ĐƠN</Text>
-          {orderItems.map((it, idx) => {
-            const img =
-              it.productImage ||
-              it.product?.imageUrl ||
-              it.product?.image ||
-              "https://via.placeholder.com/60";
-            const name = it.productName || it.product?.name || "Sản phẩm";
-            return (
-              <View key={idx} style={styles.itemRow}>
-                <Image source={{ uri: img }} style={styles.itemImg} />
-                <View style={styles.itemInfoCol}>
-                  <Text style={styles.itemName} numberOfLines={1}>
-                    {name}
-                  </Text>
-                  <Text style={styles.itemQty}>Số lượng: {it.quantity || 1}</Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Mã đơn</Text>
+            <Text style={styles.summaryValue}>#{orderId}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Sản phẩm</Text>
+            <Text style={styles.summaryValue}>
+              {Array.isArray(orderItems) ? orderItems.length : 0}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Giá trị tạm tính</Text>
+            <Text style={styles.summaryTotal}>{formatPrice(totalRefundPreview)}</Text>
+          </View>
+        </View>
+
+        {Array.isArray(orderItems) && orderItems.length > 0 ? (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Sản phẩm trong đơn</Text>
+            {orderItems.map((item, index) => (
+              <View key={item.id || `${item.productId}-${index}`} style={styles.itemRow}>
+                <View style={styles.itemToken}>
+                  <Text style={styles.itemTokenText}>#{item.productId}</Text>
                 </View>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{resolveOrderItemName(item)}</Text>
+                  <Text style={styles.itemMeta}>Số lượng {item.quantity || 1}</Text>
+                </View>
+                <Text style={styles.itemPrice}>
+                  {formatPrice(Number(item.priceAtPurchase || 0) * Number(item.quantity || 1))}
+                </Text>
               </View>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Chọn lý do trả hàng</Text>
+          {RETURN_REASONS.map((reason) => {
+            const isSelected = selectedReason === reason.id;
+
+            return (
+              <TouchableOpacity
+                key={reason.id}
+                style={[styles.reasonRow, isSelected && styles.reasonRowSelected]}
+                onPress={() => setSelectedReason(reason.id)}
+                activeOpacity={0.88}
+              >
+                <View style={[styles.reasonBullet, isSelected && styles.reasonBulletSelected]}>
+                  {isSelected ? <View style={styles.reasonBulletInner} /> : null}
+                </View>
+                <View style={styles.reasonContent}>
+                  <Text style={[styles.reasonLabel, isSelected && styles.reasonLabelSelected]}>
+                    {reason.label}
+                  </Text>
+                  {reason.requiresPhoto ? (
+                    <Text style={styles.reasonHint}>Cần ảnh minh chứng</Text>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
             );
           })}
         </View>
-      )}
 
-      {/* Chọn lý do */}
-      <Text style={styles.sectionLabel}>TẠI SAO BẠN MUỐN TRẢ HÀNG?</Text>
-      <View style={styles.reasonsGroup}>
-        {RETURN_REASONS.map((reason) => {
-          const isSelected = selectedReason === reason.id;
-          return (
-            <TouchableOpacity
-              key={reason.id}
-              style={[styles.reasonRow, isSelected && styles.reasonRowSelected]}
-              onPress={() => setSelectedReason(reason.id)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>
-                {isSelected && <View style={styles.radioInner} />}
-              </View>
-              <Text style={[styles.reasonLabel, isSelected && styles.reasonLabelSelected]}>
-                {reason.label}
-              </Text>
-              {reason.requiresPhoto && <Text style={styles.photoTag}>Cần ảnh</Text>}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Custom Reason */}
-      {selectedReason === "other" && (
-        <View style={styles.customReasonWrap}>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Mô tả thêm</Text>
           <TextInput
-            style={styles.customInput}
-            placeholder="Mô tả lý do của bạn..."
-            placeholderTextColor="#999"
+            style={styles.reasonInput}
+            placeholder="Mô tả thêm tình trạng sản phẩm hoặc lý do trả hàng"
+            placeholderTextColor="#9D9084"
+            multiline
+            numberOfLines={5}
             value={customReason}
             onChangeText={setCustomReason}
-            multiline
-            numberOfLines={4}
             textAlignVertical="top"
           />
         </View>
-      )}
 
-      {/* Gửi ảnh minh chứng */}
-      {(needsPhoto || selectedReason) && (
-        <View style={styles.photoSection}>
-          <Text style={styles.sectionLabel}>
-            {needsPhoto ? "ẢNH MINH CHỨNG (BẮT BUỘC)" : "ẢNH MINH CHỨNG (TÙY CHỌN)"}
-          </Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Ảnh minh chứng</Text>
+            <Text style={styles.sectionHint}>{requiresPhoto ? "Bắt buộc" : "Tuỳ chọn"}</Text>
+          </View>
 
-          {imageUri ? (
+          {selectedImage?.uri ? (
             <View style={styles.previewWrap}>
-              <Image source={{ uri: imageUri }} style={styles.previewImage} />
-              <TouchableOpacity style={styles.removePhotoBtn} onPress={() => setImageUri(null)}>
-                <Text style={styles.removePhotoText}>✕</Text>
+              <Image source={{ uri: selectedImage.uri }} style={styles.previewImage} />
+              <TouchableOpacity
+                style={styles.removePhotoBtn}
+                onPress={() => setSelectedImage(null)}
+              >
+                <Text style={styles.removePhotoText}>×</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.photoActions}>
-              <TouchableOpacity style={styles.photoBtn} onPress={handlePickImage}>
-                <Text style={styles.photoBtnIcon}>▢</Text>
+              <TouchableOpacity
+                style={styles.photoBtn}
+                onPress={handlePickImage}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.photoBtnIcon}>▣</Text>
                 <Text style={styles.photoBtnText}>Chọn ảnh</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.photoBtn} onPress={handleTakePhoto}>
+              <TouchableOpacity
+                style={styles.photoBtn}
+                onPress={handleTakePhoto}
+                activeOpacity={0.88}
+              >
                 <Text style={styles.photoBtnIcon}>◎</Text>
                 <Text style={styles.photoBtnText}>Chụp ảnh</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
-      )}
 
-      {/* Submit Button */}
-      <TouchableOpacity
-        style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-        onPress={handleSubmit}
-        disabled={submitting}
-        activeOpacity={0.8}
-      >
-        {submitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.submitBtnText}>Gửi yêu cầu trả hàng</Text>
-        )}
-      </TouchableOpacity>
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting}
+          activeOpacity={0.88}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#FFFDF9" size="small" />
+          ) : (
+            <Text style={styles.submitBtnText}>Gửi yêu cầu trả hàng</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FA", padding: 20 },
-
-  orderInfoCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FCF9F4",
   },
-  orderInfoTitle: { fontSize: 18, fontWeight: "900", color: "#111" },
-  orderInfoSub: { fontSize: 13, color: "#666", marginTop: 4 },
-
-  itemsSection: { marginBottom: 20 },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  heroCard: {
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: "#1E1815",
+    marginBottom: 16,
+  },
+  heroEyebrow: {
+    color: "#DCC4A8",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  heroTitle: {
+    color: "#FFF8EE",
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+  heroText: {
+    color: "rgba(255,248,238,0.76)",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    color: "#1E1815",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  sectionHint: {
+    color: "#9B4B1F",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 12,
+  },
+  summaryLabel: {
+    color: "#6D5D51",
+    fontSize: 13,
+  },
+  summaryValue: {
+    color: "#1E1815",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  summaryTotal: {
+    color: "#9B4B1F",
+    fontSize: 16,
+    fontWeight: "900",
+  },
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+    paddingTop: 12,
   },
-  itemImg: { width: 50, height: 50, borderRadius: 8, backgroundColor: "#eee" },
-  itemInfoCol: { flex: 1, marginLeft: 12 },
-  itemName: { fontSize: 14, fontWeight: "600", color: "#222" },
-  itemQty: { fontSize: 12, color: "#888", marginTop: 2 },
-
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#999",
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-
-  reasonsGroup: {
-    backgroundColor: "#fff",
+  itemToken: {
+    width: 56,
+    height: 56,
     borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: "#F5ECE3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  itemTokenText: {
+    color: "#9B4B1F",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  itemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  itemName: {
+    color: "#241A13",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  itemMeta: {
+    color: "#8A7B6F",
+    fontSize: 12,
+  },
+  itemPrice: {
+    color: "#9B4B1F",
+    fontSize: 14,
+    fontWeight: "800",
   },
   reasonRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#F0E5D8",
   },
-  reasonRowSelected: { backgroundColor: "#F0F4FF" },
-  radioOuter: {
+  reasonRowSelected: {
+    backgroundColor: "#FCF9F4",
+  },
+  reasonBullet: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: "#ccc",
-    justifyContent: "center",
+    borderColor: "#D9C7B7",
     alignItems: "center",
+    justifyContent: "center",
     marginRight: 14,
   },
-  radioOuterSelected: { borderColor: "#0055ff" },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#0055ff" },
-  reasonLabel: { flex: 1, fontSize: 15, color: "#333" },
-  reasonLabelSelected: { fontWeight: "700", color: "#111" },
-  photoTag: {
-    fontSize: 11,
-    color: "#0055ff",
-    fontWeight: "700",
-    backgroundColor: "#EFF2FE",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+  reasonBulletSelected: {
+    borderColor: "#9B4B1F",
   },
-
-  customReasonWrap: { marginBottom: 20 },
-  customInput: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
+  reasonBulletInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#9B4B1F",
+  },
+  reasonContent: {
+    flex: 1,
+  },
+  reasonLabel: {
+    color: "#241A13",
     fontSize: 15,
-    color: "#111",
-    minHeight: 100,
-    borderWidth: 1,
-    borderColor: "#E8E8E8",
   },
-
-  photoSection: { marginBottom: 24 },
-  photoActions: { flexDirection: "row", gap: 12 },
+  reasonLabelSelected: {
+    fontWeight: "700",
+  },
+  reasonHint: {
+    color: "#9B4B1F",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  reasonInput: {
+    marginTop: 14,
+    backgroundColor: "#FCF9F4",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#241A13",
+    borderWidth: 1,
+    borderColor: "#E7DBCF",
+    minHeight: 120,
+  },
+  photoActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+  },
   photoBtn: {
     flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: 16,
+    paddingVertical: 18,
     alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#E8E8E8",
-    borderStyle: "dashed",
+    justifyContent: "center",
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#E7DBCF",
   },
-  photoBtnIcon: { fontSize: 28, color: "#0055ff", marginBottom: 8 },
-  photoBtnText: { fontSize: 13, fontWeight: "600", color: "#666" },
-
-  previewWrap: { position: "relative" },
+  photoBtnIcon: {
+    color: "#9B4B1F",
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  photoBtnText: {
+    color: "#65574C",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  previewWrap: {
+    marginTop: 4,
+    position: "relative",
+  },
   previewImage: {
     width: "100%",
-    height: 200,
-    borderRadius: 14,
-    backgroundColor: "#eee",
+    height: 220,
+    borderRadius: 18,
+    backgroundColor: "#EFE8E0",
   },
   removePhotoBtn: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "rgba(30,24,21,0.72)",
   },
-  removePhotoText: { color: "#fff", fontSize: 14, fontWeight: "bold" },
-
+  removePhotoText: {
+    color: "#FFFDF9",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  bottomSpacer: {
+    height: 110,
+  },
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FCF9F4",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 34,
+    borderTopWidth: 1,
+    borderTopColor: "#EFE3D6",
+  },
   submitBtn: {
-    backgroundColor: "#0055ff",
-    paddingVertical: 18,
-    borderRadius: 14,
+    backgroundColor: "#1E1815",
+    paddingVertical: 16,
+    borderRadius: 18,
     alignItems: "center",
   },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  submitBtnDisabled: {
+    opacity: 0.6,
+  },
+  submitBtnText: {
+    color: "#FFFDF9",
+    fontSize: 16,
+    fontWeight: "800",
+  },
 });
