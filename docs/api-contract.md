@@ -569,6 +569,8 @@ Response `200`:
 ### Admin
 
 Preferred admin order routes:
+- `GET /admin/inventory`
+- `GET /admin/analytics/sales-by-product`
 - `GET /admin/products`
 - `GET /admin/products/:id`
 - `POST /admin/products`
@@ -1514,6 +1516,93 @@ Rules:
 
 Response `204`:
 - no content
+
+### `GET /admin/inventory`
+
+Get the current inventory snapshot with warehouse analytics fields.
+
+Access rules:
+- admin/staff only
+
+Query params:
+- `categoryId` optional, positive integer
+- `lowStockOnly` optional, `true` or `false`
+
+Response `200`:
+
+```json
+{
+  "generatedAt": "2026-04-24T10:00:00.000Z",
+  "items": [
+    {
+      "productId": 1,
+      "sku": "TSHIRT-001",
+      "productName": "Classic T-Shirt",
+      "categoryId": 1,
+      "category": "apparel",
+      "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
+      "basePrice": 199000,
+      "stockQty": 20,
+      "reservedQty": 3,
+      "availableQty": 17,
+      "minStockLevel": 5,
+      "ads": 0,
+      "doi": 0,
+      "lastCalculatedAt": null,
+      "isLowStock": false,
+      "isOutOfStock": false,
+      "createdAt": "2026-04-02T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `GET /admin/analytics/sales-by-product`
+
+Get aggregated product sales metrics for a date window.
+
+Access rules:
+- admin/staff only
+
+Query params:
+- `from` optional, `YYYY-MM-DD`
+- `to` optional, `YYYY-MM-DD`
+
+Behavior:
+- if both params are omitted, backend returns the last 7 days ending on today (UTC)
+- analytics currently count orders with `status = completed`
+- the sales window uses `orders.updated_at` as the completed timestamp reference
+
+Response `200`:
+
+```json
+{
+  "generatedAt": "2026-04-24T10:00:00.000Z",
+  "from": "2026-04-18",
+  "to": "2026-04-24",
+  "items": [
+    {
+      "productId": 1,
+      "sku": "TSHIRT-001",
+      "productName": "Classic T-Shirt",
+      "categoryId": 1,
+      "category": "apparel",
+      "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
+      "basePrice": 199000,
+      "stockQty": 20,
+      "reservedQty": 3,
+      "availableQty": 17,
+      "minStockLevel": 5,
+      "ads": 0,
+      "doi": 0,
+      "lastCalculatedAt": null,
+      "soldQty": 12,
+      "revenue": 2388000,
+      "orderCount": 7
+    }
+  ]
+}
+```
 
 ### `GET /admin/categories`
 

@@ -239,6 +239,20 @@ Current backend state already writes inventory lifecycle records:
 - `inventory_transactions`
 - `orders`
 - `issues`
+- `GET /admin/inventory`
+- `GET /admin/analytics/sales-by-product`
+
+### Recommended production approach
+
+1. `GET /admin/inventory`
+2. `GET /admin/analytics/sales-by-product?from=YYYY-MM-DD&to=YYYY-MM-DD`
+3. classify products in `n8n`
+4. send Discord / email alerts
+
+Notes:
+- backend now exposes `ads`, `doi`, `lastCalculatedAt`, low-stock flags, and current stock snapshot through `/admin/inventory`
+- backend now exposes per-product `soldQty`, `revenue`, and `orderCount` through `/admin/analytics/sales-by-product`
+- sales analytics currently use orders with `status = completed`
 
 ## Flow 5: Payment Failover
 
