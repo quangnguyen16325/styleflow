@@ -1,3 +1,4 @@
+/* eslint-env node */
 import http from 'http';
 
 const data = JSON.stringify({
