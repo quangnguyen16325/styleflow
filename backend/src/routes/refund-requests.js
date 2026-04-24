@@ -16,6 +16,7 @@ router.post("/", async (req, res) => {
 
   const orderId = Number(req.body.orderId);
   const imageUrl = req.body.imageUrl.trim();
+  const reason = req.body.reason.trim();
   const customerId = req.authCustomer.id;
 
   const client = await pool.connect();
@@ -83,22 +84,24 @@ router.post("/", async (req, res) => {
           order_id,
           customer_id,
           image_url,
+          reason,
           status,
           abuse_score_snapshot
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING
           id,
           order_id,
           customer_id,
           image_url,
+          reason,
           status,
           abuse_score_snapshot,
           review_note,
           created_at,
           updated_at
       `,
-      [orderId, customerId, imageUrl, initialStatus, abuseScore],
+      [orderId, customerId, imageUrl, reason, initialStatus, abuseScore],
     );
 
     if (initialStatus === "manual_review_required") {
@@ -159,21 +162,36 @@ function validateRefundRequestPayload(body) {
     return "imageUrl is required";
   }
 
+  if (!body.reason?.trim()) {
+    return "reason is required";
+  }
+
   return null;
 }
 
 export function mapRefundRequestRow(row) {
-  return {
+  const mapped = {
     id: Number(row.id),
     orderId: Number(row.order_id),
     customerId: Number(row.customer_id),
     imageUrl: row.image_url,
+    reason: row.reason,
     status: row.status,
     abuseScoreSnapshot: Number(row.abuse_score_snapshot),
     reviewNote: row.review_note,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+
+  if (row.order_total_amount != null) {
+    mapped.orderAmount = Number(row.order_total_amount);
+  }
+
+  if (row.customer_email != null) {
+    mapped.customerEmail = row.customer_email;
+  }
+
+  return mapped;
 }
 
 const ABUSE_SCORE_MANUAL_REVIEW_THRESHOLD = 3;

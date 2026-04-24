@@ -30,6 +30,7 @@ router.get("/", async (req, res) => {
           rr.order_id,
           rr.customer_id,
           rr.image_url,
+          rr.reason,
           rr.status,
           rr.abuse_score_snapshot,
           rr.review_note,
@@ -72,13 +73,18 @@ router.get("/:id", async (req, res) => {
           rr.id,
           rr.order_id,
           rr.customer_id,
+          o.total_amount AS order_total_amount,
+          c.email AS customer_email,
           rr.image_url,
+          rr.reason,
           rr.status,
           rr.abuse_score_snapshot,
           rr.review_note,
           rr.created_at,
           rr.updated_at
         FROM refund_requests rr
+        JOIN orders o ON o.id = rr.order_id
+        JOIN customers c ON c.id = rr.customer_id
         WHERE rr.id = $1
         LIMIT 1
       `,
@@ -144,6 +150,7 @@ router.patch("/:id/status", async (req, res) => {
           order_id,
           customer_id,
           image_url,
+          reason,
           status,
           abuse_score_snapshot,
           review_note,

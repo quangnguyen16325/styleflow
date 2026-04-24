@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS customer_addresses (
   receiver_name VARCHAR(255) NOT NULL,
   receiver_phone VARCHAR(50) NOT NULL,
   address_line TEXT NOT NULL,
+  province_code VARCHAR(20),
+  district_code VARCHAR(20),
+  ward_code VARCHAR(20),
   ward VARCHAR(120),
   district VARCHAR(120),
   city VARCHAR(120) NOT NULL,
@@ -134,6 +137,9 @@ CREATE TABLE IF NOT EXISTS orders (
   shipping_receiver_name VARCHAR(255),
   shipping_receiver_phone VARCHAR(50),
   shipping_address_line TEXT,
+  shipping_province_code VARCHAR(20),
+  shipping_district_code VARCHAR(20),
+  shipping_ward_code VARCHAR(20),
   shipping_ward VARCHAR(120),
   shipping_district VARCHAR(120),
   shipping_address TEXT NOT NULL,
@@ -186,6 +192,7 @@ CREATE TABLE IF NOT EXISTS refund_requests (
   order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
     status IN (
       'pending',
@@ -254,6 +261,15 @@ ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS customer_address_id BIGINT REFERENCES customer_addresses(id) ON DELETE SET NULL;
+
+ALTER TABLE customer_addresses
+ADD COLUMN IF NOT EXISTS province_code VARCHAR(20);
+
+ALTER TABLE customer_addresses
+ADD COLUMN IF NOT EXISTS district_code VARCHAR(20);
+
+ALTER TABLE customer_addresses
+ADD COLUMN IF NOT EXISTS ward_code VARCHAR(20);
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'unpaid';
@@ -405,6 +421,15 @@ ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_address_line TEXT;
 
 ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_province_code VARCHAR(20);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_district_code VARCHAR(20);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS shipping_ward_code VARCHAR(20);
+
+ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS shipping_ward VARCHAR(120);
 
 ALTER TABLE orders
@@ -446,6 +471,19 @@ WHERE de.id > older.id
 
 ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS review_note TEXT;
+
+ALTER TABLE refund_requests
+ADD COLUMN IF NOT EXISTS reason TEXT;
+
+UPDATE refund_requests
+SET reason = ''
+WHERE reason IS NULL;
+
+ALTER TABLE refund_requests
+ALTER COLUMN reason SET DEFAULT '';
+
+ALTER TABLE refund_requests
+ALTER COLUMN reason SET NOT NULL;
 
 ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS abuse_score_snapshot INTEGER DEFAULT 0;
@@ -497,6 +535,9 @@ CREATE INDEX IF NOT EXISTS idx_customers_role ON customers(role);
 CREATE INDEX IF NOT EXISTS idx_customers_blacklisted ON customers(is_blacklisted);
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_customer_id ON customer_addresses(customer_id);
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_city ON customer_addresses(city);
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_province_code ON customer_addresses(province_code);
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_district_code ON customer_addresses(district_code);
+CREATE INDEX IF NOT EXISTS idx_customer_addresses_ward_code ON customer_addresses(ward_code);
 CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_customer_addresses_default_per_customer
 ON customer_addresses(customer_id)
@@ -523,6 +564,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_customer_address_id ON orders(customer_add
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_status ON orders(delivery_status);
+CREATE INDEX IF NOT EXISTS idx_orders_shipping_province_code ON orders(shipping_province_code);
+CREATE INDEX IF NOT EXISTS idx_orders_shipping_district_code ON orders(shipping_district_code);
+CREATE INDEX IF NOT EXISTS idx_orders_shipping_ward_code ON orders(shipping_ward_code);
 CREATE INDEX IF NOT EXISTS idx_orders_transaction_ref ON orders(transaction_ref);
 CREATE INDEX IF NOT EXISTS idx_orders_incident_id ON orders(incident_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);

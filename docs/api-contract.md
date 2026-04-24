@@ -120,6 +120,9 @@ Common error codes:
   "receiverName": "Nguyen Van A",
   "receiverPhone": "0901234567",
   "addressLine": "123 Nguyen Trai",
+  "provinceCode": "79",
+  "districtCode": "760",
+  "wardCode": "26734",
   "ward": "Ward 2",
   "district": "District 5",
   "city": "Ho Chi Minh City",
@@ -138,6 +141,9 @@ Common error codes:
   "receiverName": "Nguyen Van A",
   "receiverPhone": "0901234567",
   "addressLine": "123 Nguyen Trai",
+  "provinceCode": "79",
+  "districtCode": "760",
+  "wardCode": "26734",
   "ward": "Ward 2",
   "district": "District 5",
   "city": "Ho Chi Minh City",
@@ -190,7 +196,10 @@ Common error codes:
   "id": 1,
   "orderId": 12,
   "customerId": 4,
+  "orderAmount": 219000,
+  "customerEmail": "customer@example.com",
   "imageUrl": "https://example.com/evidence.jpg",
+  "reason": "Product was damaged on arrival",
   "status": "pending",
   "abuseScoreSnapshot": 1,
   "reviewNote": null,
@@ -198,6 +207,10 @@ Common error codes:
   "updatedAt": "2026-04-02T10:00:00.000Z"
 }
 ```
+
+Notes:
+- `orderAmount` and `customerEmail` are returned by `GET /admin/refund-requests/:id`
+- list and status-update responses do not currently include `orderAmount` or `customerEmail`
 
 ## Auth Response Model
 
@@ -224,17 +237,33 @@ Common error codes:
 {
   "id": 1,
   "status": "pending",
-  "totalAmount": 418000,
-  "shippingFee": 20000,
+  "totalAmount": 438000,
+  "shippingFee": 40000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
   "customerAddressId": 1,
   "shippingAddress": "123 Nguyen Trai, HCMC",
   "city": "Ho Chi Minh City",
+  "addressChangeStatus": "requested",
+  "addressChangePayload": {
+    "receiverName": "Nguyen Van A",
+    "receiverPhone": "0901234567",
+    "addressLine": "88 Nguyen Van Linh",
+    "ward": "Hai Chau 1",
+    "district": "Hai Chau",
+    "city": "Da Nang",
+    "fullAddress": "88 Nguyen Van Linh, Hai Chau 1, Hai Chau, Da Nang, Vietnam",
+    "calculatedShippingFee": 40000,
+    "processingFee": 10000,
+    "currentShippingFee": 40000
+  },
   "shipping": {
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
     "addressLine": "123 Nguyen Trai",
+    "provinceCode": "79",
+    "districtCode": "760",
+    "wardCode": "26734",
     "ward": "Ward 2",
     "district": "District 5",
     "city": "Ho Chi Minh City",
@@ -260,6 +289,10 @@ Common error codes:
   "updatedAt": "2026-04-02T10:15:00.000Z"
 }
 ```
+
+Notes:
+- `addressChangeStatus` and `addressChangePayload` are currently returned by admin order endpoints
+- `addressChangePayload` is `null` unless an address change request is pending or preserved on the order
 
 ## Endpoints
 
@@ -437,6 +470,31 @@ Response `200`:
 
 Create a new address for the authenticated customer.
 
+Request body example:
+
+```json
+{
+  "label": "home",
+  "receiverName": "Nguyen Van A",
+  "receiverPhone": "0901234567",
+  "addressLine": "123 Nguyen Trai",
+  "provinceCode": "79",
+  "districtCode": "760",
+  "wardCode": "26734",
+  "ward": "Ward 2",
+  "district": "District 5",
+  "city": "Ho Chi Minh City",
+  "country": "Vietnam",
+  "postalCode": "700000",
+  "isDefault": true
+}
+```
+
+Rules:
+- `receiverName`, `receiverPhone`, `addressLine`, and `city` are required
+- `provinceCode`, `districtCode`, and `wardCode` are optional additive fields for precise Vietnam administrative mapping
+- existing clients can continue sending only text fields (`ward`, `district`, `city`)
+
 Response `201`:
 - `Customer Address Model`
 
@@ -454,9 +512,65 @@ Delete one address of the authenticated customer.
 Response `204`:
 - empty body
 
+### `GET /locations/provinces`
+
+Get the Vietnam province/city list for address pickers.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": 48,
+    "name": "Thành phố Đà Nẵng",
+    "divisionType": "thành phố trung ương",
+    "codename": "thanh_pho_da_nang",
+    "phoneCode": 236
+  }
+]
+```
+
+### `GET /locations/provinces/:provinceCode/districts`
+
+Get the district list for one province.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": 493,
+    "name": "Quận Sơn Trà",
+    "divisionType": "quận",
+    "codename": "quan_son_tra",
+    "provinceCode": 48
+  }
+]
+```
+
+### `GET /locations/districts/:districtCode/wards`
+
+Get the ward list for one district.
+
+Response `200`:
+
+```json
+[
+  {
+    "code": 20194,
+    "name": "Phường Hòa Hiệp Bắc",
+    "divisionType": "phường",
+    "codename": "phuong_hoa_hiep_bac",
+    "districtCode": 490
+  }
+]
+```
+
 ### Admin
 
 Preferred admin order routes:
+- `GET /admin/inventory`
+- `GET /admin/analytics/sales-by-product`
 - `GET /admin/products`
 - `GET /admin/products/:id`
 - `POST /admin/products`
@@ -733,7 +847,17 @@ Access rules:
 - admin/staff only
 
 Response `200`:
-- array of `Refund Request Model`
+- array of refund request summary objects with:
+  - `id`
+  - `orderId`
+  - `customerId`
+  - `imageUrl`
+  - `reason`
+  - `status`
+  - `abuseScoreSnapshot`
+  - `reviewNote`
+  - `createdAt`
+  - `updatedAt`
 
 ### `GET /admin/refund-requests/:id`
 
@@ -769,7 +893,17 @@ Allowed `status` values:
 - `refunded`
 
 Response `200`:
-- `Refund Request Model`
+- refund request status object with:
+  - `id`
+  - `orderId`
+  - `customerId`
+  - `imageUrl`
+  - `reason`
+  - `status`
+  - `abuseScoreSnapshot`
+  - `reviewNote`
+  - `createdAt`
+  - `updatedAt`
 
 ### `GET /admin/system-config`
 
@@ -1010,7 +1144,8 @@ Response `200`:
 ```json
 {
   "success": true,
-  "action": "retry_pending"
+  "action": "retry_pending",
+  "customerEmail": "nguyenvana@example.com"
 }
 ```
 
@@ -1382,6 +1517,93 @@ Rules:
 Response `204`:
 - no content
 
+### `GET /admin/inventory`
+
+Get the current inventory snapshot with warehouse analytics fields.
+
+Access rules:
+- admin/staff only
+
+Query params:
+- `categoryId` optional, positive integer
+- `lowStockOnly` optional, `true` or `false`
+
+Response `200`:
+
+```json
+{
+  "generatedAt": "2026-04-24T10:00:00.000Z",
+  "items": [
+    {
+      "productId": 1,
+      "sku": "TSHIRT-001",
+      "productName": "Classic T-Shirt",
+      "categoryId": 1,
+      "category": "apparel",
+      "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
+      "basePrice": 199000,
+      "stockQty": 20,
+      "reservedQty": 3,
+      "availableQty": 17,
+      "minStockLevel": 5,
+      "ads": 0,
+      "doi": 0,
+      "lastCalculatedAt": null,
+      "isLowStock": false,
+      "isOutOfStock": false,
+      "createdAt": "2026-04-02T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `GET /admin/analytics/sales-by-product`
+
+Get aggregated product sales metrics for a date window.
+
+Access rules:
+- admin/staff only
+
+Query params:
+- `from` optional, `YYYY-MM-DD`
+- `to` optional, `YYYY-MM-DD`
+
+Behavior:
+- if both params are omitted, backend returns the last 7 days ending on today (UTC)
+- analytics currently count orders with `status = completed`
+- the sales window uses `orders.updated_at` as the completed timestamp reference
+
+Response `200`:
+
+```json
+{
+  "generatedAt": "2026-04-24T10:00:00.000Z",
+  "from": "2026-04-18",
+  "to": "2026-04-24",
+  "items": [
+    {
+      "productId": 1,
+      "sku": "TSHIRT-001",
+      "productName": "Classic T-Shirt",
+      "categoryId": 1,
+      "category": "apparel",
+      "imageUrl": "https://assets.ecloria.co.uk/products/1/main-1712736000000.jpeg",
+      "basePrice": 199000,
+      "stockQty": 20,
+      "reservedQty": 3,
+      "availableQty": 17,
+      "minStockLevel": 5,
+      "ads": 0,
+      "doi": 0,
+      "lastCalculatedAt": null,
+      "soldQty": 12,
+      "revenue": 2388000,
+      "orderCount": 7
+    }
+  ]
+}
+```
+
 ### `GET /admin/categories`
 
 Get the admin category list.
@@ -1491,7 +1713,6 @@ Request body using a saved address:
 ```json
 {
   "addressId": 1,
-  "shippingFee": 20000,
   "items": [
     {
       "productId": 1,
@@ -1509,13 +1730,15 @@ Request body using a new address:
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
     "addressLine": "123 Nguyen Trai",
+    "provinceCode": "79",
+    "districtCode": "760",
+    "wardCode": "26734",
     "ward": "Ward 2",
     "district": "District 5",
     "city": "Ho Chi Minh City",
     "country": "Vietnam",
     "postalCode": "700000"
   },
-  "shippingFee": 20000,
   "items": [
     {
       "productId": 1,
@@ -1539,6 +1762,8 @@ Rules:
 - `productId`: required
 - `quantity`: required, integer, greater than 0
 - `priceAtPurchase` and `totalAmount` are computed by the backend
+- backend computes final `shippingFee` from the shipping city using the Da Nang origin zone rules
+- client-provided `shippingFee` is accepted for backward compatibility, but backend-calculated fee is the source of truth
 - when `addressId` is used, it must belong to the authenticated customer
 
 Response `201`:
@@ -1547,8 +1772,8 @@ Response `201`:
 {
   "id": 1,
   "status": "pending",
-  "totalAmount": 418000,
-  "shippingFee": 20000,
+  "totalAmount": 438000,
+  "shippingFee": 40000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
   "failCount": 0,
   "customerAddressId": 1,
@@ -1558,6 +1783,9 @@ Response `201`:
     "receiverName": "Nguyen Van A",
     "receiverPhone": "0901234567",
     "addressLine": "123 Nguyen Trai",
+    "provinceCode": "79",
+    "districtCode": "760",
+    "wardCode": "26734",
     "ward": "Ward 2",
     "district": "District 5",
     "city": "Ho Chi Minh City",
@@ -1641,15 +1869,16 @@ Request body using a new address:
     "city": "Da Nang",
     "country": "Vietnam",
     "postalCode": "550000"
-  },
-  "requestedShippingFee": 50000
+  }
 }
 ```
 
 Rules:
 - use either `addressId` or `newAddress`, not both
-- same-city change is applied immediately
-- cross-city change is stored as pending approval for admin/n8n flow
+- if the order status is `pending`, the address change is applied immediately and `shippingFee` is recalculated from the new address without any extra handling fee
+- for orders that have moved past `pending`, the request is stored as pending approval for admin/n8n flow
+- same-province approved changes keep the current `shippingFee` and add a `10000` handling fee
+- cross-province change stores a recalculated shipping fee using the backend shipping rule
 - order must still be in an address-change-eligible delivery stage
 
 Response `200` immediate update:
@@ -1657,7 +1886,10 @@ Response `200` immediate update:
 ```json
 {
   "success": true,
-  "action": "updated_same_city"
+  "action": "updated_pending_recalculated",
+  "shippingFee": 15000,
+  "processingFee": 0,
+  "feeDelta": -25000
 }
 ```
 
@@ -1666,7 +1898,10 @@ Response `200` pending approval:
 ```json
 {
   "success": true,
-  "action": "pending_approval"
+  "action": "pending_approval",
+  "calculatedShippingFee": 40000,
+  "processingFee": 10000,
+  "feeDelta": 35000
 }
 ```
 
@@ -1694,13 +1929,15 @@ Request body:
 ```json
 {
   "orderId": 12,
-  "imageUrl": "https://example.com/evidence.jpg"
+  "imageUrl": "https://example.com/evidence.jpg",
+  "reason": "Product was damaged on arrival"
 }
 ```
 
 Rules:
 - `orderId` must be a positive integer
 - `imageUrl` is required
+- `reason` is required
 - an order cannot have more than one active refund request at the same time
 - backend uses the authenticated customer from JWT, not any client-provided phone
 - if the customer's abuse score is high, the request starts as `manual_review_required`
@@ -1713,6 +1950,7 @@ Response `201`:
   "orderId": 12,
   "customerId": 4,
   "imageUrl": "https://example.com/evidence.jpg",
+  "reason": "Product was damaged on arrival",
   "status": "pending",
   "abuseScoreSnapshot": 1,
   "reviewNote": null,

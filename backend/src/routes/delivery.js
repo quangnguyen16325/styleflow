@@ -23,9 +23,15 @@ router.post("/delivery-callback", async (req, res) => {
 
     const orderResult = await client.query(
       `
-        SELECT id, status, delivery_fail_count, delivery_status
-        FROM orders
-        WHERE id = $1
+        SELECT
+          o.id,
+          o.status,
+          o.delivery_fail_count,
+          o.delivery_status,
+          c.email AS customer_email
+        FROM orders o
+        JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = $1
         LIMIT 1
       `,
       [orderId],
@@ -56,10 +62,15 @@ router.post("/delivery-callback", async (req, res) => {
 
     if (externalEventId && deliveryEventResult.rows.length === 0) {
       await client.query("COMMIT");
-      return res.json({ success: true, action: "duplicate_ignored" });
+      return res.json({
+        success: true,
+        action: "duplicate_ignored",
+        customerEmail: order.customer_email,
+      });
     }
 
     let action = "updated";
+    let failCount = Number(order.delivery_fail_count);
     if (status === "DELIVERED") {
       await client.query(
         `
@@ -74,6 +85,7 @@ router.post("/delivery-callback", async (req, res) => {
       );
       await applyOrderLifecycleTransition(client, orderId, order.status, "completed");
       action = "delivered";
+      failCount = 0;
     } else if (status === "RETURNED") {
       if (order.status === "completed" && order.delivery_status !== "returned") {
         await applyOrderReturn(client, orderId);
@@ -92,6 +104,7 @@ router.post("/delivery-callback", async (req, res) => {
         [orderId, partner],
       );
       action = "returned";
+      failCount = Number(order.delivery_fail_count);
     } else if (status === "FAILED") {
       const nextFailCount = Number(order.delivery_fail_count) + 1;
       const nextDeliveryStatus = nextFailCount >= 3 ? "returning" : "retry_pending";
@@ -142,6 +155,7 @@ router.post("/delivery-callback", async (req, res) => {
       }
 
       action = nextFailCount >= 3 ? "returning" : "retry_pending";
+      failCount = nextFailCount;
     } else {
       await client.query(
         `
@@ -154,10 +168,16 @@ router.post("/delivery-callback", async (req, res) => {
         `,
         [orderId, mapCallbackStatusToDeliveryStatus(status), partner],
       );
+      failCount = Number(order.delivery_fail_count);
     }
 
     await client.query("COMMIT");
-    return res.json({ success: true, action });
+    return res.json({
+      success: true,
+      action,
+      failCount,
+      customerEmail: order.customer_email,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("POST /delivery-callback failed:", error);
