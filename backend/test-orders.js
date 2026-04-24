@@ -1,4 +1,3 @@
-/* eslint-disable no-undef, no-console */
 import http from 'http';
 
 const data = JSON.stringify({
