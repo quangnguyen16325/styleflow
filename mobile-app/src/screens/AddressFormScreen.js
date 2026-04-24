@@ -263,16 +263,20 @@ export default function AddressFormScreen({ route, navigation }) {
     if (!validate()) return;
 
     setSaving(true);
+    const trimmedPostalCode = postalCode.trim();
     const payload = {
       label,
       receiverName: receiverName.trim(),
       receiverPhone: receiverPhone.trim(),
+      provinceCode: selectedProvince?.code ? String(selectedProvince.code) : undefined,
+      districtCode: selectedDistrict?.code ? String(selectedDistrict.code) : undefined,
+      wardCode: selectedWard?.code ? String(selectedWard.code) : undefined,
       addressLine: addressLine.trim(),
       ward: selectedWard?.name || "",
       district: selectedDistrict?.name || "",
       city: selectedProvince?.name || "",
       country: "Vietnam",
-      postalCode: postalCode.trim(),
+      postalCode: trimmedPostalCode || undefined,
       isDefault,
     };
 
@@ -307,8 +311,7 @@ export default function AddressFormScreen({ route, navigation }) {
             {isEdit ? "Cập nhật nơi nhận hàng" : "Thêm nơi nhận hàng"}
           </Text>
           <Text style={styles.heroText}>
-            Tỉnh, quận và phường được tải từ API địa giới Việt Nam của backend để map tên địa chỉ
-            nhất quán khi lưu đơn hàng.
+            Thêm các địa chỉ của bạn để dễ dàng đặt hàng nhanh chóng hơn.
           </Text>
         </View>
 
