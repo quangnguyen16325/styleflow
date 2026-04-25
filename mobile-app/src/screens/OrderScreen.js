@@ -23,6 +23,7 @@ const TABS = [
   { key: "processing", label: "Đang xử lý" },
   { key: "shipping", label: "Đang giao" },
   { key: "done", label: "Hoàn tất" },
+  { key: "refund", label: "Trả hàng" },
 ];
 
 function formatDate(dateString) {
@@ -66,6 +67,24 @@ function canChangeAddress(status) {
   return ["pending", "processing", "confirmed", "shipping", "shipped", "ready_to_ship"].includes(
     String(status || "").toLowerCase(),
   );
+}
+
+function hasRefundRequest(latestRefundRequestStatus) {
+  return (
+    typeof latestRefundRequestStatus === "string" && latestRefundRequestStatus.trim().length > 0
+  );
+}
+
+function getRefundStatusLabel(latestRefundRequestStatus) {
+  const normalized = String(latestRefundRequestStatus || "").toLowerCase();
+
+  if (normalized === "pending") return "Yêu cầu đã gửi";
+  if (normalized === "manual_review_required") return "Chờ duyệt thủ công";
+  if (normalized === "approved") return "Đã duyệt";
+  if (normalized === "rejected") return "Đã từ chối";
+  if (normalized === "refunded") return "Đã hoàn tiền";
+
+  return "Đang xử lý trả hàng";
 }
 
 function isWithin7Days(dateStr) {
@@ -249,6 +268,9 @@ export default function OrderScreen({ navigation }) {
       if (activeTab === "done") {
         return ["completed", "delivered"].includes(status);
       }
+      if (activeTab === "refund") {
+        return hasRefundRequest(order.latestRefundRequestStatus);
+      }
       return true;
     });
   }, [activeTab, orders]);
@@ -370,6 +392,7 @@ export default function OrderScreen({ navigation }) {
             const statusMeta = getOrderStatusMeta(order.status);
             const itemCount = (order.items || []).reduce((sum, item) => sum + item.quantity, 0);
             const completed = isCompletedStatus(order.status);
+            const refundRequested = hasRefundRequest(order.latestRefundRequestStatus);
 
             return (
               <View key={order.id} style={styles.orderCard}>
@@ -392,6 +415,14 @@ export default function OrderScreen({ navigation }) {
                     <Text style={styles.summaryLabel}>Sản phẩm</Text>
                     <Text style={styles.summaryValue}>{itemCount} món</Text>
                   </View>
+                  {refundRequested ? (
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Trả hàng</Text>
+                      <Text style={styles.summaryValue}>
+                        {getRefundStatusLabel(order.latestRefundRequestStatus)}
+                      </Text>
+                    </View>
+                  ) : null}
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Tổng thanh toán</Text>
                     <Text style={styles.summaryTotal}>{formatPrice(order.totalAmount)}</Text>
@@ -415,7 +446,7 @@ export default function OrderScreen({ navigation }) {
                     </TouchableOpacity>
                   ) : null}
 
-                  {completed && isWithin7Days(order.createdAt) ? (
+                  {completed && isWithin7Days(order.createdAt) && !refundRequested ? (
                     <TouchableOpacity
                       style={styles.secondaryAction}
                       onPress={() =>

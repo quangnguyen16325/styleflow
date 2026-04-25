@@ -39,7 +39,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id, latest_rr.status ORDER BY o.created_at DESC`,
       params,
     );
 
@@ -75,7 +75,7 @@ router.get("/:id", requireAuth, async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1${accessClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1${accessClause} GROUP BY o.id, c.id, latest_rr.status ORDER BY o.created_at DESC`,
       params,
     );
 
@@ -189,7 +189,7 @@ router.patch("/:id/status", requireAuth, requireRole("admin", "staff"), async (r
     await client.query("COMMIT");
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id, latest_rr.status ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -694,6 +694,7 @@ const listOrdersBaseQuery = `
     c.full_name,
     c.phone,
     c.email,
+    latest_rr.status AS latest_refund_request_status,
     COALESCE(
       json_agg(
         json_build_object(
@@ -708,6 +709,13 @@ const listOrdersBaseQuery = `
     ) AS items
   FROM orders o
   JOIN customers c ON c.id = o.customer_id
+  LEFT JOIN LATERAL (
+    SELECT rr.status
+    FROM refund_requests rr
+    WHERE rr.order_id = o.id
+    ORDER BY rr.created_at DESC, rr.id DESC
+    LIMIT 1
+  ) latest_rr ON true
   LEFT JOIN order_items oi ON oi.order_id = o.id
 `;
 
@@ -830,6 +838,7 @@ function mapOrderRow(row) {
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
     customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
+    latestRefundRequestStatus: row.latest_refund_request_status ?? null,
     shippingAddress: row.shipping_address,
     city: row.city,
     shipping: mapShippingRow(row),

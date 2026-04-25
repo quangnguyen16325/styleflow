@@ -19,6 +19,10 @@ import api, {
   uploadFileToSignedUrl,
 } from "../services/api";
 
+const REFUND_REQUESTS_WEBHOOK_URL =
+  process.env.EXPO_PUBLIC_N8N_REFUND_REQUESTS_WEBHOOK_URL ||
+  "https://n8n.ecloria.co.uk/webhook/refund-requests";
+
 const RETURN_REASONS = [
   { id: "damaged", label: "Hàng bị hư hỏng / vỡ", requiresPhoto: true },
   { id: "wrong_item", label: "Sai size / màu / chủng loại", requiresPhoto: true },
@@ -85,6 +89,15 @@ export default function ReturnRequestScreen({ route, navigation }) {
         : 0,
     [orderItems],
   );
+
+  const handleCloseAfterSubmit = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.navigate("MainTabs");
+  };
 
   const handlePickImage = async () => {
     try {
@@ -169,16 +182,33 @@ export default function ReturnRequestScreen({ route, navigation }) {
         imageUrl = upload.publicUrl;
       }
 
-      await api.post("/refund-requests", {
+      const refundRequest = await api.post("/refund-requests", {
         orderId: Number(orderId),
         imageUrl,
         reason,
       });
 
+      const refundRequestId = Number(refundRequest?.data?.id);
+      if (Number.isInteger(refundRequestId) && refundRequestId > 0) {
+        try {
+          await fetch(REFUND_REQUESTS_WEBHOOK_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              refundRequestId,
+            }),
+          });
+        } catch (webhookError) {
+          console.warn("Không thể gửi webhook refund request:", webhookError);
+        }
+      }
+
       Alert.alert(
         "Đã gửi yêu cầu",
         "Yêu cầu trả hàng của bạn đã được ghi nhận. Chúng tôi sẽ phản hồi sớm nhất có thể.",
-        [{ text: "OK", onPress: () => navigation.goBack() }],
+        [{ text: "OK", onPress: handleCloseAfterSubmit }],
       );
     } catch (error) {
       const msg = error?.message || "Không thể gửi yêu cầu. Vui lòng thử lại.";
