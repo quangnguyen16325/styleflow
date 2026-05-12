@@ -1283,6 +1283,36 @@ Side effects:
 - when payment status resolves to `payment_failed`, backend sets `orders.status = failed`
 - payment failure rolls back reserved inventory through the normal order lifecycle
 
+### `POST /payment-events/expire-pending`
+
+Expire overdue bank transfer orders.
+
+Headers:
+
+```http
+X-Internal-Webhook-Secret: <INTERNAL_WEBHOOK_SECRET>
+```
+
+Rules:
+
+- internal workflow endpoint for cron/n8n only
+- finds orders where `paymentGateway = BANK_TRANSFER`
+- requires `paymentStatus = payment_pending`
+- requires `status = pending`
+- requires `paymentExpiresAt <= now`
+- marks matched orders as `status = failed` and `paymentStatus = payment_failed`
+- rolls back reserved inventory through the normal order lifecycle
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "expiredCount": 1,
+  "orderIds": [93]
+}
+```
+
 ### `GET /products`
 
 Get the product list.
@@ -1875,6 +1905,7 @@ Rules:
 - `paymentGateway`: optional, one of `COD`, `BANK_TRANSFER`; defaults to `COD`
 - `COD` creates the order with `paymentStatus = unpaid`
 - `BANK_TRANSFER` creates the order with `paymentStatus = payment_pending`
+- `BANK_TRANSFER` uses `paymentExpiresAt` as the transfer deadline; default is 30 minutes unless `BANK_TRANSFER_PAYMENT_EXPIRY_MINUTES` is configured
 
 Response `201`:
 

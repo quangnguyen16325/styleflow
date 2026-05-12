@@ -242,7 +242,7 @@ export default function CheckoutScreen({ navigation }) {
     try {
       const order = await createOrder(payload);
       clearCart();
-      navigation.navigate("Success", { orderId: order.id });
+      navigation.navigate("Success", { order });
     } catch (error) {
       const errorMessage =
         error.response?.data?.error?.message ||

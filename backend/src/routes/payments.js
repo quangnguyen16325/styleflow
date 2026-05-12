@@ -157,6 +157,85 @@ router.post("/payment-events", async (req, res) => {
   }
 });
 
+router.post("/payment-events/expire-pending", async (req, res) => {
+  const secretError = validateInternalWebhookSecret(req);
+  if (secretError) {
+    return res.status(secretError.status).json(secretError.body);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const expiredOrdersResult = await client.query(
+      `
+        SELECT id, status
+        FROM orders
+        WHERE
+          payment_gateway = 'BANK_TRANSFER'
+          AND payment_status = 'payment_pending'
+          AND status = 'pending'
+          AND payment_expires_at <= NOW()
+        FOR UPDATE
+      `,
+    );
+
+    const expiredOrders = expiredOrdersResult.rows;
+    for (const order of expiredOrders) {
+      await client.query(
+        `
+          UPDATE orders
+          SET
+            status = 'failed',
+            payment_status = 'payment_failed',
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [order.id],
+      );
+
+      await applyOrderLifecycleTransition(client, Number(order.id), order.status, "failed");
+
+      await client.query(
+        `
+          INSERT INTO payment_logs (
+            order_id,
+            external_event_id,
+            gateway_name,
+            source,
+            error_code,
+            payment_status,
+            raw_response
+          )
+          VALUES ($1, $2, 'BANK_TRANSFER', 'schedule', 'PAYMENT_EXPIRED', 'payment_failed', $3::jsonb)
+          ON CONFLICT (external_event_id) DO NOTHING
+        `,
+        [
+          order.id,
+          `bank-transfer-expired-${order.id}`,
+          JSON.stringify({
+            orderId: Number(order.id),
+            reason: "BANK_TRANSFER payment expired",
+          }),
+        ],
+      );
+    }
+
+    await client.query("COMMIT");
+    return res.json({
+      success: true,
+      expiredCount: expiredOrders.length,
+      orderIds: expiredOrders.map((order) => Number(order.id)),
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("POST /payment-events/expire-pending failed:", error);
+    return res.status(500).json(internalError("Failed to expire pending payments"));
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
 
 function validatePaymentEventPayload(body) {
@@ -174,6 +253,33 @@ function validatePaymentEventPayload(body) {
 
   if (body.orderId != null && (!Number.isInteger(body.orderId) || body.orderId <= 0)) {
     return "orderId must be a positive integer";
+  }
+
+  return null;
+}
+
+function validateInternalWebhookSecret(req) {
+  const configuredSecret = process.env.INTERNAL_WEBHOOK_SECRET?.trim();
+  if (!configuredSecret) {
+    return {
+      status: 500,
+      body: internalError("Missing INTERNAL_WEBHOOK_SECRET env"),
+    };
+  }
+
+  const receivedSecret = req.get("X-Internal-Webhook-Secret")?.trim();
+  if (!receivedSecret) {
+    return {
+      status: 401,
+      body: unauthorizedError("X-Internal-Webhook-Secret header is required"),
+    };
+  }
+
+  if (receivedSecret !== configuredSecret) {
+    return {
+      status: 401,
+      body: unauthorizedError("Invalid internal webhook secret"),
+    };
   }
 
   return null;
@@ -247,6 +353,15 @@ function validationError(message) {
   return {
     error: {
       code: "VALIDATION_ERROR",
+      message,
+    },
+  };
+}
+
+function unauthorizedError(message) {
+  return {
+    error: {
+      code: "UNAUTHORIZED",
       message,
     },
   };

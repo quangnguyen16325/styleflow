@@ -321,6 +321,7 @@ router.post("/", requireAuth, async (req, res) => {
     }
 
     const totalAmount = subtotal + shippingFee;
+    const paymentExpiresAtExpression = getPaymentExpiresAtExpression(paymentGateway);
     const orderResult = await client.query(
       `
         INSERT INTO orders (
@@ -346,7 +347,7 @@ router.post("/", requireAuth, async (req, res) => {
           payment_expires_at
         )
         VALUES (
-          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW() + INTERVAL '24 hours'
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW() + ($19::text)::interval
         )
         RETURNING *
       `,
@@ -369,6 +370,7 @@ router.post("/", requireAuth, async (req, res) => {
         shippingSnapshot.postalCode,
         paymentStatus,
         paymentGateway,
+        paymentExpiresAtExpression,
       ],
     );
     const orderRow = orderResult.rows[0];
@@ -1045,6 +1047,17 @@ function normalizePaymentGateway(value) {
 
 function getInitialPaymentStatus(paymentGateway) {
   return paymentGateway === "BANK_TRANSFER" ? "payment_pending" : "unpaid";
+}
+
+function getPaymentExpiresAtExpression(paymentGateway) {
+  if (paymentGateway !== "BANK_TRANSFER") {
+    return "24 hours";
+  }
+
+  const configuredMinutes = Number(process.env.BANK_TRANSFER_PAYMENT_EXPIRY_MINUTES || 30);
+  const expiryMinutes =
+    Number.isFinite(configuredMinutes) && configuredMinutes > 0 ? configuredMinutes : 30;
+  return `${expiryMinutes} minutes`;
 }
 
 function isPrivilegedRole(role) {
