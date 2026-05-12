@@ -9,7 +9,12 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from "react-native";
-import api, { formatPrice, ORDER_STATUS_LABEL } from "../services/api";
+import api, {
+  DELIVERY_STATUS_LABEL,
+  formatPrice,
+  ORDER_STATUS_LABEL,
+  PAYMENT_STATUS_LABEL,
+} from "../services/api";
 
 function formatDate(dateString) {
   if (!dateString) return "Không rõ thời gian";
@@ -25,10 +30,10 @@ function formatDate(dateString) {
 function getProgressStep(status) {
   const normalized = String(status || "").toLowerCase();
 
-  if (["pending"].includes(normalized)) return 1;
-  if (["confirmed", "processing"].includes(normalized)) return 2;
-  if (["shipping", "shipped", "ready_to_ship"].includes(normalized)) return 3;
-  if (["completed", "delivered"].includes(normalized)) return 4;
+  if (normalized === "pending") return 1;
+  if (normalized === "processing") return 2;
+  if (normalized === "shipping") return 3;
+  if (normalized === "completed") return 4;
   if (["cancelled", "failed"].includes(normalized)) return 0;
   return 1;
 }
@@ -165,6 +170,18 @@ export default function OrderTrackingScreen({ route, navigation }) {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Trạng thái</Text>
             <Text style={styles.summaryValue}>{getStatusText(order.status)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Thanh toán</Text>
+            <Text style={styles.summaryValue}>
+              {PAYMENT_STATUS_LABEL[order.paymentStatus] || "Chưa rõ"}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Giao hàng</Text>
+            <Text style={styles.summaryValue}>
+              {DELIVERY_STATUS_LABEL[order.deliveryStatus] || "Chưa rõ"}
+            </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Phí vận chuyển</Text>

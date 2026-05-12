@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_id BIGINT NOT NULL REFERENCES customers(id),
   customer_address_id BIGINT REFERENCES customer_addresses(id) ON DELETE SET NULL,
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
-    status IN ('pending', 'awaiting_payment', 'paid', 'processing', 'shipping', 'completed', 'cancelled', 'failed')
+    status IN ('pending', 'processing', 'shipping', 'completed', 'cancelled', 'failed')
   ),
   payment_status VARCHAR(50) NOT NULL DEFAULT 'unpaid' CHECK (
     payment_status IN (
@@ -309,6 +309,28 @@ ADD CONSTRAINT orders_payment_status_check CHECK (
     'refunded',
     'refund_pending'
   )
+);
+
+UPDATE orders
+SET
+  payment_status = CASE
+    WHEN status = 'awaiting_payment' AND payment_status = 'unpaid' THEN 'payment_pending'
+    WHEN status = 'paid' AND payment_status = 'unpaid' THEN 'paid'
+    ELSE payment_status
+  END,
+  status = CASE
+    WHEN status = 'awaiting_payment' THEN 'pending'
+    WHEN status = 'paid' THEN 'processing'
+    ELSE status
+  END
+WHERE status IN ('awaiting_payment', 'paid');
+
+ALTER TABLE orders
+DROP CONSTRAINT IF EXISTS orders_status_check;
+
+ALTER TABLE orders
+ADD CONSTRAINT orders_status_check CHECK (
+  status IN ('pending', 'processing', 'shipping', 'completed', 'cancelled', 'failed')
 );
 
 ALTER TABLE orders

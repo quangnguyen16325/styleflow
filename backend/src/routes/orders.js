@@ -409,6 +409,8 @@ router.post("/", requireAuth, async (req, res) => {
     return res.status(201).json({
       id: Number(orderRow.id),
       status: orderRow.status,
+      paymentStatus: orderRow.payment_status,
+      deliveryStatus: orderRow.delivery_status,
       totalAmount: Number(orderRow.total_amount),
       shippingFee: Number(orderRow.shipping_fee),
       paymentExpiresAt: orderRow.payment_expires_at,
@@ -671,6 +673,8 @@ const listOrdersBaseQuery = `
   SELECT
     o.id,
     o.status,
+    o.payment_status,
+    o.delivery_status,
     o.total_amount,
     o.shipping_fee,
     o.payment_expires_at,
@@ -833,6 +837,8 @@ function mapOrderRow(row) {
   return {
     id: Number(row.id),
     status: row.status,
+    paymentStatus: row.payment_status,
+    deliveryStatus: row.delivery_status,
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
     paymentExpiresAt: row.payment_expires_at,
@@ -1003,16 +1009,7 @@ function validateShippingAddressPayload(address) {
   return null;
 }
 
-const ORDER_STATUSES = [
-  "pending",
-  "awaiting_payment",
-  "paid",
-  "processing",
-  "shipping",
-  "completed",
-  "cancelled",
-  "failed",
-];
+const ORDER_STATUSES = ["pending", "processing", "shipping", "completed", "cancelled", "failed"];
 
 const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = ["pending", "ready_to_ship", "retry_pending"];
 

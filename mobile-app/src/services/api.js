@@ -175,14 +175,35 @@ export function formatPrice(amount) {
 }
 
 export const ORDER_STATUS_LABEL = {
-  pending: "Chờ xác nhận",
-  confirmed: "Đã xác nhận",
+  pending: "Chờ xử lý",
   processing: "Đang xử lý",
   shipping: "Đang giao",
-  delivered: "Đã giao",
   completed: "Hoàn tất",
   cancelled: "Đã hủy",
   failed: "Thất bại",
+};
+
+export const PAYMENT_STATUS_LABEL = {
+  unpaid: "Chưa thanh toán",
+  payment_pending: "Chờ thanh toán",
+  payment_unknown: "Chưa xác nhận thanh toán",
+  paid: "Đã thanh toán",
+  paid_held: "Thanh toán tạm giữ",
+  payment_failed: "Thanh toán thất bại",
+  refunded: "Đã hoàn tiền",
+  refund_pending: "Chờ hoàn tiền",
+};
+
+export const DELIVERY_STATUS_LABEL = {
+  pending: "Chờ bàn giao",
+  ready_to_ship: "Sẵn sàng giao",
+  handover: "Đã bàn giao",
+  in_transit: "Đang vận chuyển",
+  delivery_failed: "Giao thất bại",
+  retry_pending: "Chờ giao lại",
+  returning: "Đang hoàn về",
+  returned: "Đã hoàn về",
+  delivered: "Đã giao",
 };
 
 export default api;

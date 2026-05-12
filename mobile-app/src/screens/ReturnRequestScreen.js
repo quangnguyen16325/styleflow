@@ -189,27 +189,28 @@ export default function ReturnRequestScreen({ route, navigation }) {
       });
 
       const refundRequestId = Number(refundRequest?.data?.id);
-      if (Number.isInteger(refundRequestId) && refundRequestId > 0) {
-        try {
-          await fetch(REFUND_REQUESTS_WEBHOOK_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              refundRequestId,
-            }),
-          });
-        } catch (webhookError) {
-          console.warn("Không thể gửi webhook refund request:", webhookError);
-        }
-      }
+
+      setSubmitting(false);
 
       Alert.alert(
         "Đã gửi yêu cầu",
         "Yêu cầu trả hàng của bạn đã được ghi nhận. Chúng tôi sẽ phản hồi sớm nhất có thể.",
         [{ text: "OK", onPress: handleCloseAfterSubmit }],
       );
+
+      if (Number.isInteger(refundRequestId) && refundRequestId > 0) {
+        void fetch(REFUND_REQUESTS_WEBHOOK_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            refundRequestId,
+          }),
+        }).catch((webhookError) => {
+          console.warn("Không thể gửi webhook refund request:", webhookError);
+        });
+      }
     } catch (error) {
       const msg = error?.message || "Không thể gửi yêu cầu. Vui lòng thử lại.";
       Alert.alert("Lỗi", msg);

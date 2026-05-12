@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
+import { applyOrderLifecycleTransition } from "./order-lifecycle.js";
 
 const router = Router();
 
@@ -15,11 +16,11 @@ router.post("/payment-events", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    let orderExists = false;
+    let currentOrderStatus = null;
     if (event.orderId != null) {
       const { rows } = await client.query(
         `
-          SELECT id
+          SELECT id, status
           FROM orders
           WHERE id = $1
           LIMIT 1
@@ -32,7 +33,7 @@ router.post("/payment-events", async (req, res) => {
         return res.status(404).json(notFoundError("Order not found"));
       }
 
-      orderExists = true;
+      currentOrderStatus = rows[0].status;
     }
 
     const insertedLogResult = await client.query(
@@ -76,8 +77,9 @@ router.post("/payment-events", async (req, res) => {
       });
     }
 
-    if (orderExists) {
+    if (currentOrderStatus) {
       const nextPaymentStatus = inferPaymentStatus(event);
+      const nextOrderStatus = deriveOrderStatusFromPayment(nextPaymentStatus, currentOrderStatus);
       await client.query(
         `
           UPDATE orders
@@ -86,11 +88,28 @@ router.post("/payment-events", async (req, res) => {
             transaction_ref = COALESCE($3, transaction_ref),
             incident_id = COALESCE($4, incident_id),
             payment_status = COALESCE($5, payment_status),
+            status = COALESCE($6, status),
             updated_at = NOW()
           WHERE id = $1
         `,
-        [event.orderId, event.gateway, event.transactionRef, event.incidentId, nextPaymentStatus],
+        [
+          event.orderId,
+          event.gateway,
+          event.transactionRef,
+          event.incidentId,
+          nextPaymentStatus,
+          nextOrderStatus,
+        ],
       );
+
+      if (nextOrderStatus && nextOrderStatus !== currentOrderStatus) {
+        await applyOrderLifecycleTransition(
+          client,
+          event.orderId,
+          currentOrderStatus,
+          nextOrderStatus,
+        );
+      }
 
       if (nextPaymentStatus === "payment_failed") {
         await client.query(
@@ -191,6 +210,22 @@ function inferPaymentStatus(event) {
     /TIMEOUT|UNAVAILABLE|NETWORK|FAILED|DECLINED|REJECTED/i.test(event.errorCode)
   ) {
     return event.source === "app_client" ? "payment_unknown" : "payment_failed";
+  }
+
+  return null;
+}
+
+function deriveOrderStatusFromPayment(paymentStatus, currentStatus) {
+  if (!paymentStatus || ["completed", "cancelled", "failed"].includes(currentStatus)) {
+    return null;
+  }
+
+  if (paymentStatus === "paid") {
+    return currentStatus === "pending" ? "processing" : null;
+  }
+
+  if (paymentStatus === "payment_failed") {
+    return "failed";
   }
 
   return null;

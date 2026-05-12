@@ -51,11 +51,12 @@ export default function OrderDetailScreen({ navigation }) {
 
   const getStatusDisplay = (status) => {
     const s = (status || "").toLowerCase();
-    if (s === "pending" || s === "paid" || s === "awaiting_payment") return "Pending";
+    if (s === "pending") return "Pending";
     if (s === "processing") return "Packed";
-    if (s === "shipping" || s === "ready_to_ship") return "Shipped";
-    if (s === "completed" || s === "delivered") return "Delivered";
-    if (s === "failed" || s === "delivery_failed") return "Failed";
+    if (s === "shipping") return "Shipped";
+    if (s === "completed") return "Delivered";
+    if (s === "failed") return "Failed";
+    if (s === "cancelled") return "Cancelled";
     return "Pending";
   };
 

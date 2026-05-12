@@ -12,7 +12,12 @@ import {
   Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import api, { formatPrice, ORDER_STATUS_LABEL } from "../services/api";
+import api, {
+  DELIVERY_STATUS_LABEL,
+  formatPrice,
+  ORDER_STATUS_LABEL,
+  PAYMENT_STATUS_LABEL,
+} from "../services/api";
 
 const ADDRESS_CHANGE_WEBHOOK_URL =
   process.env.EXPO_PUBLIC_N8N_ADDRESS_CHANGE_WEBHOOK_URL ||
@@ -40,15 +45,15 @@ function formatDate(dateString) {
 function getOrderStatusMeta(status) {
   const normalized = String(status || "").toLowerCase();
 
-  if (["pending", "confirmed", "processing"].includes(normalized)) {
+  if (["pending", "processing"].includes(normalized)) {
     return { label: "Đang xử lý", tone: "#B66A1E", bg: "#F6E6D7" };
   }
 
-  if (["shipping", "shipped", "ready_to_ship"].includes(normalized)) {
+  if (normalized === "shipping") {
     return { label: "Đang giao", tone: "#005A9C", bg: "#E5EDF8" };
   }
 
-  if (["completed", "delivered"].includes(normalized)) {
+  if (normalized === "completed") {
     return { label: "Hoàn tất", tone: "#1C7C54", bg: "#E4F2EA" };
   }
 
@@ -60,12 +65,12 @@ function getOrderStatusMeta(status) {
 }
 
 function isCompletedStatus(status) {
-  return ["completed", "delivered"].includes(String(status || "").toLowerCase());
+  return String(status || "").toLowerCase() === "completed";
 }
 
-function canChangeAddress(status) {
-  return ["pending", "processing", "confirmed", "shipping", "shipped", "ready_to_ship"].includes(
-    String(status || "").toLowerCase(),
+function canChangeAddress(order) {
+  return ["pending", "ready_to_ship", "retry_pending"].includes(
+    String(order?.deliveryStatus || "").toLowerCase(),
   );
 }
 
@@ -82,7 +87,7 @@ function getRefundStatusLabel(latestRefundRequestStatus) {
   if (normalized === "manual_review_required") return "Chờ duyệt thủ công";
   if (normalized === "approved") return "Đã duyệt";
   if (normalized === "rejected") return "Đã từ chối";
-  if (normalized === "refunded") return "Đã hoàn tiền";
+  if (normalized === "refunded") return "Đã trả hàng";
 
   return "Đang xử lý trả hàng";
 }
@@ -257,16 +262,20 @@ export default function OrderScreen({ navigation }) {
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const status = String(order.status || "").toLowerCase();
+      const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
 
       if (activeTab === "all") return true;
       if (activeTab === "processing") {
-        return ["pending", "confirmed", "processing"].includes(status);
+        return ["pending", "processing"].includes(status);
       }
       if (activeTab === "shipping") {
-        return ["shipping", "shipped", "ready_to_ship"].includes(status);
+        return (
+          status === "shipping" ||
+          ["ready_to_ship", "handover", "in_transit"].includes(deliveryStatus)
+        );
       }
       if (activeTab === "done") {
-        return ["completed", "delivered"].includes(status);
+        return status === "completed";
       }
       if (activeTab === "refund") {
         return hasRefundRequest(order.latestRefundRequestStatus);
@@ -305,23 +314,13 @@ export default function OrderScreen({ navigation }) {
       const res = await api.post(`/orders/${addressModalOrderId}/address-change-request`, {
         addressId: selectedAddressId,
       });
+      const orderId = addressModalOrderId;
       const action = res?.data?.action;
       const requiresApproval = action === "pending_approval";
 
-      try {
-        await fetch(ADDRESS_CHANGE_WEBHOOK_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: addressModalOrderId,
-            requiresApproval,
-          }),
-        });
-      } catch (webhookError) {
-        console.warn("Lỗi gửi webhook address-change-request:", webhookError);
-      }
+      setAddressModalOrderId(null);
+      setSelectedAddressId(null);
+      setSubmittingAddressChange(false);
 
       if (requiresApproval) {
         Alert.alert("Thành công", "Yêu cầu đổi địa chỉ đã được gửi.");
@@ -329,8 +328,18 @@ export default function OrderScreen({ navigation }) {
         Alert.alert("Thành công", "Địa chỉ giao hàng đã được cập nhật.");
       }
 
-      setAddressModalOrderId(null);
-      setSelectedAddressId(null);
+      void fetch(ADDRESS_CHANGE_WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId,
+          requiresApproval,
+        }),
+      }).catch((webhookError) => {
+        console.warn("Lỗi gửi webhook address-change-request:", webhookError);
+      });
     } catch (err) {
       Alert.alert("Lỗi", err?.message || "Không thể đổi địa chỉ cho đơn hàng này.");
     } finally {
@@ -401,10 +410,19 @@ export default function OrderScreen({ navigation }) {
                     <Text style={styles.orderId}>Đơn #{order.id}</Text>
                     <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
-                    <Text style={[styles.statusBadgeText, { color: statusMeta.tone }]}>
-                      {statusMeta.label}
-                    </Text>
+                  <View style={styles.badgesColumn}>
+                    <View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
+                      <Text style={[styles.statusBadgeText, { color: statusMeta.tone }]}>
+                        {statusMeta.label}
+                      </Text>
+                    </View>
+                    {refundRequested ? (
+                      <View style={styles.refundBadge}>
+                        <Text style={styles.refundBadgeText}>
+                          {getRefundStatusLabel(order.latestRefundRequestStatus)}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
 
@@ -414,6 +432,18 @@ export default function OrderScreen({ navigation }) {
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Sản phẩm</Text>
                     <Text style={styles.summaryValue}>{itemCount} món</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Thanh toán</Text>
+                    <Text style={styles.summaryValue}>
+                      {PAYMENT_STATUS_LABEL[order.paymentStatus] || "Chưa rõ"}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Giao hàng</Text>
+                    <Text style={styles.summaryValue}>
+                      {DELIVERY_STATUS_LABEL[order.deliveryStatus] || "Chưa rõ"}
+                    </Text>
                   </View>
                   {refundRequested ? (
                     <View style={styles.summaryRow}>
@@ -436,7 +466,7 @@ export default function OrderScreen({ navigation }) {
                 </View>
 
                 <View style={styles.actionsRow}>
-                  {canChangeAddress(order.status) ? (
+                  {canChangeAddress(order) ? (
                     <TouchableOpacity
                       style={styles.secondaryAction}
                       onPress={() => openAddressChange(order.id)}
@@ -599,6 +629,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 14,
   },
+  badgesColumn: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
   orderId: {
     color: "#1E1815",
     fontSize: 18,
@@ -615,6 +649,17 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   statusBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  refundBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#F5ECE3",
+  },
+  refundBadgeText: {
+    color: "#9B4B1F",
     fontSize: 12,
     fontWeight: "800",
   },

@@ -157,16 +157,24 @@ router.post("/delivery-callback", async (req, res) => {
       action = nextFailCount >= 3 ? "returning" : "retry_pending";
       failCount = nextFailCount;
     } else {
+      const nextDeliveryStatus = mapCallbackStatusToDeliveryStatus(status);
+      const nextOrderStatus =
+        ["handover", "in_transit"].includes(nextDeliveryStatus) &&
+        ["pending", "processing"].includes(order.status)
+          ? "shipping"
+          : order.status;
+
       await client.query(
         `
           UPDATE orders
           SET
-            delivery_status = $2,
-            delivery_partner = COALESCE($3, delivery_partner),
+            status = $2,
+            delivery_status = $3,
+            delivery_partner = COALESCE($4, delivery_partner),
             updated_at = NOW()
           WHERE id = $1
         `,
-        [orderId, mapCallbackStatusToDeliveryStatus(status), partner],
+        [orderId, nextOrderStatus, nextDeliveryStatus, partner],
       );
       failCount = Number(order.delivery_fail_count);
     }
