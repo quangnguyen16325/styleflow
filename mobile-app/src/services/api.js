@@ -194,6 +194,11 @@ export const PAYMENT_STATUS_LABEL = {
   refund_pending: "Chờ hoàn tiền",
 };
 
+export const PAYMENT_GATEWAY_LABEL = {
+  COD: "Thanh toán khi nhận hàng",
+  BANK_TRANSFER: "Chuyển khoản ngân hàng",
+};
+
 export const DELIVERY_STATUS_LABEL = {
   pending: "Chờ bàn giao",
   ready_to_ship: "Sẵn sàng giao",

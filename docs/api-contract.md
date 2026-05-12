@@ -1817,6 +1817,7 @@ Request body using a saved address:
 ```json
 {
   "addressId": 1,
+  "paymentGateway": "COD",
   "items": [
     {
       "productId": 1,
@@ -1843,6 +1844,7 @@ Request body using a new address:
     "country": "Vietnam",
     "postalCode": "700000"
   },
+  "paymentGateway": "BANK_TRANSFER",
   "items": [
     {
       "productId": 1,
@@ -1870,6 +1872,9 @@ Rules:
 - backend computes final `shippingFee` from the shipping city using the Da Nang origin zone rules
 - client-provided `shippingFee` is accepted for backward compatibility, but backend-calculated fee is the source of truth
 - when `addressId` is used, it must belong to the authenticated customer
+- `paymentGateway`: optional, one of `COD`, `BANK_TRANSFER`; defaults to `COD`
+- `COD` creates the order with `paymentStatus = unpaid`
+- `BANK_TRANSFER` creates the order with `paymentStatus = payment_pending`
 
 Response `201`:
 
@@ -1877,6 +1882,8 @@ Response `201`:
 {
   "id": 1,
   "status": "pending",
+  "paymentStatus": "unpaid",
+  "paymentGateway": "COD",
   "totalAmount": 438000,
   "shippingFee": 40000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",

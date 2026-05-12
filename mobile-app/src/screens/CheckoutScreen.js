@@ -19,6 +19,19 @@ import api, { createOrder, formatPrice, getShippingQuote } from "../services/api
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop";
 
+const PAYMENT_OPTIONS = [
+  {
+    value: "COD",
+    title: "Thanh toán khi nhận hàng",
+    description: "Trả tiền mặt hoặc chuyển khoản cho shipper khi nhận đơn.",
+  },
+  {
+    value: "BANK_TRANSFER",
+    title: "Chuyển khoản ngân hàng",
+    description: "Đơn sẽ ở trạng thái chờ thanh toán cho đến khi backend xác nhận.",
+  },
+];
+
 function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose, onAddAddress }) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -113,6 +126,7 @@ export default function CheckoutScreen({ navigation }) {
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [shippingCost, setShippingCost] = useState(0);
   const [loadingShippingQuote, setLoadingShippingQuote] = useState(false);
+  const [paymentGateway, setPaymentGateway] = useState("COD");
 
   const loadAddresses = useCallback(async () => {
     try {
@@ -222,6 +236,7 @@ export default function CheckoutScreen({ navigation }) {
     const payload = {
       items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
       addressId: shippingAddressId,
+      paymentGateway,
     };
 
     try {
@@ -312,6 +327,31 @@ export default function CheckoutScreen({ navigation }) {
         </View>
 
         <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Phương thức thanh toán</Text>
+          <View style={styles.paymentOptionList}>
+            {PAYMENT_OPTIONS.map((option) => {
+              const selected = paymentGateway === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.paymentOption, selected && styles.paymentOptionSelected]}
+                  onPress={() => setPaymentGateway(option.value)}
+                  activeOpacity={0.88}
+                >
+                  <View style={styles.paymentOptionCopy}>
+                    <Text style={styles.paymentOptionTitle}>{option.title}</Text>
+                    <Text style={styles.paymentOptionDescription}>{option.description}</Text>
+                  </View>
+                  <View style={[styles.paymentRadio, selected && styles.paymentRadioSelected]}>
+                    {selected ? <View style={styles.paymentRadioDot} /> : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Tóm tắt thanh toán</Text>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tiền hàng</Text>
@@ -320,6 +360,12 @@ export default function CheckoutScreen({ navigation }) {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
             <Text style={styles.summaryValue}>{formatPrice(shippingCost)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Thanh toán</Text>
+            <Text style={styles.summaryValue}>
+              {PAYMENT_OPTIONS.find((option) => option.value === paymentGateway)?.title}
+            </Text>
           </View>
           <View style={[styles.summaryRow, styles.summaryTotalRow]}>
             <Text style={styles.summaryTotalLabel}>Tổng cộng</Text>
@@ -536,6 +582,56 @@ const styles = StyleSheet.create({
     color: "#9B4B1F",
     fontSize: 16,
     fontWeight: "800",
+  },
+  paymentOptionList: {
+    marginTop: 12,
+    gap: 10,
+  },
+  paymentOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
+  },
+  paymentOptionSelected: {
+    backgroundColor: "#F5ECE3",
+    borderColor: "#D69A65",
+  },
+  paymentOptionCopy: {
+    flex: 1,
+    marginRight: 12,
+  },
+  paymentOptionTitle: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  paymentOptionDescription: {
+    color: "#78695C",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  paymentRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#CDBEAF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paymentRadioSelected: {
+    borderColor: "#9B4B1F",
+  },
+  paymentRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#9B4B1F",
   },
   summaryRow: {
     flexDirection: "row",

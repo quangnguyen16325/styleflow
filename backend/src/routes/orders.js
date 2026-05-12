@@ -273,6 +273,8 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   const { items } = req.body;
+  const paymentGateway = normalizePaymentGateway(req.body.paymentGateway ?? req.body.paymentMethod);
+  const paymentStatus = getInitialPaymentStatus(paymentGateway);
 
   const client = await pool.connect();
   try {
@@ -339,10 +341,12 @@ router.post("/", requireAuth, async (req, res) => {
           city,
           shipping_country,
           shipping_postal_code,
+          payment_status,
+          payment_gateway,
           payment_expires_at
         )
         VALUES (
-          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW() + INTERVAL '24 hours'
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW() + INTERVAL '24 hours'
         )
         RETURNING *
       `,
@@ -363,6 +367,8 @@ router.post("/", requireAuth, async (req, res) => {
         shippingSnapshot.city,
         shippingSnapshot.country,
         shippingSnapshot.postalCode,
+        paymentStatus,
+        paymentGateway,
       ],
     );
     const orderRow = orderResult.rows[0];
@@ -410,6 +416,7 @@ router.post("/", requireAuth, async (req, res) => {
       id: Number(orderRow.id),
       status: orderRow.status,
       paymentStatus: orderRow.payment_status,
+      paymentGateway: orderRow.payment_gateway,
       deliveryStatus: orderRow.delivery_status,
       totalAmount: Number(orderRow.total_amount),
       shippingFee: Number(orderRow.shipping_fee),
@@ -674,6 +681,7 @@ const listOrdersBaseQuery = `
     o.id,
     o.status,
     o.payment_status,
+    o.payment_gateway,
     o.delivery_status,
     o.total_amount,
     o.shipping_fee,
@@ -773,6 +781,13 @@ function validateOrderPayload(body) {
     return "Shipping fee must be a non-negative number";
   }
 
+  if (
+    (body.paymentGateway != null || body.paymentMethod != null) &&
+    !normalizePaymentGateway(body.paymentGateway ?? body.paymentMethod)
+  ) {
+    return "paymentGateway must be COD or BANK_TRANSFER";
+  }
+
   return null;
 }
 
@@ -838,6 +853,7 @@ function mapOrderRow(row) {
     id: Number(row.id),
     status: row.status,
     paymentStatus: row.payment_status,
+    paymentGateway: row.payment_gateway,
     deliveryStatus: row.delivery_status,
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
@@ -1010,8 +1026,26 @@ function validateShippingAddressPayload(address) {
 }
 
 const ORDER_STATUSES = ["pending", "processing", "shipping", "completed", "cancelled", "failed"];
+const PAYMENT_GATEWAYS = ["COD", "BANK_TRANSFER"];
 
 const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = ["pending", "ready_to_ship", "retry_pending"];
+
+function normalizePaymentGateway(value) {
+  if (value == null || value === "") {
+    return "COD";
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toUpperCase();
+  return PAYMENT_GATEWAYS.includes(normalizedValue) ? normalizedValue : null;
+}
+
+function getInitialPaymentStatus(paymentGateway) {
+  return paymentGateway === "BANK_TRANSFER" ? "payment_pending" : "unpaid";
+}
 
 function isPrivilegedRole(role) {
   return role === "admin" || role === "staff";
