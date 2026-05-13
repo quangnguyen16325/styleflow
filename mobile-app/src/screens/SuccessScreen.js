@@ -11,40 +11,12 @@ import {
   Linking,
 } from "react-native";
 import { formatPrice } from "../services/api";
-
-const BANK_TRANSFER_CONFIG = {
-  bank: "TPBank",
-  accountNumber: "0000000001",
-  accountName: "ECLORIA",
-  template: "compact",
-};
-
-function buildSepayQrUrl(order) {
-  const params = new URLSearchParams({
-    bank: BANK_TRANSFER_CONFIG.bank,
-    acc: BANK_TRANSFER_CONFIG.accountNumber,
-    amount: String(Math.round(Number(order?.totalAmount || 0))),
-    des: `Thanh toan don hang ORD${order?.id}`,
-    template: BANK_TRANSFER_CONFIG.template,
-  });
-
-  return `https://qr.sepay.vn/img?${params.toString()}`;
-}
-
-function formatExpiresAt(value) {
-  if (!value) return null;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+import {
+  BANK_TRANSFER_CONFIG,
+  buildBankTransferQrUrl,
+  formatPaymentExpiresAt,
+} from "../components/BankTransferPaymentCard";
+import AppIcon from "../components/AppIcon";
 
 export default function SuccessScreen({ route, navigation }) {
   const order = route?.params?.order || null;
@@ -52,17 +24,17 @@ export default function SuccessScreen({ route, navigation }) {
   const isBankTransfer = order?.paymentGateway === "BANK_TRANSFER";
   const paymentCode = orderId ? `ORD${orderId}` : "";
   const qrUrl = useMemo(
-    () => (isBankTransfer ? buildSepayQrUrl(order) : null),
+    () => (isBankTransfer ? buildBankTransferQrUrl(order) : null),
     [isBankTransfer, order],
   );
-  const expiresAtLabel = formatExpiresAt(order?.paymentExpiresAt);
+  const expiresAtLabel = formatPaymentExpiresAt(order?.paymentExpiresAt);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View style={styles.iconCircle}>
-            <Text style={styles.checkIcon}>✓</Text>
+            <AppIcon name="check" size={34} color="#1E1815" />
           </View>
           <Text style={styles.successTitle}>
             {isBankTransfer ? "Đơn hàng đang chờ thanh toán" : "Đặt hàng thành công"}
@@ -189,11 +161,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
-  },
-  checkIcon: {
-    color: "#1E1815",
-    fontSize: 34,
-    fontWeight: "900",
   },
   successTitle: {
     color: "#FFF8EE",

@@ -2,6 +2,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { useAuth } from "../context/AuthContext";
+import AppIcon from "./AppIcon";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -11,7 +12,7 @@ function getGreeting() {
   return "Đêm muộn";
 }
 
-export default function HeaderBar({ onSettingsPress }) {
+export default function HeaderBar() {
   const { displayName } = useAuth();
   const greeting = getGreeting();
   const firstName = displayName?.trim()?.split(" ")?.slice(-1)?.[0] || "Bạn";
@@ -20,7 +21,7 @@ export default function HeaderBar({ onSettingsPress }) {
     <View style={styles.shell}>
       <View style={styles.brandBlock}>
         <View style={styles.copyBlock}>
-          <Text style={styles.brandWordmark}>Ecloria</Text>
+          <Text style={styles.brandWordmark}>StyleFlow</Text>
           <Text style={styles.eyebrow}>{greeting}</Text>
           <Text style={styles.title} numberOfLines={1}>
             {firstName}, chọn outfit hôm nay
@@ -29,12 +30,12 @@ export default function HeaderBar({ onSettingsPress }) {
       </View>
 
       <TouchableOpacity
-        style={styles.settingsBtn}
-        onPress={onSettingsPress}
+        style={styles.notificationBtn}
         activeOpacity={0.82}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Text style={styles.settingsIcon}>⚙</Text>
+        <AppIcon name="bell" size={22} color="#6F5847" />
+        <View style={styles.notificationBadge} />
       </TouchableOpacity>
     </View>
   );
@@ -66,10 +67,10 @@ const styles = StyleSheet.create({
       android: "serif",
       default: "serif",
     }),
-    fontWeight: "600",
+    fontWeight: "700",
     fontStyle: "italic",
     letterSpacing: 0.2,
-    marginBottom: 1,
+    marginBottom: 2,
   },
   eyebrow: {
     color: "#9D7A60",
@@ -81,23 +82,30 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#241A13",
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 22,
   },
-  settingsBtn: {
+  notificationBtn: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 22,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E6DBCE",
     justifyContent: "center",
     alignItems: "center",
+    position: "relative",
   },
-  settingsIcon: {
-    fontSize: 20,
-    color: "#6F5847",
-    fontWeight: "700",
+  notificationBadge: {
+    position: "absolute",
+    top: 10,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#D99152",
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
   },
 });

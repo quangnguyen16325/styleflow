@@ -1,14 +1,10 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  SafeAreaView,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView } from "react-native";
+import BankTransferPaymentCard, {
+  shouldShowBankTransferPayment,
+} from "../components/BankTransferPaymentCard";
+import BackPillButton from "../components/BackPillButton";
 import api, {
   DELIVERY_STATUS_LABEL,
   formatPrice,
@@ -136,13 +132,7 @@ export default function OrderTrackingScreen({ route, navigation }) {
     return (
       <SafeAreaView style={[styles.safeArea, styles.center]}>
         <Text style={styles.emptyTitle}>Không tìm thấy đơn hàng</Text>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.backBtnText}>Quay lại</Text>
-        </TouchableOpacity>
+        <BackPillButton onPress={() => navigation.goBack()} />
       </SafeAreaView>
     );
   }
@@ -160,6 +150,8 @@ export default function OrderTrackingScreen({ route, navigation }) {
         </View>
 
         <Stepper currentStep={progressStep} />
+
+        {shouldShowBankTransferPayment(order) ? <BankTransferPaymentCard order={order} /> : null}
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
@@ -411,16 +403,5 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     marginBottom: 16,
-  },
-  backBtn: {
-    backgroundColor: "#1E1815",
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-  backBtnText: {
-    color: "#FFFDF9",
-    fontSize: 14,
-    fontWeight: "800",
   },
 });

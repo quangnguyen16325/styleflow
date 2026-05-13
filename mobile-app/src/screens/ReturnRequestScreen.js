@@ -18,6 +18,7 @@ import api, {
   formatPrice,
   uploadFileToSignedUrl,
 } from "../services/api";
+import AppIcon from "../components/AppIcon";
 
 const REFUND_REQUESTS_WEBHOOK_URL =
   process.env.EXPO_PUBLIC_N8N_REFUND_REQUESTS_WEBHOOK_URL ||
@@ -333,7 +334,7 @@ export default function ReturnRequestScreen({ route, navigation }) {
                 onPress={handlePickImage}
                 activeOpacity={0.88}
               >
-                <Text style={styles.photoBtnIcon}>▣</Text>
+                <AppIcon name="image" size={24} color="#9B4B1F" style={styles.photoBtnIcon} />
                 <Text style={styles.photoBtnText}>Chọn ảnh</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -341,7 +342,7 @@ export default function ReturnRequestScreen({ route, navigation }) {
                 onPress={handleTakePhoto}
                 activeOpacity={0.88}
               >
-                <Text style={styles.photoBtnIcon}>◎</Text>
+                <AppIcon name="camera" size={24} color="#9B4B1F" style={styles.photoBtnIcon} />
                 <Text style={styles.photoBtnText}>Chụp ảnh</Text>
               </TouchableOpacity>
             </View>
@@ -558,8 +559,6 @@ const styles = StyleSheet.create({
     borderColor: "#E7DBCF",
   },
   photoBtnIcon: {
-    color: "#9B4B1F",
-    fontSize: 24,
     marginBottom: 8,
   },
   photoBtnText: {

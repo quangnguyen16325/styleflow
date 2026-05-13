@@ -13,11 +13,12 @@ import {
   Modal,
 } from "react-native";
 import api, { getVietnamDistricts, getVietnamProvinces, getVietnamWards } from "../services/api";
+import AppIcon from "../components/AppIcon";
 
 const LABELS = [
-  { key: "home", icon: "⌂", name: "Nhà" },
-  { key: "office", icon: "▣", name: "Văn phòng" },
-  { key: "other", icon: "◎", name: "Khác" },
+  { key: "home", icon: "location", name: "Nhà" },
+  { key: "office", icon: "office", name: "Văn phòng" },
+  { key: "other", icon: "other", name: "Khác" },
 ];
 
 function LabelSelector({ selected, onSelect }) {
@@ -30,7 +31,12 @@ function LabelSelector({ selected, onSelect }) {
           onPress={() => onSelect(label.key)}
           activeOpacity={0.82}
         >
-          <Text style={styles.labelChipIcon}>{label.icon}</Text>
+          <AppIcon
+            name={label.icon}
+            size={15}
+            color={selected === label.key ? "#FFF8EE" : "#9B4B1F"}
+            style={styles.labelChipIcon}
+          />
           <Text
             style={[styles.labelChipText, selected === label.key && styles.labelChipTextActive]}
           >
@@ -79,7 +85,7 @@ function LocationPickerModal({ visible, title, items, selectedCode, onSelect, on
                     {item.name}
                   </Text>
                   {selectedCode === item.code ? (
-                    <Text style={styles.modalOptionCheck}>✓</Text>
+                    <Text style={styles.modalOptionCheck}>Đã chọn</Text>
                   ) : null}
                 </TouchableOpacity>
               ))
@@ -532,9 +538,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2E2D2",
   },
   labelChipIcon: {
-    fontSize: 17,
     marginRight: 6,
-    color: "#6C5647",
   },
   labelChipText: {
     fontSize: 13,

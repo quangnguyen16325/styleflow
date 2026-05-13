@@ -1,21 +1,24 @@
 /* eslint-disable react/prop-types */
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
+import AppIcon from "./AppIcon";
 
 const TABS = [
-  { key: "Home", label: "Trang chủ", icon: "◐" },
-  { key: "Wishlist", label: "Yêu thích", icon: "♡" },
-  { key: "Track", label: "Đơn hàng", icon: "◈", centerTab: true },
-  { key: "Cart", label: "Giỏ hàng", icon: "◌" },
-  { key: "Profile", label: "Tài khoản", icon: "◎" },
+  { key: "Home", label: "Trang chủ", icon: "home" },
+  { key: "Wishlist", label: "Yêu thích", icon: "heart" },
+  { key: "Track", label: "Đơn hàng", icon: "orders", centerTab: true },
+  { key: "Cart", label: "Giỏ hàng", icon: "cart" },
+  { key: "Profile", label: "Tài khoản", icon: "profile" },
 ];
 
 export default function BottomTabBar({ activeTab, onTabPress }) {
   const { totalCount } = useCart();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.outer}>
+    <View style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       <View style={styles.shell}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -29,9 +32,12 @@ export default function BottomTabBar({ activeTab, onTabPress }) {
                 activeOpacity={0.88}
               >
                 <View style={[styles.centerCircle, isActive && styles.centerCircleActive]}>
-                  <Text style={[styles.centerIcon, isActive && styles.centerIconActive]}>
-                    {tab.icon}
-                  </Text>
+                  <AppIcon
+                    name={tab.icon}
+                    size={22}
+                    color={isActive ? "#FFFDF9" : "#FFF7EA"}
+                    style={styles.centerIcon}
+                  />
                 </View>
                 <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                   {tab.label}
@@ -48,7 +54,7 @@ export default function BottomTabBar({ activeTab, onTabPress }) {
               activeOpacity={0.82}
             >
               <View style={[styles.iconBadge, isActive && styles.iconBadgeActive]}>
-                <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{tab.icon}</Text>
+                <AppIcon name={tab.icon} size={18} color={isActive ? "#9B4B1F" : "#876E5B"} />
                 {tab.key === "Cart" && totalCount > 0 ? (
                   <View style={styles.countBadge}>
                     <Text style={styles.countBadgeText}>
@@ -71,7 +77,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FCF9F4",
     paddingHorizontal: 14,
     paddingTop: 0,
-    paddingBottom: 10,
   },
   shell: {
     flexDirection: "row",
@@ -113,14 +118,6 @@ const styles = StyleSheet.create({
   iconBadgeActive: {
     backgroundColor: "#F1E0D0",
   },
-  tabIcon: {
-    color: "#876E5B",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  tabIconActive: {
-    color: "#9B4B1F",
-  },
   centerCircle: {
     width: 58,
     height: 58,
@@ -136,12 +133,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#9B4B1F",
   },
   centerIcon: {
-    color: "#FFF7EA",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  centerIconActive: {
-    color: "#FFFDF9",
+    marginTop: 1,
   },
   tabLabel: {
     color: "#857669",

@@ -15,6 +15,8 @@ import { getProductById, formatPrice } from "../services/api";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import { COLORS } from "../constants/colors";
+import BackPillButton from "../components/BackPillButton";
+import AppIcon from "../components/AppIcon";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -110,9 +112,7 @@ export default function ProductDetailScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyTitle}>Không tải được sản phẩm</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryBtnText}>Quay lại</Text>
-        </TouchableOpacity>
+        <BackPillButton onPress={() => navigation.goBack()} />
       </View>
     );
   }
@@ -135,9 +135,11 @@ export default function ProductDetailScreen() {
               onPress={() => toggleWishlist(product)}
               activeOpacity={0.85}
             >
-              <Text style={[styles.heartIcon, liked && styles.heartActive]}>
-                {liked ? "♥" : "♡"}
-              </Text>
+              <AppIcon
+                name={liked ? "heartFilled" : "heart"}
+                size={22}
+                color={liked ? "#E5484D" : COLORS.textMuted}
+              />
             </TouchableOpacity>
           </View>
 
@@ -272,16 +274,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 16,
   },
-  retryBtn: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  retryBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
   heroWrapper: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT * 0.5,
@@ -323,8 +315,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  heartIcon: { fontSize: 22, color: COLORS.textMuted },
-  heartActive: { color: "#e5484d" },
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",

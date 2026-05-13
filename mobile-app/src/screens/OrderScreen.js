@@ -12,6 +12,7 @@ import {
   Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { shouldShowBankTransferPayment } from "../components/BankTransferPaymentCard";
 import api, {
   DELIVERY_STATUS_LABEL,
   formatPrice,
@@ -64,6 +65,51 @@ function getOrderStatusMeta(status) {
   return { label: ORDER_STATUS_LABEL[normalized] || "Đơn hàng", tone: "#65574C", bg: "#F3ECE5" };
 }
 
+function getPaymentStatusMeta(paymentStatus, paymentGateway) {
+  const normalized = String(paymentStatus || "").toLowerCase();
+  const gateway = String(paymentGateway || "").toUpperCase();
+
+  if (normalized === "unpaid") {
+    return gateway === "COD"
+      ? { label: "COD chưa thu", tone: "#7A4B12", bg: "#FFF2D8" }
+      : { label: "Chưa thanh toán", tone: "#9B4B1F", bg: "#F7E4D4" };
+  }
+
+  if (normalized === "payment_pending") {
+    return { label: "Chờ thanh toán", tone: "#9B4B1F", bg: "#FFF1E5" };
+  }
+
+  if (normalized === "paid") {
+    return { label: "Đã thanh toán", tone: "#1C7C54", bg: "#E4F2EA" };
+  }
+
+  if (normalized === "paid_held") {
+    return { label: "Tạm giữ tiền", tone: "#7A4B12", bg: "#FFF2D8" };
+  }
+
+  if (normalized === "payment_unknown") {
+    return { label: "Cần xác minh tiền", tone: "#8A5A00", bg: "#FFF4CC" };
+  }
+
+  if (normalized === "payment_failed") {
+    return { label: "Thanh toán lỗi", tone: "#B33939", bg: "#F8E4E4" };
+  }
+
+  if (normalized === "refund_pending") {
+    return { label: "Chờ hoàn tiền", tone: "#7B4E9B", bg: "#F1E7F8" };
+  }
+
+  if (normalized === "refunded") {
+    return { label: "Đã hoàn tiền", tone: "#1B6F78", bg: "#DFF3F5" };
+  }
+
+  return {
+    label: PAYMENT_STATUS_LABEL[normalized] || "Thanh toán chưa rõ",
+    tone: "#65574C",
+    bg: "#F3ECE5",
+  };
+}
+
 function isCompletedStatus(status) {
   return String(status || "").toLowerCase() === "completed";
 }
@@ -90,6 +136,79 @@ function getRefundStatusLabel(latestRefundRequestStatus) {
   if (normalized === "refunded") return "Đã trả hàng";
 
   return "Đang xử lý trả hàng";
+}
+
+function getRefundStatusMeta(latestRefundRequestStatus) {
+  const normalized = String(latestRefundRequestStatus || "").toLowerCase();
+
+  if (normalized === "pending") {
+    return { label: "Đã gửi yêu cầu trả", tone: "#9B4B1F", bg: "#FFF1E5" };
+  }
+
+  if (normalized === "manual_review_required") {
+    return { label: "Chờ duyệt trả hàng", tone: "#8A5A00", bg: "#FFF4CC" };
+  }
+
+  if (normalized === "approved") {
+    return { label: "Đã duyệt trả hàng", tone: "#1B6F78", bg: "#DFF3F5" };
+  }
+
+  if (normalized === "rejected") {
+    return { label: "Từ chối trả hàng", tone: "#B33939", bg: "#F8E4E4" };
+  }
+
+  if (normalized === "refunded") {
+    return { label: "Đã trả hàng", tone: "#1C7C54", bg: "#E4F2EA" };
+  }
+
+  return { label: "Đang xử lý trả hàng", tone: "#7B4E9B", bg: "#F1E7F8" };
+}
+
+function getCustomerFacingBadges(order) {
+  const orderStatus = String(order?.status || "").toLowerCase();
+  const paymentStatus = String(order?.paymentStatus || "").toLowerCase();
+  const deliveryStatus = String(order?.deliveryStatus || "").toLowerCase();
+  const refundStatus = String(order?.latestRefundRequestStatus || "").toLowerCase();
+  const badges = [];
+
+  if (refundStatus) {
+    badges.push(getRefundStatusMeta(refundStatus));
+    if (["refunded", "approved"].includes(refundStatus)) {
+      return badges;
+    }
+  }
+
+  if (["payment_pending", "payment_unknown", "payment_failed"].includes(paymentStatus)) {
+    badges.push(getPaymentStatusMeta(paymentStatus, order?.paymentGateway));
+    return badges;
+  }
+
+  if (paymentStatus === "unpaid" && order?.paymentGateway !== "COD") {
+    badges.push(getPaymentStatusMeta(paymentStatus, order?.paymentGateway));
+    return badges;
+  }
+
+  if (["returning", "returned"].includes(deliveryStatus)) {
+    badges.push(
+      deliveryStatus === "returned"
+        ? { label: "Đã hoàn hàng", tone: "#7B4E9B", bg: "#F1E7F8" }
+        : { label: "Đang hoàn hàng", tone: "#7B4E9B", bg: "#F1E7F8" },
+    );
+    return badges;
+  }
+
+  if (["delivery_failed", "retry_pending"].includes(deliveryStatus)) {
+    badges.push({ label: "Giao hàng gặp lỗi", tone: "#B66A1E", bg: "#F6E6D7" });
+    return badges;
+  }
+
+  badges.push(getOrderStatusMeta(orderStatus));
+
+  if (orderStatus === "completed" && paymentStatus === "refunded") {
+    badges.push(getPaymentStatusMeta(paymentStatus, order?.paymentGateway));
+  }
+
+  return badges.slice(0, 2);
 }
 
 function isWithin7Days(dateStr) {
@@ -206,6 +325,14 @@ function OrderItemSummary({ items }) {
       {items.length > 3 ? (
         <Text style={styles.itemMoreText}>+{items.length - 3} sản phẩm</Text>
       ) : null}
+    </View>
+  );
+}
+
+function StatusPill({ meta }) {
+  return (
+    <View style={[styles.statusPill, { backgroundColor: meta.bg }]}>
+      <Text style={[styles.statusPillText, { color: meta.tone }]}>{meta.label}</Text>
     </View>
   );
 }
@@ -398,10 +525,11 @@ export default function OrderScreen({ navigation }) {
           </View>
         ) : (
           filteredOrders.map((order) => {
-            const statusMeta = getOrderStatusMeta(order.status);
+            const displayBadges = getCustomerFacingBadges(order);
             const itemCount = (order.items || []).reduce((sum, item) => sum + item.quantity, 0);
             const completed = isCompletedStatus(order.status);
             const refundRequested = hasRefundRequest(order.latestRefundRequestStatus);
+            const needsBankTransferPayment = shouldShowBankTransferPayment(order);
 
             return (
               <View key={order.id} style={styles.orderCard}>
@@ -411,18 +539,9 @@ export default function OrderScreen({ navigation }) {
                     <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
                   </View>
                   <View style={styles.badgesColumn}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
-                      <Text style={[styles.statusBadgeText, { color: statusMeta.tone }]}>
-                        {statusMeta.label}
-                      </Text>
-                    </View>
-                    {refundRequested ? (
-                      <View style={styles.refundBadge}>
-                        <Text style={styles.refundBadgeText}>
-                          {getRefundStatusLabel(order.latestRefundRequestStatus)}
-                        </Text>
-                      </View>
-                    ) : null}
+                    {displayBadges.map((badge) => (
+                      <StatusPill key={badge.label} meta={badge} />
+                    ))}
                   </View>
                 </View>
 
@@ -464,6 +583,24 @@ export default function OrderScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
+
+                {needsBankTransferPayment ? (
+                  <View style={styles.paymentPendingBox}>
+                    <View style={styles.paymentPendingTextWrap}>
+                      <Text style={styles.paymentPendingTitle}>Chờ chuyển khoản</Text>
+                      <Text style={styles.paymentPendingText}>
+                        Nội dung thanh toán: ORD{order.id}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.paymentPendingBtn}
+                      onPress={() => navigation.navigate("OrderTracking", { orderId: order.id })}
+                      activeOpacity={0.88}
+                    >
+                      <Text style={styles.paymentPendingBtnText}>Thanh toán ngay</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
 
                 <View style={styles.actionsRow}>
                   {canChangeAddress(order) ? (
@@ -632,6 +769,8 @@ const styles = StyleSheet.create({
   badgesColumn: {
     alignItems: "flex-end",
     gap: 8,
+    flexShrink: 1,
+    maxWidth: "56%",
   },
   orderId: {
     color: "#1E1815",
@@ -643,23 +782,13 @@ const styles = StyleSheet.create({
     color: "#7A685B",
     fontSize: 12,
   },
-  statusBadge: {
+  statusPill: {
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
+    alignSelf: "flex-end",
   },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  refundBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: "#F5ECE3",
-  },
-  refundBadgeText: {
-    color: "#9B4B1F",
+  statusPillText: {
     fontSize: 12,
     fontWeight: "800",
   },
@@ -727,6 +856,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     fontWeight: "600",
+  },
+  paymentPendingBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderRadius: 18,
+    padding: 14,
+    marginTop: 12,
+    backgroundColor: "#FFF8EE",
+    borderWidth: 1,
+    borderColor: "#E8D7C6",
+  },
+  paymentPendingTextWrap: {
+    flex: 1,
+  },
+  paymentPendingTitle: {
+    color: "#9B4B1F",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  paymentPendingText: {
+    color: "#6D5D51",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  paymentPendingBtn: {
+    borderRadius: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    backgroundColor: "#1E1815",
+  },
+  paymentPendingBtnText: {
+    color: "#FFFDF9",
+    fontSize: 12,
+    fontWeight: "900",
   },
   actionsRow: {
     flexDirection: "row",

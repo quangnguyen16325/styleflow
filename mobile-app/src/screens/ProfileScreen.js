@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../services/api";
 import { useWishlist } from "../context/WishlistContext";
+import AppIcon from "../components/AppIcon";
 
 function MenuItem({ label, sub, onPress, isLast = false }) {
   return (
@@ -86,7 +87,7 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
               onPress={onSettingsPress || (() => navigation.navigate("Settings"))}
               activeOpacity={0.88}
             >
-              <Text style={styles.settingsIcon}>⚙</Text>
+              <AppIcon name="settings" size={22} color="#9B4B1F" />
             </TouchableOpacity>
           </View>
           <Text style={styles.heroSubtext}>
@@ -212,10 +213,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2E2D2",
     justifyContent: "center",
     alignItems: "center",
-  },
-  settingsIcon: {
-    fontSize: 20,
-    color: "#9B4B1F",
   },
   profileCard: {
     flexDirection: "row",

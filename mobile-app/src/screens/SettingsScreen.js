@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { COLORS } from "../constants/colors";
+import AppIcon from "../components/AppIcon";
 
 const SectionTitle = ({ title }) => <Text style={styles.sectionTitle}>{title}</Text>;
 
@@ -22,7 +23,7 @@ const MenuRow = ({ icon, label, onPress, isLast, renderRight }) => (
     disabled={!onPress}
   >
     <View style={styles.iconWrap}>
-      <Text style={styles.icon}>{icon}</Text>
+      <AppIcon name={icon} size={16} color={COLORS.primary} />
     </View>
     <Text style={styles.label}>{label}</Text>
     {renderRight ? renderRight() : <Text style={styles.chevron}>›</Text>}
@@ -48,13 +49,17 @@ export default function SettingsScreen({ navigation }) {
         <SectionTitle title="Tài khoản" />
         <View style={styles.group}>
           <MenuRow
-            icon="○"
+            icon="profile"
             label="Thông tin cá nhân"
             onPress={() => Alert.alert("Thông báo", "Tính năng đang bảo trì.")}
           />
-          <MenuRow icon="▽" label="Sổ địa chỉ" onPress={() => navigation.navigate("AddressList")} />
           <MenuRow
-            icon="□"
+            icon="location"
+            label="Sổ địa chỉ"
+            onPress={() => navigation.navigate("AddressList")}
+          />
+          <MenuRow
+            icon="shield"
             label="Bảo mật & Mật khẩu"
             onPress={() => Alert.alert("Bảo mật", "Tính năng đang phát triển.")}
             isLast
@@ -65,7 +70,7 @@ export default function SettingsScreen({ navigation }) {
         <SectionTitle title="Ứng dụng" />
         <View style={styles.group}>
           <MenuRow
-            icon="○"
+            icon="other"
             label="Chế độ tối"
             onPress={() => setDarkMode(!darkMode)}
             renderRight={() => (
@@ -75,7 +80,7 @@ export default function SettingsScreen({ navigation }) {
             )}
           />
           <MenuRow
-            icon="◑"
+            icon="bell"
             label="Thông báo"
             onPress={() => setNotifications(!notifications)}
             renderRight={() => (
@@ -91,12 +96,12 @@ export default function SettingsScreen({ navigation }) {
         <SectionTitle title="Hỗ trợ" />
         <View style={styles.group}>
           <MenuRow
-            icon="◇"
+            icon="note"
             label="Về StyleFlow"
             onPress={() => Alert.alert("StyleFlow", "Phiên bản 1.0.0 (Beta)")}
           />
           <MenuRow
-            icon="□"
+            icon="shield"
             label="Chính sách bảo mật"
             onPress={() => Alert.alert("Thông báo", "Đang cập nhật")}
             isLast
@@ -104,7 +109,7 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-          <Text style={styles.logoutIcon}>→</Text>
+          <AppIcon name="logout" size={18} color={COLORS.danger} style={styles.logoutIcon} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
 
@@ -151,7 +156,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-  icon: { fontSize: 16, color: COLORS.primary },
   label: { flex: 1, fontSize: 15, fontWeight: "500", color: COLORS.textPrimary },
   chevron: { fontSize: 20, color: COLORS.textMuted },
   logoutBtn: {
@@ -163,6 +167,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 10,
   },
-  logoutIcon: { fontSize: 18, color: COLORS.danger, marginRight: 8 },
+  logoutIcon: { marginRight: 8 },
   logoutText: { fontSize: 15, fontWeight: "700", color: COLORS.danger },
 });

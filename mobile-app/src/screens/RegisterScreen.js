@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import { COLORS } from "../constants/colors";
+import BackPillButton from "../components/BackPillButton";
 
 export default function RegisterScreen({ navigation }) {
   const { register, isLoading } = useAuth();
@@ -72,14 +73,13 @@ export default function RegisterScreen({ navigation }) {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* Back button */}
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>← Quay lại</Text>
-          </TouchableOpacity>
+          <View style={styles.backWrap}>
+            <BackPillButton onPress={() => navigation.goBack()} />
+          </View>
 
           {/* Header */}
           <View style={styles.headerSection}>
-            <Text style={styles.title}>Tạo tài khoản ✨</Text>
+            <Text style={styles.title}>Tạo tài khoản</Text>
             <Text style={styles.subtitle}>Điền thông tin để bắt đầu mua sắm</Text>
           </View>
 
@@ -165,8 +165,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
 
-  backBtn: { paddingTop: 16, paddingBottom: 8 },
-  backText: { fontSize: 15, color: COLORS.primary, fontWeight: "600" },
+  backWrap: { paddingTop: 16, paddingBottom: 8 },
 
   headerSection: { paddingBottom: 28 },
   title: {

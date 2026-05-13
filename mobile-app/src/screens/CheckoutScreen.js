@@ -15,6 +15,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { useCart } from "../context/CartContext";
 import api, { createOrder, formatPrice, getShippingQuote } from "../services/api";
+import AppIcon from "../components/AppIcon";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop";
@@ -80,7 +81,7 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose,
                   </View>
                   {selectedId === addr.id ? (
                     <View style={styles.addrOptionCheck}>
-                      <Text style={styles.addrOptionCheckIcon}>✓</Text>
+                      <AppIcon name="check" size={14} color="#FFFDF9" />
                     </View>
                   ) : null}
                 </TouchableOpacity>
@@ -824,11 +825,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E1815",
     justifyContent: "center",
     alignItems: "center",
-  },
-  addrOptionCheckIcon: {
-    color: "#FFFDF9",
-    fontSize: 14,
-    fontWeight: "800",
   },
   modalFooter: {
     flexDirection: "row",

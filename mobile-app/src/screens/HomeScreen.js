@@ -16,6 +16,7 @@ import HeaderBar from "../components/HeaderBar";
 import { COLORS } from "../constants/colors";
 import { getCategories, getProducts, formatPrice } from "../services/api";
 import { useWishlist } from "../context/WishlistContext";
+import AppIcon from "../components/AppIcon";
 
 const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=700&auto=format&fit=crop",
@@ -43,7 +44,7 @@ function getProductStatus(product) {
   return { label: "Có thể đặt", color: COLORS.success };
 }
 
-export default function HomeScreen({ navigation, onSettingsPress }) {
+export default function HomeScreen({ navigation }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -154,9 +155,11 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
           <Text style={styles.statusBadgeText}>{status.label}</Text>
         </View>
         <TouchableOpacity style={styles.wishlistBtn} onPress={() => toggleWishlist(item)}>
-          <Text style={[styles.wishlistIcon, isInWishlist(item.id) && styles.wishlistActive]}>
-            {isInWishlist(item.id) ? "♥" : "♡"}
-          </Text>
+          <AppIcon
+            name={isInWishlist(item.id) ? "heartFilled" : "heart"}
+            size={18}
+            color={isInWishlist(item.id) ? "#C44A34" : "#6C5647"}
+          />
         </TouchableOpacity>
         <View style={styles.spotlightInfo}>
           {item.category ? (
@@ -194,9 +197,11 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
           <Text style={styles.statusBadgeText}>{status.label}</Text>
         </View>
         <TouchableOpacity style={styles.editorialWishBtn} onPress={() => toggleWishlist(item)}>
-          <Text style={[styles.wishlistIcon, isInWishlist(item.id) && styles.wishlistActive]}>
-            {isInWishlist(item.id) ? "♥" : "♡"}
-          </Text>
+          <AppIcon
+            name={isInWishlist(item.id) ? "heartFilled" : "heart"}
+            size={18}
+            color={isInWishlist(item.id) ? "#C44A34" : "#6C5647"}
+          />
         </TouchableOpacity>
         <View style={styles.editorialInfo}>
           <Text style={styles.editorialName} numberOfLines={2}>
@@ -213,26 +218,22 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <HeaderBar onSettingsPress={onSettingsPress} />
+      <HeaderBar />
 
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={COLORS.primary}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9E5E2F" />
         }
       >
         <View style={styles.searchWrapper}>
           <View style={styles.searchContainer}>
-            <Text style={styles.searchIcon}>○</Text>
+            <AppIcon name="search" size={17} color="#8A7B6F" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Tìm kiếm quần áo, phụ kiện..."
-              placeholderTextColor={COLORS.textMuted}
+              placeholder="Tìm kiếm phong cách của bạn..."
+              placeholderTextColor="#8A7B6F"
               value={searchQuery}
               onChangeText={setSearchQuery}
               onSubmitEditing={handleSearch}
@@ -240,14 +241,14 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
             />
             {searchQuery.length > 0 ? (
               <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <Text style={styles.clearIcon}>✕</Text>
+                <AppIcon name="close" size={16} color="#9B4B1F" style={styles.clearIcon} />
               </TouchableOpacity>
             ) : null}
           </View>
         </View>
 
         {loading ? (
-          <ActivityIndicator color={COLORS.primary} style={styles.loader} />
+          <ActivityIndicator color="#9E5E2F" style={styles.loader} />
         ) : error ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>Không tải được trang chủ</Text>
@@ -260,12 +261,12 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
           <>
             <View style={styles.heroShell}>
               <View style={styles.heroCopy}>
-                <Text style={styles.heroEyebrow}>Bộ sưu tập hôm nay</Text>
-                <Text style={styles.heroTitle}>Trang phục và phụ kiện</Text>
+                <Text style={styles.heroEyebrow}>Bộ sưu tập nổi bật</Text>
+                <Text style={styles.heroTitle}>Trang phục & Phụ kiện</Text>
                 <Text style={styles.heroText}>
                   {heroProduct?.category
                     ? `${heroProduct.category} đang có mặt trong cửa hàng hôm nay.`
-                    : "Sản phẩm hiện tại được lấy trực tiếp từ hệ thống đang chạy."}
+                    : "Khám phá các sản phẩm hot nhất được cập nhật mỗi ngày."}
                 </Text>
                 <View style={styles.heroStatsRow}>
                   <View style={styles.heroStat}>
@@ -278,7 +279,7 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
                   </View>
                 </View>
                 <TouchableOpacity style={styles.heroButton} onPress={() => navigateToList()}>
-                  <Text style={styles.heroButtonText}>Xem sản phẩm</Text>
+                  <Text style={styles.heroButtonText}>Khám phá ngay</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.heroMedia}>
@@ -301,10 +302,10 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderContent}>
                   <Text style={styles.sectionEyebrow}>Shop by category</Text>
-                  <Text style={styles.sectionTitle}>Danh mục nổi bật</Text>
+                  <Text style={styles.sectionTitle}>Danh mục sản phẩm</Text>
                 </View>
                 <TouchableOpacity onPress={() => navigateToList()}>
-                  <Text style={styles.sectionLink}>Xem tất cả →</Text>
+                  <Text style={styles.sectionLink}>Xem tất cả</Text>
                 </TouchableOpacity>
               </View>
 
@@ -325,10 +326,10 @@ export default function HomeScreen({ navigation, onSettingsPress }) {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderContent}>
                   <Text style={styles.sectionEyebrow}>Ready to wear</Text>
-                  <Text style={styles.sectionTitle}>Sản phẩm có thể đặt</Text>
+                  <Text style={styles.sectionTitle}>Sản phẩm sẵn sàng</Text>
                 </View>
                 <TouchableOpacity onPress={() => navigateToList()}>
-                  <Text style={styles.sectionLink}>Xem tất cả →</Text>
+                  <Text style={styles.sectionLink}>Xem tất cả</Text>
                 </TouchableOpacity>
               </View>
 
@@ -393,16 +394,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 14,
-    height: 50,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    height: 48,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E8DFD4",
-    gap: 8,
+    gap: 10,
   },
   searchIcon: {
-    fontSize: 18,
-    color: "#7A6656",
+    marginTop: 1,
   },
   searchInput: {
     flex: 1,
@@ -410,8 +410,7 @@ const styles = StyleSheet.create({
     color: "#271C15",
   },
   clearIcon: {
-    fontSize: 16,
-    color: "#A09082",
+    marginTop: 1,
   },
   loader: {
     marginVertical: 36,
@@ -419,44 +418,45 @@ const styles = StyleSheet.create({
   heroShell: {
     marginHorizontal: 20,
     marginTop: 6,
-    borderRadius: 28,
+    borderRadius: 24,
     overflow: "hidden",
     backgroundColor: "#1E1815",
-    padding: 20,
+    padding: 24,
   },
   heroCopy: {
     paddingRight: 8,
-    marginBottom: 18,
+    marginBottom: 20,
   },
   heroEyebrow: {
     color: "#DCC4A8",
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
     letterSpacing: 1.5,
     textTransform: "uppercase",
     marginBottom: 8,
+    opacity: 0.8,
   },
   heroTitle: {
     color: "#FFF9F0",
-    fontSize: 29,
+    fontSize: 28,
     lineHeight: 34,
     fontWeight: "900",
-    letterSpacing: -0.7,
+    letterSpacing: -0.5,
     marginBottom: 10,
   },
   heroText: {
     color: "rgba(255, 249, 240, 0.78)",
     fontSize: 14,
     lineHeight: 22,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   heroStatsRow: {
     flexDirection: "row",
     gap: 12,
-    marginBottom: 18,
+    marginBottom: 20,
   },
   heroStat: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -475,8 +475,8 @@ const styles = StyleSheet.create({
   heroButton: {
     alignSelf: "flex-start",
     backgroundColor: "#D99152",
-    paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 12,
   },
   heroButtonText: {
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   heroImage: {
     width: "100%",
     height: 280,
-    borderRadius: 22,
+    borderRadius: 20,
     backgroundColor: "#362C24",
   },
   heroProductTag: {
@@ -498,14 +498,14 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 12,
-    padding: 12,
+    padding: 14,
     borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.9)",
   },
   heroProductTagLabel: {
     color: "#8C6B54",
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     textTransform: "uppercase",
     marginBottom: 4,
   },
@@ -521,11 +521,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   section: {
-    marginTop: 28,
+    marginTop: 32,
   },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "space-between",
     paddingHorizontal: 20,
     marginBottom: 16,
@@ -538,21 +538,22 @@ const styles = StyleSheet.create({
   sectionEyebrow: {
     color: "#AA7A54",
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1.2,
     textTransform: "uppercase",
     marginBottom: 4,
   },
   sectionTitle: {
     color: "#211912",
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     letterSpacing: -0.5,
   },
   sectionLink: {
     color: "#9E5E2F",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
+    marginBottom: 2,
   },
   categoryList: {
     paddingHorizontal: 14,
@@ -560,19 +561,19 @@ const styles = StyleSheet.create({
   categoryCard: {
     width: 178,
     marginHorizontal: 6,
-    padding: 16,
-    borderRadius: 22,
+    padding: 18,
+    borderRadius: 20,
   },
   categoryLabel: {
     color: "#826C5B",
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     textTransform: "uppercase",
     marginBottom: 8,
   },
   categoryTitle: {
     color: "#201914",
-    fontSize: 19,
+    fontSize: 18,
     lineHeight: 22,
     fontWeight: "900",
     marginBottom: 12,
@@ -580,7 +581,7 @@ const styles = StyleSheet.create({
   categoryCount: {
     color: "#6C5C51",
     fontSize: 13,
-    marginBottom: 22,
+    marginBottom: 24,
   },
   categoryLinkRow: {
     flexDirection: "row",
@@ -590,12 +591,12 @@ const styles = StyleSheet.create({
   categoryLink: {
     color: "#201914",
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   categoryArrow: {
     color: "#201914",
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   spotlightList: {
     paddingHorizontal: 14,
@@ -603,7 +604,7 @@ const styles = StyleSheet.create({
   spotlightCard: {
     width: 210,
     marginHorizontal: 6,
-    borderRadius: 22,
+    borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
     shadowColor: "#1E1815",
@@ -614,7 +615,7 @@ const styles = StyleSheet.create({
   },
   spotlightImage: {
     width: "100%",
-    height: 260,
+    height: 250,
     backgroundColor: "#EFE8E0",
   },
   statusBadge: {
@@ -623,7 +624,7 @@ const styles = StyleSheet.create({
     left: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 999,
+    borderRadius: 12,
   },
   statusBadgeText: {
     color: "#FFFFFF",
@@ -634,19 +635,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "rgba(255,255,255,0.9)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  wishlistIcon: {
-    fontSize: 16,
-    color: "#8D857F",
-  },
-  wishlistActive: {
-    color: "#D53F56",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   spotlightInfo: {
     padding: 14,
@@ -654,42 +653,42 @@ const styles = StyleSheet.create({
   spotlightCategory: {
     color: "#8A705A",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     textTransform: "uppercase",
     marginBottom: 6,
   },
   spotlightName: {
     color: "#211912",
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: "800",
     marginBottom: 6,
   },
   spotlightPrice: {
     color: "#A44E1D",
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "900",
   },
   editorialPanel: {
     marginHorizontal: 20,
-    marginTop: 30,
-    paddingTop: 22,
+    marginTop: 36,
+    paddingTop: 24,
     paddingHorizontal: 16,
-    paddingBottom: 8,
-    borderRadius: 28,
+    paddingBottom: 16,
+    borderRadius: 24,
     backgroundColor: "#F1E8DC",
   },
   sectionEyebrowDark: {
     color: "#8D6C52",
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1.2,
     textTransform: "uppercase",
     marginBottom: 4,
   },
   sectionTitleDark: {
     color: "#201812",
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     letterSpacing: -0.5,
   },
@@ -698,8 +697,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     flexShrink: 0,
-    alignSelf: "flex-start",
-    paddingTop: 18,
+    alignSelf: "flex-end",
+    marginBottom: 2,
   },
   editorialGrid: {
     flexDirection: "row",
@@ -709,13 +708,13 @@ const styles = StyleSheet.create({
   editorialCard: {
     width: "48%",
     backgroundColor: "#FFFFFF",
-    marginBottom: 14,
-    borderRadius: 20,
+    marginBottom: 16,
+    borderRadius: 16,
     overflow: "hidden",
   },
   editorialImage: {
     width: "100%",
-    height: 176,
+    height: 180,
     backgroundColor: "#EDE6DE",
     resizeMode: "cover",
   },
@@ -743,7 +742,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "800",
     minHeight: 40,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   editorialPrice: {
     color: "#9B4B1F",
@@ -773,11 +772,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#75665A",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   retryBtn: {
     color: "#9E5E2F",
-    fontWeight: "700",
+    fontWeight: "800",
     fontSize: 15,
   },
   emptyText: {

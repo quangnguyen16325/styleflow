@@ -14,6 +14,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../services/api";
 import { COLORS } from "../constants/colors";
+import AppIcon from "../components/AppIcon";
 
 export default function OrderDetailScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
@@ -119,7 +120,9 @@ export default function OrderDetailScreen({ navigation }) {
           <View style={styles.cardBottomRow}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Text style={styles.statusText}>{statusText}</Text>
-              {isDelivered && <Text style={styles.successCheck}> ✔</Text>}
+              {isDelivered && (
+                <AppIcon name="check" size={15} color={COLORS.info} style={styles.successCheck} />
+              )}
             </View>
 
             <TouchableOpacity
@@ -154,10 +157,10 @@ export default function OrderDetailScreen({ navigation }) {
         </View>
         <View style={styles.headerIcons}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Text>📝</Text>
+            <AppIcon name="note" size={17} color={COLORS.primary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
-            <Text>⚙️</Text>
+            <AppIcon name="settings" size={18} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -270,7 +273,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   statusText: { fontSize: 18, fontWeight: "800", color: COLORS.textPrimary },
-  successCheck: { fontSize: 16, color: COLORS.info },
+  successCheck: { marginLeft: 4 },
 
   // Buttons
   actionBtn: {

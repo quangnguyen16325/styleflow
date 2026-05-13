@@ -32,19 +32,26 @@ import ReturnRequestScreen from "../screens/ReturnRequestScreen";
 
 const Stack = createNativeStackNavigator();
 
-const stackScreenOptions = {
-  headerStyle: {
-    backgroundColor: "#FCF9F4",
-  },
-  headerShadowVisible: false,
-  headerTintColor: "#9B4B1F",
-  headerTitleStyle: {
-    color: "#241A13",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  headerBackTitle: "Quay lại",
-};
+function createStackScreenOptions() {
+  return {
+    contentStyle: {
+      backgroundColor: "#FCF9F4",
+    },
+    headerStyle: {
+      backgroundColor: "#FCF9F4",
+    },
+    headerShadowVisible: false,
+    headerTitleStyle: {
+      color: "#241A13",
+      fontSize: 18,
+      fontWeight: "800",
+    },
+    headerBackTitle: "",
+    headerBackTitleVisible: false,
+    headerBackButtonDisplayMode: "minimal",
+    headerTintColor: "#9B4B1F",
+  };
+}
 
 // ── Auth Stack ───────────────────────────────────────────────────────────────
 
@@ -106,42 +113,46 @@ function MainTabsWithNavigation({ navigation }) {
 function MainAppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainTabs" component={MainTabsWithNavigation} />
+      <Stack.Screen
+        name="MainTabs"
+        component={MainTabsWithNavigation}
+        options={{ title: "", headerBackTitle: "" }}
+      />
       <Stack.Screen
         name="ProductList"
         component={ProductListScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Sản phẩm",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="ProductDetail"
         component={ProductDetailScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Chi tiết",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="CartStack"
         component={CartScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Giỏ hàng",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="Checkout"
         component={CheckoutScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Thanh toán",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen name="Success" component={SuccessScreen} options={{ headerShown: false }} />
       <Stack.Screen
@@ -154,38 +165,38 @@ function MainAppStack() {
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Cài đặt",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="AddressList"
         component={AddressListScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Sổ địa chỉ",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="AddressForm"
         component={AddressFormScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Thêm địa chỉ",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="ReturnRequest"
         component={ReturnRequestScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Yêu cầu trả hàng",
-          ...stackScreenOptions,
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
     </Stack.Navigator>
   );
@@ -215,6 +226,6 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1 },
-  screenContainer: { flex: 1 },
+  mainContainer: { flex: 1, backgroundColor: "#FCF9F4" },
+  screenContainer: { flex: 1, backgroundColor: "#FCF9F4" },
 });
