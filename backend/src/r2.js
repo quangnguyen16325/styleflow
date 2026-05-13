@@ -79,6 +79,37 @@ export async function createProductImageUploadUrl({ productId, fileName, content
   };
 }
 
+export async function uploadProductImageObject({ productId, fileName, contentType, body }) {
+  const config = getR2Config();
+  if (!config) {
+    throw new Error("R2 upload is not configured");
+  }
+
+  const key = buildProductImageKey(productId, fileName);
+  const client = new S3Client({
+    region: "auto",
+    endpoint: config.endpoint,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+  });
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucketName,
+      Key: key,
+      ContentType: contentType,
+      Body: body,
+    }),
+  );
+
+  return {
+    objectKey: key,
+    publicUrl: `${config.publicBaseUrl}/${key}`,
+  };
+}
+
 export async function createRefundEvidenceUploadUrl({
   customerId,
   orderId,

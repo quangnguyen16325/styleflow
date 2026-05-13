@@ -75,38 +75,18 @@ class ApiService {
     return client.patch(`/admin/products/${id}/image`, { imageUrl });
   }
   static async uploadProductImage(productId, file, contentType) {
-    const presignPayload = await this.createProductUploadPresign(productId, file.name, contentType);
-    if (!presignPayload?.uploadUrl || !presignPayload?.publicUrl) {
-      throw new Error('Missing uploadUrl or publicUrl in presign response');
-    }
-
     const uploadBody =
       file.type === contentType ? file : file.slice(0, file.size, contentType);
+    const encodedFileName = encodeURIComponent(file.name || `product-${productId}`);
 
-    const uploadResponse = await fetch(presignPayload.uploadUrl, {
-      method: 'PUT',
-      mode: 'cors',
-      credentials: 'omit',
+    return client.put(`/admin/products/${productId}/image-upload`, uploadBody, {
       cache: 'no-store',
       headers: {
         'Content-Type': contentType,
+        'X-File-Name': encodedFileName,
       },
-      body: uploadBody,
+      timeout: 60000,
     });
-
-    if (!uploadResponse.ok) {
-      const responseText = await uploadResponse.text().catch(() => '');
-      throw new Error(
-        `Storage upload failed with status ${uploadResponse.status}${responseText ? `: ${responseText}` : ''}`
-      );
-    }
-
-    const product = await this.updateProductImage(productId, presignPayload.publicUrl);
-    return {
-      product,
-      imageUrl: presignPayload.publicUrl,
-      objectKey: presignPayload.objectKey,
-    };
   }
   static async createProduct(productData) {
     return client.post('/admin/products', productData);

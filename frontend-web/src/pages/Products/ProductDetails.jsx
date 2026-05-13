@@ -133,7 +133,7 @@ export default function ProductDetails() {
 
     try {
       const result = await ApiService.uploadProductImage(product.id, selectedFile, contentType);
-      setProduct((prev) => (prev ? { ...prev, imageUrl: result.imageUrl } : prev));
+      setProduct(result);
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
