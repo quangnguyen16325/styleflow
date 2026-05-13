@@ -21,7 +21,7 @@ export default function HeaderBar() {
     <View style={styles.shell}>
       <View style={styles.brandBlock}>
         <View style={styles.copyBlock}>
-          <Text style={styles.brandWordmark}>StyleFlow</Text>
+          <Text style={styles.brandWordmark}>Ecloria</Text>
           <Text style={styles.eyebrow}>{greeting}</Text>
           <Text style={styles.title} numberOfLines={1}>
             {firstName}, chọn outfit hôm nay

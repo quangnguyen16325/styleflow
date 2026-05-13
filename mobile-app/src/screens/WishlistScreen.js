@@ -1,20 +1,10 @@
 /* eslint-disable react/prop-types */
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  SafeAreaView,
-  Image,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView } from "react-native";
+import AppImage from "../components/AppImage";
 import { useWishlist } from "../context/WishlistContext";
 import { useCart } from "../context/CartContext";
 import { formatPrice } from "../services/api";
-
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=500&auto=format&fit=crop";
 
 export default function WishlistScreen({ navigation }) {
   const { items, removeFromWishlist } = useWishlist();
@@ -33,7 +23,7 @@ export default function WishlistScreen({ navigation }) {
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <Image source={{ uri: item.imageUrl || PLACEHOLDER_IMAGE }} style={styles.cardImage} />
+      <AppImage source={{ uri: item.imageUrl || null }} style={styles.cardImage} />
       <View style={styles.cardBody}>
         {item.category ? (
           <Text style={styles.cardCategory} numberOfLines={1}>

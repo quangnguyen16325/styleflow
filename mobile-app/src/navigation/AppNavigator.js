@@ -121,11 +121,7 @@ function MainAppStack() {
       <Stack.Screen
         name="ProductList"
         component={ProductListScreen}
-        options={() => ({
-          headerShown: true,
-          title: "Sản phẩm",
-          ...createStackScreenOptions(),
-        })}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ProductDetail"

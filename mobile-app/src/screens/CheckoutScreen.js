@@ -10,15 +10,12 @@ import {
   ActivityIndicator,
   Modal,
   SafeAreaView,
-  Image,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import AppImage from "../components/AppImage";
 import { useCart } from "../context/CartContext";
 import api, { createOrder, formatPrice, getShippingQuote } from "../services/api";
 import AppIcon from "../components/AppIcon";
-
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop";
 
 const PAYMENT_OPTIONS = [
   {
@@ -29,7 +26,7 @@ const PAYMENT_OPTIONS = [
   {
     value: "BANK_TRANSFER",
     title: "Chuyển khoản ngân hàng",
-    description: "Đơn sẽ ở trạng thái chờ thanh toán cho đến khi backend xác nhận.",
+    description: "Vui lòng chuyển khoản bằng cách quét mã QR. Đơn sẽ được xử lý sau khi nhận được thanh toán.",
   },
 ];
 
@@ -104,9 +101,10 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose,
 }
 
 function CheckoutItemRow({ item }) {
+  const imageUri = item.imageUrl || item.image || null;
   return (
     <View style={styles.itemRow}>
-      <Image source={{ uri: item.image || PLACEHOLDER_IMAGE }} style={styles.itemImage} />
+      <AppImage source={{ uri: imageUri }} style={styles.itemImage} />
       <View style={styles.itemInfo}>
         <Text style={styles.itemName} numberOfLines={2}>
           {item.name}

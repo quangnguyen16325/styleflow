@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
   SafeAreaView,
   RefreshControl,
-  Image,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import AppImage from "../components/AppImage";
 import api from "../services/api";
 import { COLORS } from "../constants/colors";
 import AppIcon from "../components/AppIcon";
@@ -86,7 +86,7 @@ export default function OrderDetailScreen({ navigation }) {
             const item = itemsList[idx];
             if (item && item.imageUrl) {
               return (
-                <Image
+                <AppImage
                   key={idx}
                   source={{ uri: item.imageUrl }}
                   style={styles.collageChunk}

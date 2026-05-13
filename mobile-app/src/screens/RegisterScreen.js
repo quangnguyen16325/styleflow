@@ -15,7 +15,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
-import { COLORS } from "../constants/colors";
 import BackPillButton from "../components/BackPillButton";
 
 export default function RegisterScreen({ navigation }) {
@@ -67,7 +66,7 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bgPrimary} />
+      <StatusBar barStyle="dark-content" backgroundColor="#FCF9F4" />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -79,22 +78,22 @@ export default function RegisterScreen({ navigation }) {
 
           {/* Header */}
           <View style={styles.headerSection}>
-            <Text style={styles.title}>Tạo tài khoản</Text>
-            <Text style={styles.subtitle}>Điền thông tin để bắt đầu mua sắm</Text>
+            <Text style={styles.title}>Trở thành thành viên.</Text>
+            <Text style={styles.subtitle}>Đăng ký để trải nghiệm đặc quyền mua sắm cao cấp.</Text>
           </View>
 
           {/* Form */}
           <View style={styles.formCard}>
             <InputField
               label="Họ và tên *"
-              placeholder="Nguyễn Quang Anh"
+              placeholder="Nguyễn Văn A"
               value={form.fullName}
               onChangeText={(v) => setField("fullName", v)}
               error={errors.fullName}
             />
             <InputField
               label="Số điện thoại *"
-              placeholder="0901234567"
+              placeholder="0123456789"
               value={form.phone}
               onChangeText={(v) => setField("phone", v)}
               error={errors.phone}
@@ -135,7 +134,7 @@ export default function RegisterScreen({ navigation }) {
 
           {/* Login link */}
           <View style={styles.loginRow}>
-            <Text style={styles.loginLabel}>Đã có tài khoản? </Text>
+            <Text style={styles.loginLabel}>Bạn đã là thành viên? </Text>
             <TouchableOpacity onPress={() => navigation.navigate("Login")}>
               <Text style={styles.loginLink}>Đăng nhập</Text>
             </TouchableOpacity>
@@ -152,7 +151,7 @@ function InputField({ label, error, ...props }) {
       <Text style={styles.label}>{label}</Text>
       <TextInput
         style={[styles.input, error && styles.inputError]}
-        placeholderTextColor={COLORS.textMuted}
+        placeholderTextColor="#8A7B6F"
         {...props}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -161,7 +160,7 @@ function InputField({ label, error, ...props }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.bgSecondary },
+  safeArea: { flex: 1, backgroundColor: "#FCF9F4" },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
 
@@ -170,60 +169,59 @@ const styles = StyleSheet.create({
   headerSection: { paddingBottom: 28 },
   title: {
     fontSize: 28,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
+    fontWeight: "900",
+    color: "#1E1815",
     marginBottom: 6,
   },
-  subtitle: { fontSize: 15, color: COLORS.textSecondary },
+  subtitle: { fontSize: 15, color: "#8A7B6F" },
 
   formCard: {
-    backgroundColor: COLORS.bgCard,
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 24,
-    shadowColor: "#000",
+    shadowColor: "#1E1815",
     shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "#E8DFD4",
   },
 
   fieldContainer: { marginBottom: 20 },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#8A7B6F",
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   input: {
-    height: 52,
-    backgroundColor: COLORS.bgInput,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    paddingHorizontal: 16,
+    height: 48,
+    backgroundColor: "transparent",
+    borderBottomWidth: 1,
+    borderBottomColor: "#DCC4A8",
+    paddingHorizontal: 4,
     fontSize: 16,
-    color: COLORS.textPrimary,
+    color: "#271C15",
   },
-  inputError: { borderColor: COLORS.danger, backgroundColor: "#FFF5F5" },
-  errorText: { fontSize: 12, color: COLORS.danger, marginTop: 4, marginLeft: 4 },
+  inputError: { borderBottomColor: "#C44A34" },
+  errorText: { fontSize: 12, color: "#C44A34", marginTop: 6, marginLeft: 4 },
 
   registerBtn: {
     height: 56,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#D99152",
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
+    marginTop: 8,
   },
   btnDisabled: { opacity: 0.7 },
-  registerBtnText: { color: "#fff", fontSize: 17, fontWeight: "700", letterSpacing: 0.3 },
+  registerBtnText: { color: "#FFFDF9", fontSize: 17, fontWeight: "800" },
 
   loginRow: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
-  loginLabel: { fontSize: 15, color: COLORS.textSecondary },
-  loginLink: { fontSize: 15, fontWeight: "700", color: COLORS.primary },
+  loginLabel: { fontSize: 15, color: "#8A7B6F" },
+  loginLink: { fontSize: 15, fontWeight: "700", color: "#9E5E2F" },
 });

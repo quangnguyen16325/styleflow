@@ -29,7 +29,8 @@ export function CartProvider({ children }) {
           basePrice: product.basePrice,
           availableQty: product.availableQty,
           quantity,
-          image: product.image || null,
+          image: product.imageUrl || product.image || null,
+          imageUrl: product.imageUrl || product.image || null,
         },
       ];
     });

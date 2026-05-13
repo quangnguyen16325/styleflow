@@ -5,30 +5,28 @@ import {
   Text,
   TouchableOpacity,
   FlatList,
-  Image,
   StyleSheet,
   Dimensions,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import AppImage from "../components/AppImage";
+import AppIcon from "../components/AppIcon";
 import { getProducts, formatPrice } from "../services/api";
+import { useWishlist } from "../context/WishlistContext";
 import { COLORS } from "../constants/colors";
 
 const screenWidth = Dimensions.get("window").width;
 
-const PLACEHOLDER_IMAGES = [
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=400&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=400&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=400&auto=format&fit=crop",
-];
-
-function getProductImage(product, fallbackIndex) {
+function getProductImage(product) {
   if (product?.imageUrl) return product.imageUrl;
-  return PLACEHOLDER_IMAGES[fallbackIndex % PLACEHOLDER_IMAGES.length];
+  return null;
 }
 
 export default function ProductListScreen({ navigation, route }) {
+  const { isInWishlist, toggleWishlist } = useWishlist();
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,7 +76,7 @@ export default function ProductListScreen({ navigation, route }) {
     fetchProducts();
   }, [fetchProducts]);
 
-  const renderProduct = ({ item, index }) => {
+  const renderProduct = ({ item }) => {
     const isOutOfStock = item.availableQty <= 0;
 
     return (
@@ -87,21 +85,28 @@ export default function ProductListScreen({ navigation, route }) {
         onPress={() => navigation.navigate("ProductDetail", { productId: item.id })}
         activeOpacity={0.85}
       >
-        <Image source={{ uri: getProductImage(item, index) }} style={styles.image} />
+        <AppImage source={{ uri: getProductImage(item) }} style={styles.image} />
         <View
           style={[styles.stockBadge, isOutOfStock ? styles.stockBadgeOut : styles.stockBadgeIn]}
         >
           <Text style={styles.stockBadgeText}>{isOutOfStock ? "Hết hàng" : "Có thể đặt"}</Text>
         </View>
+        <TouchableOpacity style={styles.wishlistBtn} onPress={() => toggleWishlist(item)}>
+          <AppIcon
+            name={isInWishlist(item.id) ? "heartFilled" : "heart"}
+            size={18}
+            color={isInWishlist(item.id) ? "#C44A34" : "#6C5647"}
+          />
+        </TouchableOpacity>
         <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={2}>
-            {item.name}
-          </Text>
           {item.category ? (
             <Text style={styles.category} numberOfLines={1}>
               {item.category}
             </Text>
           ) : null}
+          <Text style={styles.name} numberOfLines={2}>
+            {item.name}
+          </Text>
           <Text style={styles.price}>{formatPrice(item.basePrice)}</Text>
           <Text style={styles.meta}>
             {isOutOfStock ? "Tạm hết hàng" : `Số lượng có thể đặt: ${item.availableQty}`}
@@ -112,10 +117,15 @@ export default function ProductListScreen({ navigation, route }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>{screenTitle}</Text>
-        <Text style={styles.subtitle}>{filteredProducts.length} sản phẩm</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <AppIcon name="chevronLeft" size={24} color="#1E1815" />
+        </TouchableOpacity>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.title}>{screenTitle}</Text>
+          <Text style={styles.subtitle}>{filteredProducts.length} sản phẩm</Text>
+        </View>
       </View>
 
       {loading ? (
@@ -155,126 +165,158 @@ export default function ProductListScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: "#FCF9F4",
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F5ECE3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
+  headerTitleWrap: {
+    flex: 1,
   },
   title: {
     fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-    marginBottom: 4,
+    fontWeight: "900",
+    color: "#1E1815",
+    marginBottom: 2,
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: "#8A7B6F",
   },
   loader: {
     marginTop: 32,
   },
   listContent: {
-    paddingHorizontal: 10,
-    paddingBottom: 20,
+    paddingHorizontal: 14,
+    paddingBottom: 24,
   },
   columnWrapper: {
     justifyContent: "space-between",
   },
   card: {
-    backgroundColor: COLORS.bgCard,
-    width: screenWidth / 2 - 15,
-    marginBottom: 15,
-    borderRadius: 12,
+    width: screenWidth / 2 - 21,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 16,
+    borderRadius: 20,
     overflow: "hidden",
-    shadowColor: "#000",
+    shadowColor: "#1E1815",
     shadowOpacity: 0.08,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   image: {
     width: "100%",
-    height: 180,
+    height: 190,
     resizeMode: "cover",
-    backgroundColor: "#f1f1f1",
+    backgroundColor: "#EFE8E0",
   },
   stockBadge: {
     position: "absolute",
-    top: 8,
-    left: 8,
+    top: 10,
+    left: 10,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
   stockBadgeIn: {
-    backgroundColor: COLORS.success,
+    backgroundColor: "#00C48C",
   },
   stockBadgeOut: {
-    backgroundColor: COLORS.danger,
+    backgroundColor: "#FF2D2D",
   },
   stockBadgeText: {
     color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "800",
   },
+  wishlistBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
   info: {
-    padding: 12,
+    padding: 14,
   },
   name: {
     fontSize: 14,
-    color: COLORS.textPrimary,
-    fontWeight: "700",
+    color: "#211912",
+    fontWeight: "800",
     lineHeight: 20,
     marginBottom: 4,
     minHeight: 40,
   },
   category: {
     fontSize: 12,
-    color: COLORS.textSecondary,
+    color: "#8A705A",
+    fontWeight: "800",
+    textTransform: "uppercase",
     marginBottom: 6,
   },
   price: {
-    fontSize: 16,
-    color: COLORS.primary,
-    fontWeight: "800",
-    marginBottom: 4,
+    fontSize: 17,
+    color: "#9B4B1F",
+    fontWeight: "900",
+    marginBottom: 6,
   },
   meta: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: "#76675B",
   },
   stateBox: {
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     marginTop: 32,
     padding: 20,
-    borderRadius: 16,
-    backgroundColor: COLORS.bgCard,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
   },
   stateTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: COLORS.textPrimary,
+    color: "#241C16",
     marginBottom: 8,
   },
   stateText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: "#75665A",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   retryBtn: {
-    color: COLORS.primary,
-    fontWeight: "700",
+    color: "#9E5E2F",
+    fontWeight: "800",
     fontSize: 15,
   },
 });

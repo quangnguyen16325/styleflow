@@ -1,28 +1,18 @@
 /* eslint-disable react/prop-types */
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
-  Image,
-  ScrollView,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from "react-native";
+import AppImage from "../components/AppImage";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import { formatPrice } from "../services/api";
 
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=500&auto=format&fit=crop";
-
 function CartItemCard({ item, onDecrease, onIncrease, onRemove }) {
-  const imageUri = item.image || item.imageUrl || PLACEHOLDER_IMAGE;
+  const imageUri = item.image || item.imageUrl || null;
   const price = item.basePrice || item.price || 0;
 
   return (
     <View style={styles.itemCard}>
-      <Image source={{ uri: imageUri }} style={styles.itemImage} />
+      <AppImage source={{ uri: imageUri }} style={styles.itemImage} />
       <View style={styles.itemBody}>
         <View style={styles.itemTopRow}>
           <Text style={styles.itemName} numberOfLines={2}>
@@ -36,7 +26,9 @@ function CartItemCard({ item, onDecrease, onIncrease, onRemove }) {
           {item.availableQty > 0 ? `Có thể đặt ${item.availableQty}` : "Tạm hết hàng"}
         </Text>
         <View style={styles.itemBottomRow}>
-          <Text style={styles.itemPrice}>{formatPrice(price)}</Text>
+          <Text style={styles.itemPrice} numberOfLines={1} adjustsFontSizeToFit>
+            {formatPrice(price)}
+          </Text>
           <View style={styles.qtyControl}>
             <TouchableOpacity style={styles.qtyBtn} onPress={onDecrease} activeOpacity={0.85}>
               <Text style={styles.qtyBtnText}>−</Text>
@@ -56,11 +48,11 @@ function CartItemCard({ item, onDecrease, onIncrease, onRemove }) {
 
 function WishlistRow({ product, onMoveToCart }) {
   const price = product.basePrice || product.price || 0;
-  const imageUri = product.imageUrl || product.image || PLACEHOLDER_IMAGE;
+  const imageUri = product.imageUrl || product.image || null;
 
   return (
     <View style={styles.wishlistRow}>
-      <Image source={{ uri: imageUri }} style={styles.wishlistImage} />
+      <AppImage source={{ uri: imageUri }} style={styles.wishlistImage} />
       <View style={styles.wishlistInfo}>
         <Text style={styles.wishlistName} numberOfLines={2}>
           {product.name}
@@ -302,9 +294,9 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0E5D8",
   },
   itemImage: {
-    width: 98,
-    height: 118,
-    borderRadius: 18,
+    width: 84,
+    height: 104,
+    borderRadius: 16,
     backgroundColor: "#EFE8E0",
     marginRight: 14,
   },
@@ -351,17 +343,19 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     color: "#9B4B1F",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "900",
+    marginRight: 6,
+    flex: 1,
   },
   qtyControl: {
     flexDirection: "row",
     alignItems: "center",
   },
   qtyBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#D9C7B7",
     alignItems: "center",
@@ -370,18 +364,18 @@ const styles = StyleSheet.create({
   },
   qtyBtnText: {
     color: "#9B4B1F",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
   },
   qtyValueWrap: {
-    minWidth: 38,
-    height: 34,
-    borderRadius: 12,
+    minWidth: 32,
+    height: 28,
+    borderRadius: 8,
     backgroundColor: "#F5ECE3",
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 8,
-    paddingHorizontal: 10,
+    marginHorizontal: 6,
+    paddingHorizontal: 6,
   },
   qtyValueText: {
     color: "#241A13",

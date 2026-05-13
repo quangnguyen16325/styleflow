@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -14,14 +13,11 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { getProductById, formatPrice } from "../services/api";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
-import { COLORS } from "../constants/colors";
 import BackPillButton from "../components/BackPillButton";
 import AppIcon from "../components/AppIcon";
+import AppImage from "../components/AppImage";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1515347619362-e612984183ab?q=80&w=800&auto=format&fit=crop";
 
 export default function ProductDetailScreen() {
   const route = useRoute();
@@ -65,7 +61,7 @@ export default function ProductDetailScreen() {
   const availableQty = Number(product?.availableQty ?? 0);
   const minStockLevel = Number(product?.minStockLevel ?? 0);
   const isOutOfStock = availableQty <= 0;
-  const imageUrl = product?.imageUrl || FALLBACK_IMAGE;
+  const imageUrl = product?.imageUrl || null;
 
   const stockLabel = isOutOfStock
     ? "Hết hàng"
@@ -103,7 +99,7 @@ export default function ProductDetailScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color="#9B4B1F" />
       </View>
     );
   }
@@ -121,7 +117,7 @@ export default function ProductDetailScreen() {
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.heroWrapper}>
-          <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
+          <AppImage source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
         </View>
 
         <View style={styles.contentPanel}>
@@ -138,7 +134,7 @@ export default function ProductDetailScreen() {
               <AppIcon
                 name={liked ? "heartFilled" : "heart"}
                 size={22}
-                color={liked ? "#E5484D" : COLORS.textMuted}
+                color={liked ? "#E5484D" : "#AA9C8F"}
               />
             </TouchableOpacity>
           </View>
@@ -253,38 +249,38 @@ function SummaryRow({ label, value }) {
 const RADIUS = 24;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bgPrimary },
+  container: { flex: 1, backgroundColor: "#FCF9F4" },
   scrollView: { flex: 1 },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.bgPrimary,
+    backgroundColor: "#FCF9F4",
   },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.bgPrimary,
+    backgroundColor: "#FCF9F4",
     paddingHorizontal: 24,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: "#1E1815",
     marginBottom: 16,
   },
   heroWrapper: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT * 0.5,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#F1EBE4",
   },
   heroImage: { width: "100%", height: "100%" },
   contentPanel: {
     marginTop: -RADIUS,
     borderTopLeftRadius: RADIUS,
     borderTopRightRadius: RADIUS,
-    backgroundColor: COLORS.bgPrimary,
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 20,
     paddingTop: 24,
   },
@@ -298,20 +294,20 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 26,
     fontWeight: "800",
-    color: COLORS.textPrimary,
+    color: "#9B4B1F",
     marginBottom: 4,
   },
   titleText: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    color: "#1E1815",
     lineHeight: 24,
   },
   heartBtnTop: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: "#F5ECE3",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -323,16 +319,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   metaChip: {
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: "#F5ECE3",
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
   metaChipText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-    textTransform: "capitalize",
+    fontWeight: "700",
+    color: "#76675B",
+    textTransform: "uppercase",
   },
   stockBadge: {
     alignSelf: "flex-start",
@@ -341,48 +337,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 8,
   },
-  stockBadgeOk: { backgroundColor: "#e7f7ed" },
-  stockBadgeWarn: { backgroundColor: "#fff4db" },
-  stockBadgeDanger: { backgroundColor: "#fdecec" },
+  stockBadgeOk: { backgroundColor: "#F3EFE9" },
+  stockBadgeWarn: { backgroundColor: "#F9E4D4" },
+  stockBadgeDanger: { backgroundColor: "#F2D5D5" },
   stockBadgeText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
+    fontWeight: "800",
+    color: "#1E1815",
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginTop: 18,
+    fontWeight: "800",
+    color: "#1E1815",
+    marginTop: 20,
     marginBottom: 10,
   },
   descText: {
     fontSize: 14,
-    color: COLORS.textSecondary,
-    lineHeight: 21,
+    color: "#76675B",
+    lineHeight: 22,
   },
   purchaseInfoCard: {
-    marginTop: 8,
-    backgroundColor: COLORS.bgSecondary,
+    marginTop: 12,
+    backgroundColor: "#F5ECE3",
     borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
   },
   purchaseInfoLabel: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    color: "#AA9C8F",
     marginBottom: 6,
   },
   purchaseInfoValue: {
     fontSize: 24,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
+    fontWeight: "900",
+    color: "#1E1815",
     marginBottom: 6,
   },
   purchaseInfoHint: {
     fontSize: 13,
-    lineHeight: 18,
-    color: COLORS.textSecondary,
+    lineHeight: 20,
+    color: "#76675B",
   },
   qtyRow: {
     flexDirection: "row",
@@ -390,10 +388,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   qtyCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: COLORS.bgSecondary,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F5ECE3",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -402,35 +400,37 @@ const styles = StyleSheet.create({
   },
   qtyCircleText: {
     fontSize: 24,
-    color: COLORS.textPrimary,
+    color: "#1E1815",
     marginTop: -2,
   },
   qtyBox: {
     minWidth: 56,
     paddingHorizontal: 12,
-    height: 42,
+    height: 44,
     borderRadius: 14,
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: "#F5ECE3",
     justifyContent: "center",
     alignItems: "center",
   },
   qtyBoxText: {
     fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
+    fontWeight: "800",
+    color: "#1E1815",
   },
   helperText: {
     fontSize: 13,
-    color: COLORS.textMuted,
-    marginTop: 10,
+    color: "#AA9C8F",
+    marginTop: 12,
     lineHeight: 18,
   },
   summaryCard: {
-    marginTop: 18,
-    backgroundColor: COLORS.bgSecondary,
+    marginTop: 20,
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#EBE1D7",
     borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
   },
   summaryRow: {
     flexDirection: "row",
@@ -440,12 +440,12 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: "#76675B",
   },
   summaryValue: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E1815",
   },
   bottomSpacer: { height: 110 },
   bottomBar: {
@@ -456,30 +456,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 22,
-    backgroundColor: "#fff",
+    paddingTop: 16,
+    paddingBottom: 26,
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
+    borderTopColor: "#F0EAE1",
   },
   secondaryBtn: {
     flex: 1,
-    height: 52,
+    height: 54,
     borderRadius: 16,
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: "#F5ECE3",
     justifyContent: "center",
     alignItems: "center",
   },
   secondaryBtnText: {
     fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
+    fontWeight: "800",
+    color: "#1E1815",
   },
   primaryBtn: {
     flex: 1.2,
-    height: 52,
+    height: 54,
     borderRadius: 16,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#1E1815",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -489,6 +489,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#fff",
+    color: "#FFFDF9",
   },
 });
+

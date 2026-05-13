@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  Image,
   StyleSheet,
   TextInput,
   ActivityIndicator,
@@ -17,19 +16,13 @@ import { COLORS } from "../constants/colors";
 import { getCategories, getProducts, formatPrice } from "../services/api";
 import { useWishlist } from "../context/WishlistContext";
 import AppIcon from "../components/AppIcon";
-
-const PLACEHOLDER_IMAGES = [
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=700&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=700&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=700&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=700&auto=format&fit=crop",
-];
+import AppImage from "../components/AppImage";
 
 const COLLECTION_TONES = ["#F7EEE7", "#E9EDF9", "#F4EAF6", "#EFF5E8"];
 
-function getProductImage(product, fallbackIndex) {
+function getProductImage(product) {
   if (product?.imageUrl) return product.imageUrl;
-  return PLACEHOLDER_IMAGES[fallbackIndex % PLACEHOLDER_IMAGES.length];
+  return null;
 }
 
 function getProductStatus(product) {
@@ -101,7 +94,7 @@ export default function HomeScreen({ navigation }) {
   );
 
   const heroProduct = availableProducts[0] || newestProducts[0] || products[0] || null;
-  const heroImage = getProductImage(heroProduct, 0);
+  const heroImage = getProductImage(heroProduct);
 
   const categorySummaries = useMemo(() => {
     const counts = products.reduce((acc, product) => {
@@ -128,11 +121,7 @@ export default function HomeScreen({ navigation }) {
       activeOpacity={0.88}
       onPress={() => navigateToList({ category: category.name })}
     >
-      <Text style={styles.categoryLabel}>Danh mục</Text>
       <Text style={styles.categoryTitle}>{category.name}</Text>
-      <Text style={styles.categoryCount}>
-        {category.count > 0 ? `${category.count} sản phẩm` : "Chưa có sản phẩm"}
-      </Text>
       <View style={styles.categoryLinkRow}>
         <Text style={styles.categoryLink}>Mở bộ sưu tập</Text>
         <Text style={styles.categoryArrow}>→</Text>
@@ -140,7 +129,7 @@ export default function HomeScreen({ navigation }) {
     </TouchableOpacity>
   );
 
-  const renderSpotlightCard = (item, index) => {
+  const renderSpotlightCard = (item) => {
     const status = getProductStatus(item);
 
     return (
@@ -150,7 +139,7 @@ export default function HomeScreen({ navigation }) {
         onPress={() => navigation.navigate("ProductDetail", { productId: item.id })}
         activeOpacity={0.9}
       >
-        <Image source={{ uri: getProductImage(item, index + 1) }} style={styles.spotlightImage} />
+        <AppImage source={{ uri: getProductImage(item) }} style={styles.spotlightImage} />
         <View style={[styles.statusBadge, { backgroundColor: status.color }]}>
           <Text style={styles.statusBadgeText}>{status.label}</Text>
         </View>
@@ -176,7 +165,7 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
-  const renderEditorialCard = (item, index) => {
+  const renderEditorialCard = (item) => {
     const status = getProductStatus(item);
 
     return (
@@ -186,7 +175,7 @@ export default function HomeScreen({ navigation }) {
         onPress={() => navigation.navigate("ProductDetail", { productId: item.id })}
         activeOpacity={0.9}
       >
-        <Image source={{ uri: getProductImage(item, index + 2) }} style={styles.editorialImage} />
+        <AppImage source={{ uri: getProductImage(item) }} style={styles.editorialImage} />
         <View
           style={[
             styles.statusBadge,
@@ -268,22 +257,9 @@ export default function HomeScreen({ navigation }) {
                     ? `${heroProduct.category} đang có mặt trong cửa hàng hôm nay.`
                     : "Khám phá các sản phẩm hot nhất được cập nhật mỗi ngày."}
                 </Text>
-                <View style={styles.heroStatsRow}>
-                  <View style={styles.heroStat}>
-                    <Text style={styles.heroStatValue}>{products.length}</Text>
-                    <Text style={styles.heroStatLabel}>Sản phẩm</Text>
-                  </View>
-                  <View style={styles.heroStat}>
-                    <Text style={styles.heroStatValue}>{categories.length}</Text>
-                    <Text style={styles.heroStatLabel}>Danh mục</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.heroButton} onPress={() => navigateToList()}>
-                  <Text style={styles.heroButtonText}>Khám phá ngay</Text>
-                </TouchableOpacity>
               </View>
               <View style={styles.heroMedia}>
-                <Image source={{ uri: heroImage }} style={styles.heroImage} />
+                <AppImage source={{ uri: heroImage }} style={styles.heroImage} />
                 {heroProduct ? (
                   <View style={styles.heroProductTag}>
                     <Text style={styles.heroProductTagLabel}>Spotlight</Text>
@@ -296,6 +272,9 @@ export default function HomeScreen({ navigation }) {
                   </View>
                 ) : null}
               </View>
+              <TouchableOpacity style={styles.heroButton} onPress={() => navigateToList()}>
+                <Text style={styles.heroButtonText}>Khám phá ngay</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.section}>
@@ -339,9 +318,7 @@ export default function HomeScreen({ navigation }) {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.spotlightList}
                 >
-                  {spotlightProducts
-                    .slice(0, 8)
-                    .map((item, index) => renderSpotlightCard(item, index))}
+                  {spotlightProducts.slice(0, 8).map((item) => renderSpotlightCard(item))}
                 </ScrollView>
               ) : (
                 <Text style={styles.emptyText}>Chưa có sản phẩm khả dụng.</Text>
@@ -359,9 +336,7 @@ export default function HomeScreen({ navigation }) {
 
               {editorialProducts.length > 0 ? (
                 <View style={styles.editorialGrid}>
-                  {editorialProducts
-                    .slice(0, 6)
-                    .map((item, index) => renderEditorialCard(item, index))}
+                  {editorialProducts.slice(0, 6).map((item) => renderEditorialCard(item))}
                 </View>
               ) : (
                 <Text style={styles.emptyTextDark}>Chưa có sản phẩm nào.</Text>
@@ -473,11 +448,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   heroButton: {
-    alignSelf: "flex-start",
+    alignSelf: "center",
     backgroundColor: "#D99152",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 20,
   },
   heroButtonText: {
     color: "#FFFDF9",
