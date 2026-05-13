@@ -1,13 +1,14 @@
 import { NavLink } from 'react-router-dom';
 import { useEffect } from 'react';
+import { LayoutDashboard, Package, Tags, ShoppingCart, AlertTriangle, Receipt } from 'lucide-react';
 
 const menuItems = [
-  { to: '/', label: 'Dashboard', icon: '📊', end: true },
-  { to: '/products', label: 'Inventory', icon: '📦' },
-  { to: '/categories', label: 'Categories', icon: '🏷️' },
-  { to: '/orders', label: 'Orders', icon: '🛒' },
-  { to: '/issues', label: 'Issues', icon: '⚠️' },
-  { to: '/refund-requests', label: 'Refunds', icon: '💸' },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/products', label: 'Inventory', icon: Package },
+  { to: '/categories', label: 'Categories', icon: Tags },
+  { to: '/orders', label: 'Orders', icon: ShoppingCart },
+  { to: '/issues', label: 'Issues', icon: AlertTriangle },
+  { to: '/refund-requests', label: 'Refunds', icon: Receipt },
 ];
 
 export default function Sidebar({ collapsed = false, onToggle, isMobile = false }) {
@@ -213,8 +214,8 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
               title={collapsed ? item.label : ''}
               aria-label={item.label}
             >
-              <span style={{ fontSize: 'var(--font-size-md)' }} role="img" aria-hidden="true">
-                {item.icon}
+              <span style={{ display: 'flex', alignItems: 'center' }}>
+                <item.icon size={20} strokeWidth={2} />
               </span>
               {!collapsed && <span>{item.label}</span>}
             </NavLink>

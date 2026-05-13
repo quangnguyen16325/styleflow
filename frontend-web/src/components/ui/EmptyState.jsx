@@ -1,5 +1,7 @@
+import { Inbox } from 'lucide-react';
+
 export default function EmptyState({ 
-  icon = '📭', 
+  icon = <Inbox size={48} strokeWidth={1.5} />,
   title = 'No Data', 
   description = 'There is nothing to display here right now.',
   action,
@@ -24,12 +26,11 @@ export default function EmptyState({
     >
       <div
         style={{
-          fontSize: '48px',
+          display: 'flex',
+          justifyContent: 'center',
           marginBottom: 'var(--spacing-md)',
           opacity: 0.4,
         }}
-        role="img"
-        aria-label={typeof icon === 'string' ? 'Empty state icon' : ''}
       >
         {icon}
       </div>

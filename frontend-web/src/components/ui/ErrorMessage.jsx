@@ -1,3 +1,5 @@
+import { AlertTriangle } from 'lucide-react';
+
 export default function ErrorMessage({ error, onRetry, onDismiss }) {
   const code = error?.code || 'ERROR';
   const message = error?.message || 'Something went wrong. Please try again.';
@@ -20,14 +22,13 @@ export default function ErrorMessage({ error, onRetry, onDismiss }) {
     >
       <div 
         style={{ 
-          fontSize: 'var(--font-size-lg)', 
+          display: 'flex',
+          alignItems: 'center',
           flexShrink: 0,
           marginTop: '2px',
         }}
-        role="img"
-        aria-label="Error"
       >
-        ⚠️
+        <AlertTriangle size={24} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p

@@ -4,6 +4,7 @@ import ApiService from '../api';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import StatusBadge from '../components/ui/StatusBadge';
 import ErrorMessage from '../components/ui/ErrorMessage';
+import { Package, ShoppingCart, AlertTriangle } from 'lucide-react';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -108,7 +109,7 @@ export default function Dashboard() {
       sub: `${stats.products?.lowStock ?? 0} low stock`,
       subColor: (stats.products?.lowStock ?? 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
       link: '/products',
-      icon: '📦',
+      icon: Package,
     },
     {
       title: 'Orders',
@@ -116,7 +117,7 @@ export default function Dashboard() {
       sub: `${stats.orders?.pending ?? 0} pending`,
       subColor: (stats.orders?.pending ?? 0) > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)',
       link: '/orders',
-      icon: '🛒',
+      icon: ShoppingCart,
     },
     {
       title: 'Issues',
@@ -124,7 +125,7 @@ export default function Dashboard() {
       sub: `${stats.issues?.open ?? 0} open`,
       subColor: (stats.issues?.open ?? 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
       link: '/issues',
-      icon: '⚠️',
+      icon: AlertTriangle,
     },
   ], [stats]);
 
@@ -168,7 +169,7 @@ export default function Dashboard() {
                   gap: 'var(--spacing-xs)',
                 }}
               >
-                <span role="img" aria-hidden="true">{card.icon}</span>
+                <card.icon size={16} />
                 <span>{card.title}</span>
               </div>
               <div 

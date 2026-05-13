@@ -6,6 +6,7 @@ import {
   isPrivilegedRole,
   isTokenExpired,
 } from '../../utils/auth';
+import { ShieldAlert } from 'lucide-react';
 
 export default function ProtectedRoute() {
   const token = getStoredAdminToken();
@@ -49,14 +50,13 @@ export default function ProtectedRoute() {
         >
           <div 
             style={{ 
-              fontSize: '48px', 
+              display: 'flex',
+              justifyContent: 'center',
               marginBottom: 'var(--spacing-lg)', 
-              opacity: 0.4 
+              color: 'var(--color-danger)'
             }}
-            role="img"
-            aria-label="Access denied"
           >
-            🚫
+            <ShieldAlert size={64} strokeWidth={1.5} />
           </div>
           <h2 
             style={{ 
