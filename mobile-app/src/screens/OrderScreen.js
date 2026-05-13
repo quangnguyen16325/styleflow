@@ -18,6 +18,7 @@ import api, {
   formatPrice,
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL,
+  PAYMENT_GATEWAY_LABEL,
 } from "../services/api";
 
 const ADDRESS_CHANGE_WEBHOOK_URL =
@@ -115,6 +116,10 @@ function isCompletedStatus(status) {
 }
 
 function canChangeAddress(order) {
+  const status = String(order?.status || "").toLowerCase();
+  if (["completed", "cancelled", "failed"].includes(status)) {
+    return false;
+  }
   return ["pending", "ready_to_ship", "retry_pending"].includes(
     String(order?.deliveryStatus || "").toLowerCase(),
   );
@@ -556,6 +561,12 @@ export default function OrderScreen({ navigation }) {
                     <Text style={styles.summaryLabel}>Thanh toán</Text>
                     <Text style={styles.summaryValue}>
                       {PAYMENT_STATUS_LABEL[order.paymentStatus] || "Chưa rõ"}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Hình thức TT</Text>
+                    <Text style={styles.summaryValue}>
+                      {PAYMENT_GATEWAY_LABEL[order.paymentGateway] || order.paymentGateway || "Chưa rõ"}
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>

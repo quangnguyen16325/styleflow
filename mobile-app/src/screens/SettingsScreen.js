@@ -10,7 +10,6 @@ import {
   Alert,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { COLORS } from "../constants/colors";
 import AppIcon from "../components/AppIcon";
 
 const SectionTitle = ({ title }) => <Text style={styles.sectionTitle}>{title}</Text>;
@@ -19,11 +18,11 @@ const MenuRow = ({ icon, label, onPress, isLast, renderRight }) => (
   <TouchableOpacity
     style={[styles.menuRow, isLast && styles.menuRowLast]}
     onPress={onPress}
-    activeOpacity={onPress ? 0.7 : 1}
+    activeOpacity={onPress ? 0.85 : 1}
     disabled={!onPress}
   >
     <View style={styles.iconWrap}>
-      <AppIcon name={icon} size={16} color={COLORS.primary} />
+      <AppIcon name={icon} size={16} color="#9B4B1F" />
     </View>
     <Text style={styles.label}>{label}</Text>
     {renderRight ? renderRight() : <Text style={styles.chevron}>›</Text>}
@@ -51,7 +50,7 @@ export default function SettingsScreen({ navigation }) {
           <MenuRow
             icon="profile"
             label="Thông tin cá nhân"
-            onPress={() => Alert.alert("Thông báo", "Tính năng đang bảo trì.")}
+            onPress={() => Alert.alert("Thông báo", "Tính năng đang được phát triển.")}
           />
           <MenuRow
             icon="location"
@@ -61,7 +60,7 @@ export default function SettingsScreen({ navigation }) {
           <MenuRow
             icon="shield"
             label="Bảo mật & Mật khẩu"
-            onPress={() => Alert.alert("Bảo mật", "Tính năng đang phát triển.")}
+            onPress={() => Alert.alert("Bảo mật", "Tính năng đang được phát triển.")}
             isLast
           />
         </View>
@@ -74,9 +73,7 @@ export default function SettingsScreen({ navigation }) {
             label="Chế độ tối"
             onPress={() => setDarkMode(!darkMode)}
             renderRight={() => (
-              <Text style={{ color: COLORS.primary, fontWeight: "700" }}>
-                {darkMode ? "Bật" : "Tắt"}
-              </Text>
+              <Text style={styles.toggleText}>{darkMode ? "Bật" : "Tắt"}</Text>
             )}
           />
           <MenuRow
@@ -84,9 +81,7 @@ export default function SettingsScreen({ navigation }) {
             label="Thông báo"
             onPress={() => setNotifications(!notifications)}
             renderRight={() => (
-              <Text style={{ color: COLORS.primary, fontWeight: "700" }}>
-                {notifications ? "Bật" : "Tắt"}
-              </Text>
+              <Text style={styles.toggleText}>{notifications ? "Bật" : "Tắt"}</Text>
             )}
             isLast
           />
@@ -97,19 +92,19 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.group}>
           <MenuRow
             icon="note"
-            label="Về StyleFlow"
-            onPress={() => Alert.alert("StyleFlow", "Phiên bản 1.0.0 (Beta)")}
+            label="Về Ecloria"
+            onPress={() => Alert.alert("Ecloria", "Phiên bản 1.0.0 (Beta)")}
           />
           <MenuRow
             icon="shield"
             label="Chính sách bảo mật"
-            onPress={() => Alert.alert("Thông báo", "Đang cập nhật")}
+            onPress={() => Alert.alert("Thông báo", "Đang cập nhật.")}
             isLast
           />
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-          <AppIcon name="logout" size={18} color={COLORS.danger} style={styles.logoutIcon} />
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.88}>
+          <AppIcon name="logout" size={18} color="#C43A2F" style={styles.logoutIcon} />
           <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
 
@@ -120,53 +115,69 @@ export default function SettingsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.bgSecondary },
+  safeArea: { flex: 1, backgroundColor: "#FCF9F4" },
   scroll: { padding: 20 },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-    marginTop: 10,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#AA9C8F",
+    marginBottom: 10,
+    marginTop: 12,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   group: {
-    backgroundColor: COLORS.bgPrimary,
-    borderRadius: 16,
-    marginBottom: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    marginBottom: 18,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   menuRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: "#F0E5D8",
   },
   menuRowLast: { borderBottomWidth: 0 },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.bgInput,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F5ECE3",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 14,
   },
-  label: { flex: 1, fontSize: 15, fontWeight: "500", color: COLORS.textPrimary },
-  chevron: { fontSize: 20, color: COLORS.textMuted },
+  label: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1E1815",
+  },
+  chevron: {
+    fontSize: 22,
+    color: "#9B4B1F",
+  },
+  toggleText: {
+    color: "#9B4B1F",
+    fontSize: 14,
+    fontWeight: "800",
+  },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF0F0",
-    padding: 16,
-    borderRadius: 16,
-    marginTop: 10,
+    backgroundColor: "#F5ECE3",
+    paddingVertical: 16,
+    borderRadius: 18,
+    marginTop: 8,
   },
   logoutIcon: { marginRight: 8 },
-  logoutText: { fontSize: 15, fontWeight: "700", color: COLORS.danger },
+  logoutText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#C43A2F",
+  },
 });

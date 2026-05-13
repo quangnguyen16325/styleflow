@@ -8,10 +8,12 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../services/api";
 import { useWishlist } from "../context/WishlistContext";
+import { useAuth } from "../context/AuthContext";
 import AppIcon from "../components/AppIcon";
 
 function MenuItem({ label, sub, onPress, isLast = false }) {
@@ -31,11 +33,23 @@ function MenuItem({ label, sub, onPress, isLast = false }) {
   );
 }
 
-export default function ProfileScreen({ navigation, onSettingsPress }) {
+export default function ProfileScreen({ navigation, onSettingsPress, onTabSwitch }) {
   const [profile, setProfile] = useState(null);
   const [orderCount, setOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { items: wishlistItems } = useWishlist();
+  const { logout } = useAuth();
+
+  const handleLogout = useCallback(() => {
+    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+      { text: "Huỷ", style: "cancel" },
+      {
+        text: "Đăng xuất",
+        style: "destructive",
+        onPress: () => logout(),
+      },
+    ]);
+  }, [logout]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -44,7 +58,8 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
         api.get("/me"),
         api.get("/orders").catch(() => ({ data: [] })),
       ]);
-      setProfile(meRes.data);
+      const meData = meRes.data;
+      setProfile(meData.customer || meData);
       setOrderCount(Array.isArray(ordersRes.data) ? ordersRes.data.length : 0);
     } catch (error) {
       console.warn("Lỗi tải data Profile:", error);
@@ -126,12 +141,12 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
           <MenuItem
             label="Theo dõi đơn hàng"
             sub={`${orderCount} đơn đang lưu trong lịch sử`}
-            onPress={() => navigation.navigate("MainTabs", { screen: "Track" })}
+            onPress={() => onTabSwitch?.("Track")}
           />
           <MenuItem
             label="Sản phẩm yêu thích"
             sub={`${wishlistItems.length} sản phẩm`}
-            onPress={() => navigation.navigate("MainTabs", { screen: "Wishlist" })}
+            onPress={() => onTabSwitch?.("Wishlist")}
           />
           <MenuItem
             label="Sổ địa chỉ giao hàng"
@@ -143,14 +158,35 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Tài khoản</Text>
-          <MenuItem label="Thông tin cá nhân" sub={profile?.email || ""} />
+          <MenuItem
+            label="Thông tin cá nhân"
+            sub={profile?.email || ""}
+            onPress={() =>
+              Alert.alert("Thông tin cá nhân", "Tính năng chỉnh sửa thông tin đang được phát triển.")
+            }
+          />
           <MenuItem
             label="Cài đặt"
             sub="Thông báo, giao diện và tuỳ chọn khác"
             onPress={onSettingsPress || (() => navigation.navigate("Settings"))}
           />
-          <MenuItem label="Bảo mật" sub="Kiểm tra thông tin đăng nhập" isLast />
+          <MenuItem
+            label="Bảo mật"
+            sub="Kiểm tra thông tin đăng nhập"
+            onPress={() =>
+              Alert.alert("Bảo mật", "Tính năng bảo mật tài khoản đang được phát triển.")
+            }
+            isLast
+          />
         </View>
+
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.88}
+        >
+          <Text style={styles.logoutBtnText}>Đăng xuất</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -321,5 +357,17 @@ const styles = StyleSheet.create({
   menuChevron: {
     color: "#9B4B1F",
     fontSize: 22,
+  },
+  logoutBtn: {
+    alignItems: "center",
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: "#F5ECE3",
+    marginBottom: 30,
+  },
+  logoutBtnText: {
+    color: "#C43A2F",
+    fontSize: 15,
+    fontWeight: "800",
   },
 });

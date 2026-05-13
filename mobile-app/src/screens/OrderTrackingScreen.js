@@ -5,11 +5,13 @@ import BankTransferPaymentCard, {
   shouldShowBankTransferPayment,
 } from "../components/BankTransferPaymentCard";
 import BackPillButton from "../components/BackPillButton";
+import AppImage from "../components/AppImage";
 import api, {
   DELIVERY_STATUS_LABEL,
   formatPrice,
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL,
+  PAYMENT_GATEWAY_LABEL,
 } from "../services/api";
 
 function formatDate(dateString) {
@@ -71,12 +73,22 @@ function Stepper({ currentStep }) {
 function OrderItemRow({ item }) {
   return (
     <View style={styles.orderItemRow}>
-      <View style={styles.productToken}>
-        <Text style={styles.productTokenText}>#{item.productId}</Text>
-      </View>
+      {item.imageUrl ? (
+        <AppImage
+          source={{ uri: item.imageUrl }}
+          style={styles.productImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.productToken}>
+          <Text style={styles.productTokenText}>#{item.productId}</Text>
+        </View>
+      )}
       <View style={styles.orderItemInfo}>
-        <Text style={styles.orderItemName}>Sản phẩm #{item.productId}</Text>
-        <Text style={styles.orderItemMeta}>Số lượng {item.quantity}</Text>
+        <Text style={styles.orderItemName} numberOfLines={2}>
+          {item.name || `Sản phẩm #${item.productId}`}
+        </Text>
+        <Text style={styles.orderItemMeta}>Số lượng: {item.quantity}</Text>
       </View>
       <Text style={styles.orderItemPrice}>{formatPrice(item.priceAtPurchase * item.quantity)}</Text>
     </View>
@@ -167,6 +179,12 @@ export default function OrderTrackingScreen({ route, navigation }) {
             <Text style={styles.summaryLabel}>Thanh toán</Text>
             <Text style={styles.summaryValue}>
               {PAYMENT_STATUS_LABEL[order.paymentStatus] || "Chưa rõ"}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Hình thức TT</Text>
+            <Text style={styles.summaryValue}>
+              {PAYMENT_GATEWAY_LABEL[order.paymentGateway] || order.paymentGateway || "Chưa rõ"}
             </Text>
           </View>
           <View style={styles.summaryRow}>
@@ -365,10 +383,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0E5D8",
   },
+  productImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    marginRight: 12,
+  },
   productToken: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 12,
     backgroundColor: "#F5ECE3",
     alignItems: "center",
     justifyContent: "center",
