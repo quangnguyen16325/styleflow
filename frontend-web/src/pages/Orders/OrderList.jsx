@@ -381,6 +381,7 @@ export default function OrderList() {
                   <th>Total</th>
                   <th>Customer</th>
                   <th>Created</th>
+                  <th>Customer Requests</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -390,11 +391,6 @@ export default function OrderList() {
                     <td style={{ fontWeight: "var(--font-weight-bold)" }}>#{order.id}</td>
                     <td>
                       <StatusBadge value={order.status} showIcon />
-                      {order.addressChangeStatus && order.addressChangeStatus !== "none" ? (
-                        <div style={{ marginTop: "var(--spacing-xs)" }}>
-                          <StatusBadge value={order.addressChangeStatus} size="sm" showIcon />
-                        </div>
-                      ) : null}
                     </td>
                     <td>
                       <div
@@ -436,6 +432,9 @@ export default function OrderList() {
                     </td>
                     <td style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
                       {new Date(order.createdAt).toLocaleString()}
+                    </td>
+                    <td>
+                      <CustomerRequestsCell order={order} />
                     </td>
                     <td>
                       <Link to={`/orders/${order.id}`} className="link">
@@ -508,6 +507,72 @@ function normalizePageSize(value) {
 function normalizePage(value) {
   const page = Number(value);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function shouldShowAddressChangeBadge(value) {
+  const status = String(value || "").toLowerCase();
+  return status && status !== "none" && status !== "approved";
+}
+
+function CustomerRequestsCell({ order }) {
+  const requests = getCustomerRequests(order);
+
+  if (requests.length === 0) {
+    return <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>—</span>;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}>
+      {requests.map((request) => (
+        <div key={request.key} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <StatusBadge value={request.status} size="sm" showIcon />
+          <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}>
+            {request.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function getCustomerRequests(order) {
+  const requests = [];
+  if (shouldShowAddressChangeBadge(order.addressChangeStatus)) {
+    requests.push({
+      key: "address-change",
+      status: order.addressChangeStatus,
+      label: getAddressChangeMeta(order.addressChangeStatus),
+    });
+  }
+
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
+  if (refundStatus && refundStatus !== "none") {
+    requests.push({
+      key: "refund-request",
+      status: refundStatus,
+      label: getRefundRequestMeta(refundStatus),
+    });
+  }
+
+  return requests;
+}
+
+function getAddressChangeMeta(value) {
+  const status = String(value || "").toLowerCase();
+  if (status === "requested") return "Address change requested";
+  if (status === "rejected") return "Address change rejected";
+  if (status === "rejected_timeout") return "Address change expired";
+  return "Address change";
+}
+
+function getRefundRequestMeta(value) {
+  const status = String(value || "").toLowerCase();
+  if (status === "pending") return "Return request pending";
+  if (status === "manual_review_required") return "Return needs review";
+  if (status === "approved") return "Return approved";
+  if (status === "rejected") return "Return rejected";
+  if (status === "refunded") return "Refund completed";
+  return "Return request";
 }
 
 function normalizeSearchText(value) {
