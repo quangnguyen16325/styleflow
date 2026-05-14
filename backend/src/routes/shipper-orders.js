@@ -357,4 +357,11 @@ async function notifyDeliveryCallbackWebhook({
   }
 }
 
-const DELIVERY_CALLBACK_STATUSES = ["FAILED", "DELIVERED", "IN_TRANSIT", "HANDOVER", "RETURNED"];
+const DELIVERY_CALLBACK_STATUSES = [
+  "FAILED",
+  "DELIVERED",
+  "IN_TRANSIT",
+  "READY_TO_SHIP",
+  "HANDOVER",
+  "RETURNED",
+];

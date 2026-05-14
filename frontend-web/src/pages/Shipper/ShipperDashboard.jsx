@@ -8,6 +8,7 @@ import StatusBadge from "../../components/ui/StatusBadge";
 
 const DELIVERY_STATUSES = [
   { value: "IN_TRANSIT", label: "In transit" },
+  { value: "READY_TO_SHIP", label: "Ready to ship" },
   { value: "DELIVERED", label: "Delivered" },
   { value: "FAILED", label: "Failed" },
   { value: "RETURNED", label: "Returned" },
@@ -24,6 +25,17 @@ const DELIVERY_SORT_PRIORITY = {
   returning: 4,
   returned: 5,
 };
+
+function getDeliverySortPriority(order) {
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
+
+  if (refundStatus === "approved" && ["delivered", "handover"].includes(deliveryStatus)) {
+    return -1;
+  }
+
+  return DELIVERY_SORT_PRIORITY[deliveryStatus] ?? 6;
+}
 
 function getAvailableDeliveryStatuses(order) {
   const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
@@ -98,10 +110,8 @@ export default function ShipperDashboard() {
 
   const sortedOrders = useMemo(() => {
     return [...orders].sort((a, b) => {
-      const aDeliveryStatus = String(a.deliveryStatus || "").toLowerCase();
-      const bDeliveryStatus = String(b.deliveryStatus || "").toLowerCase();
-      const aPriority = DELIVERY_SORT_PRIORITY[aDeliveryStatus] ?? 6;
-      const bPriority = DELIVERY_SORT_PRIORITY[bDeliveryStatus] ?? 6;
+      const aPriority = getDeliverySortPriority(a);
+      const bPriority = getDeliverySortPriority(b);
 
       if (aPriority !== bPriority) {
         return aPriority - bPriority;
@@ -157,13 +167,7 @@ export default function ShipperDashboard() {
           />
         </div>
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "var(--spacing-lg)",
-          }}
-        >
+        <div className="shipper-delivery-grid">
           {sortedOrders.map((order) => (
             <div key={order.id} className="card" style={{ padding: "var(--spacing-lg)" }}>
               {(() => {

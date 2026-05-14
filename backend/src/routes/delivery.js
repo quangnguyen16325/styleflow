@@ -358,7 +358,11 @@ function validateDeliveryPayload(body) {
   }
 
   const status = typeof body.status === "string" ? body.status.trim().toUpperCase() : "";
-  if (!["FAILED", "DELIVERED", "IN_TRANSIT", "HANDOVER", "RETURNED"].includes(status)) {
+  if (
+    !["FAILED", "DELIVERED", "IN_TRANSIT", "READY_TO_SHIP", "HANDOVER", "RETURNED"].includes(
+      status,
+    )
+  ) {
     return "status is invalid";
   }
 
@@ -387,6 +391,8 @@ function mapCallbackStatusToDeliveryStatus(status) {
       return "delivery_failed";
     case "IN_TRANSIT":
       return "in_transit";
+    case "READY_TO_SHIP":
+      return "ready_to_ship";
     case "HANDOVER":
       return "handover";
     case "RETURNED":

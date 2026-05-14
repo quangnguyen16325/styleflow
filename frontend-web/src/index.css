@@ -493,6 +493,12 @@ table tbody tr:last-child td {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.shipper-delivery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-lg);
+}
+
 .flex {
   display: flex;
 }
@@ -665,6 +671,10 @@ table tbody tr:last-child td {
   .grid-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .shipper-delivery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
@@ -684,6 +694,10 @@ table tbody tr:last-child td {
   .grid-2,
   .grid-3,
   .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .shipper-delivery-grid {
     grid-template-columns: 1fr;
   }
 
