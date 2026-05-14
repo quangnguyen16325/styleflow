@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Tags,
   Truck,
+  Users,
 } from "lucide-react";
 import { getPortalRoleConfig, getStoredAdminUser, normalizeRole } from "../../utils/auth";
 
@@ -18,6 +19,7 @@ const adminMenuItems = [
   { to: "/products", label: "Inventory", icon: Package },
   { to: "/categories", label: "Categories", icon: Tags },
   { to: "/orders", label: "Orders", icon: ShoppingCart },
+  { to: "/users", label: "Users", icon: Users },
   { to: "/delivery", label: "Delivery", icon: Truck },
   { to: "/issues", label: "Issues", icon: AlertTriangle },
   { to: "/refund-requests", label: "Refunds", icon: Receipt },
@@ -26,6 +28,7 @@ const adminMenuItems = [
 const staffMenuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/orders", label: "Orders", icon: ShoppingCart },
+  { to: "/users", label: "Users", icon: Users },
   { to: "/delivery", label: "Delivery", icon: Truck },
   { to: "/issues", label: "Issues", icon: AlertTriangle },
   { to: "/refund-requests", label: "Refunds", icon: Receipt },

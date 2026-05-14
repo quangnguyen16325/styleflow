@@ -22,6 +22,12 @@ const ADMIN_FUNCTIONS = [
     keywords: ["order", "orders", "don hang", "payment", "delivery", "giao hang"],
   },
   {
+    label: "Users",
+    description: "Manage customers, shippers, staff and admin accounts",
+    path: "/users",
+    keywords: ["users", "user", "customers", "staff", "shipper", "nguoi dung", "khach hang"],
+  },
+  {
     label: "Delivery Assignment",
     description: "Assign orders to shipper accounts",
     path: "/delivery",

@@ -153,6 +153,20 @@ class ApiService {
     return client.post(`/admin/orders/${id}/address-change-decision`, payload);
   }
 
+  // USERS
+  static async getUsers() {
+    return client.get('/admin/users');
+  }
+  static async createUser(payload) {
+    return client.post('/admin/users', payload);
+  }
+  static async updateUser(id, payload) {
+    return client.patch(`/admin/users/${id}`, payload);
+  }
+  static async deleteUser(id) {
+    return client.delete(`/admin/users/${id}`);
+  }
+
   // SHIPPER
   static async getShipperOrders() {
     return client.get('/shipper/orders');

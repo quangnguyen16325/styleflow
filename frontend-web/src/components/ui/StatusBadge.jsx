@@ -25,6 +25,12 @@ const STATUS_COLORS = {
   handover:         { color: '#06B6D4', bg: '#CFFAFE', icon: Handshake },
   in_transit:       { color: '#06B6D4', bg: '#CFFAFE', icon: Truck },
   delivered:        { color: '#059669', bg: '#D1FAE5', icon: Check },
+  active:           { color: '#059669', bg: '#D1FAE5', icon: Check },
+  blacklisted:      { color: '#DC2626', bg: '#FEE2E2', icon: X },
+  customer:         { color: '#3B82F6', bg: '#DBEAFE', icon: CircleDot },
+  shipper:          { color: '#06B6D4', bg: '#CFFAFE', icon: Truck },
+  staff:            { color: '#8B5CF6', bg: '#EDE9FE', icon: Settings },
+  admin:            { color: '#F97316', bg: '#FFEDD5', icon: Settings },
 
   // Issue statuses
   open:             { color: '#DC2626', bg: '#FEE2E2', icon: AlertTriangle },

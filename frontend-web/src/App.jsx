@@ -20,6 +20,7 @@ import IssueList from './pages/Issues/IssueList';
 import IssueDetails from './pages/Issues/IssueDetails';
 import RefundRequestList from './pages/RefundRequests/RefundRequestList';
 import RefundRequestDetails from './pages/RefundRequests/RefundRequestDetails';
+import UserManagement from './pages/Users/UserManagement';
 import NotFound from './pages/NotFound';
 import './App.css';
 import { getStoredAdminUser } from './utils/auth';
@@ -72,6 +73,9 @@ function App() {
 
               {/* Delivery assignment */}
               <Route path="delivery" element={<DeliveryAssignment />} />
+
+              {/* Users */}
+              <Route path="users" element={<UserManagement />} />
 
               {/* Issues */}
               <Route path="issues">

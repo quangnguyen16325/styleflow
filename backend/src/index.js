@@ -14,6 +14,7 @@ import adminRefundRequestsRouter from "./routes/admin-refund-requests.js";
 import adminShippersRouter from "./routes/admin-shippers.js";
 import adminSystemConfigRouter from "./routes/admin-system-config.js";
 import adminUploadsRouter from "./routes/admin-uploads.js";
+import adminUsersRouter from "./routes/admin-users.js";
 import authRouter from "./routes/auth.js";
 import categoriesRouter from "./routes/categories.js";
 import addressesRouter from "./routes/addresses.js";
@@ -73,6 +74,7 @@ app.use(
   adminSystemConfigRouter,
 );
 app.use("/admin/uploads", requireAuth, requireRole("admin", "staff"), adminUploadsRouter);
+app.use("/admin/users", requireAuth, requireRole("admin", "staff"), adminUsersRouter);
 app.use("/customers/:customerId/addresses", addressesRouter);
 app.use("/categories", categoriesRouter);
 app.use("/locations", locationsRouter);
