@@ -34,11 +34,11 @@ export function getMomoConfig() {
 }
 
 export function buildMomoOrderId(orderId) {
-  return `ORD${orderId}`;
+  return `ORD${orderId}-${Date.now()}`;
 }
 
 export function parseMomoOrderId(value) {
-  const match = String(value || "").match(/^ORD(\d+)$/i);
+  const match = String(value || "").match(/^ORD(\d+)(?:-.+)?$/i);
   if (!match) return null;
 
   const orderId = Number(match[1]);
@@ -118,6 +118,15 @@ export async function createMomoPaymentRequest({ order, customer, items = [] }) 
     const error = new Error(`MoMo create payment failed with HTTP ${response.status}`);
     error.response = responseBody;
     error.status = response.status;
+    throw error;
+  }
+
+  const paymentUrl =
+    responseBody.payUrl ?? responseBody.deeplink ?? responseBody.qrCodeUrl ?? responseBody.shortLink;
+  if (Number(responseBody.resultCode) !== 0 || !paymentUrl) {
+    const error = new Error(responseBody.message || "MoMo create payment failed");
+    error.response = responseBody;
+    error.status = 502;
     throw error;
   }
 
