@@ -1,6 +1,14 @@
 /* eslint-disable react/prop-types */
 import React, { useState } from "react";
-import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import api, { formatPrice } from "../services/api";
 
 export function shouldShowMomoPayment(order) {
@@ -15,28 +23,45 @@ export function getMomoPaymentUrl(payment) {
   return payment?.deeplink || payment?.payUrl || payment?.shortLink || payment?.qrCodeUrl || null;
 }
 
+function isPaymentExpired(order) {
+  if (!order?.paymentExpiresAt) return false;
+  return new Date(order.paymentExpiresAt).getTime() <= Date.now();
+}
+
 export default function MomoPaymentCard({ order, payment, compact = false }) {
   const [loading, setLoading] = useState(false);
   const [currentPayment, setCurrentPayment] = useState(payment || order?.payment || null);
+  const [currentPaymentExpiresAt, setCurrentPaymentExpiresAt] = useState(order?.paymentExpiresAt);
   const paymentUrl = getMomoPaymentUrl(currentPayment);
+  const paymentExpired = isPaymentExpired({ paymentExpiresAt: currentPaymentExpiresAt });
 
   const openMomoPayment = async () => {
     try {
       setLoading(true);
       let nextPayment = currentPayment;
 
-      if (!getMomoPaymentUrl(nextPayment) && order?.id) {
+      if (order?.id && (paymentExpired || !getMomoPaymentUrl(nextPayment))) {
         const res = await api.post(`/orders/${order.id}/momo-payment`);
         nextPayment = res.data;
         setCurrentPayment(nextPayment);
+        if (res.data?.paymentExpiresAt) {
+          setCurrentPaymentExpiresAt(res.data.paymentExpiresAt);
+        }
       }
 
       const url = getMomoPaymentUrl(nextPayment);
       if (url) {
         await Linking.openURL(url);
+      } else {
+        Alert.alert("Không thể tạo link MoMo", "Vui lòng thử lại sau.");
       }
     } catch (error) {
       console.warn("Lỗi mở thanh toán MoMo:", error);
+      const message =
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Không thể tạo link thanh toán MoMo. Vui lòng thử lại.";
+      Alert.alert("Lỗi thanh toán MoMo", message);
     } finally {
       setLoading(false);
     }
@@ -57,10 +82,10 @@ export default function MomoPaymentCard({ order, payment, compact = false }) {
       <View style={styles.rows}>
         <InfoRow label="Số tiền" value={formatPrice(Number(order?.totalAmount || 0))} strong />
         <InfoRow label="Cổng thanh toán" value="Ví MoMo" />
-        {order?.paymentExpiresAt ? (
+        {currentPaymentExpiresAt ? (
           <InfoRow
             label="Hạn thanh toán"
-            value={new Date(order.paymentExpiresAt).toLocaleString("vi-VN")}
+            value={new Date(currentPaymentExpiresAt).toLocaleString("vi-VN")}
           />
         ) : null}
       </View>
@@ -75,7 +100,7 @@ export default function MomoPaymentCard({ order, payment, compact = false }) {
           <ActivityIndicator size="small" color="#FFFDF9" />
         ) : (
           <Text style={styles.payBtnText}>
-            {paymentUrl ? "Mở MoMo để thanh toán" : "Tạo lại link MoMo"}
+            {paymentExpired || !paymentUrl ? "Tạo lại link MoMo" : "Mở MoMo để thanh toán"}
           </Text>
         )}
       </TouchableOpacity>

@@ -602,13 +602,17 @@ router.post("/:id/momo-payment", requireAuth, async (req, res) => {
       items: orderItemsResult.rows,
     });
 
+    const paymentExpiresAt = getPaymentExpiresAt("MOMO");
     await client.query(
       `
         UPDATE orders
-        SET transaction_ref = $2, updated_at = NOW()
+        SET
+          transaction_ref = $2,
+          payment_expires_at = $3,
+          updated_at = NOW()
         WHERE id = $1
       `,
-      [orderId, momoPayment.requestId],
+      [orderId, momoPayment.requestId, paymentExpiresAt],
     );
 
     await client.query(
@@ -633,7 +637,10 @@ router.post("/:id/momo-payment", requireAuth, async (req, res) => {
       ],
     );
 
-    return res.json(momoPayment);
+    return res.json({
+      ...momoPayment,
+      paymentExpiresAt,
+    });
   } catch (error) {
     console.error(`POST /orders/${orderId}/momo-payment failed:`, error);
     return res.status(500).json({
