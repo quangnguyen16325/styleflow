@@ -80,6 +80,14 @@ export async function applyDeliveryStatusUpdate(
   }
 
   const order = orderResult.rows[0];
+  if (isTerminalDeliveryUpdateIgnored(order.delivery_status, status)) {
+    return {
+      action: "terminal_ignored",
+      failCount: Number(order.delivery_fail_count),
+      customerEmail: order.customer_email,
+    };
+  }
+
   const deliveryEventResult = await client.query(
     `
       INSERT INTO delivery_events (
@@ -256,6 +264,18 @@ export async function applyDeliveryStatusUpdate(
     failCount,
     customerEmail: order.customer_email,
   };
+}
+
+function isTerminalDeliveryUpdateIgnored(currentDeliveryStatus, nextCallbackStatus) {
+  if (currentDeliveryStatus === "returned") {
+    return true;
+  }
+
+  if (currentDeliveryStatus === "returning" && nextCallbackStatus !== "RETURNED") {
+    return true;
+  }
+
+  return false;
 }
 
 function validateInternalWebhookSecret(req) {

@@ -14,10 +14,55 @@ export function isPrivilegedRole(role) {
 }
 
 export function isPortalRole(role) {
+  return PORTAL_ROLES.has(normalizeRole(role));
+}
+
+export function normalizeRole(role) {
   if (typeof role !== 'string') {
-    return false;
+    return '';
   }
-  return PORTAL_ROLES.has(role.trim().toLowerCase());
+  return role.trim().toLowerCase();
+}
+
+export function getPortalRoleConfig(role) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === 'shipper') {
+    return {
+      role: 'shipper',
+      title: 'Shipper Portal',
+      sidebarSubtitle: 'Delivery workspace',
+      headerTitle: 'Shipper Portal',
+      headerSubtitle: 'Assigned deliveries and status updates',
+      searchPlaceholder: 'Search deliveries',
+      footerTitle: 'Delivery',
+      footerVersion: 'Shipper workspace',
+    };
+  }
+
+  if (normalizedRole === 'staff') {
+    return {
+      role: 'staff',
+      title: 'Staff Console',
+      sidebarSubtitle: 'Operations workspace',
+      headerTitle: 'Staff Portal',
+      headerSubtitle: 'Orders, delivery and support operations',
+      searchPlaceholder: 'Search operations',
+      footerTitle: 'Staff operations',
+      footerVersion: 'Operations workspace',
+    };
+  }
+
+  return {
+    role: 'admin',
+    title: 'Admin Console',
+    sidebarSubtitle: 'Admin console',
+    headerTitle: 'Admin Portal',
+    headerSubtitle: 'Inventory, orders and operations',
+    searchPlaceholder: 'Search console',
+    footerTitle: 'Operations',
+    footerVersion: 'v0.5.0',
+  };
 }
 
 /**

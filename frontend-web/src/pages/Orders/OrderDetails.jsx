@@ -16,6 +16,32 @@ const DELIVERY_CALLBACK_STATUSES = [
   { value: "RETURNED", label: "Returned" },
 ];
 
+function getAvailableDeliveryStatuses(deliveryStatus) {
+  const normalizedDeliveryStatus = String(deliveryStatus || "").toLowerCase();
+
+  if (normalizedDeliveryStatus === "returned") {
+    return [];
+  }
+
+  if (normalizedDeliveryStatus === "returning") {
+    return DELIVERY_CALLBACK_STATUSES.filter((statusOption) => statusOption.value === "RETURNED");
+  }
+
+  return DELIVERY_CALLBACK_STATUSES;
+}
+
+function getEffectiveDeliveryUpdateStatus(order, deliveryUpdateStatus) {
+  const availableStatuses = getAvailableDeliveryStatuses(
+    order?.deliveryStatus || order?.delivery_status,
+  );
+
+  if (availableStatuses.some((statusOption) => statusOption.value === deliveryUpdateStatus)) {
+    return deliveryUpdateStatus;
+  }
+
+  return availableStatuses[0]?.value || "";
+}
+
 const ADDRESS_CHANGE_DECISIONS = [
   { value: "approved", label: "Approve" },
   { value: "rejected", label: "Reject" },
@@ -89,6 +115,13 @@ export default function OrderDetails() {
     };
   }, [id]);
 
+  useEffect(() => {
+    const nextStatus = getEffectiveDeliveryUpdateStatus(order, deliveryUpdateStatus);
+    if (nextStatus && nextStatus !== deliveryUpdateStatus) {
+      setDeliveryUpdateStatus(nextStatus);
+    }
+  }, [order, deliveryUpdateStatus]);
+
   const handleUpdateStatus = useCallback(async () => {
     if (newStatus === order.status) return;
     setUpdating(true);
@@ -129,13 +162,18 @@ export default function OrderDetails() {
   }, [id, addressDecision, approvedShippingFee]);
 
   const handleUpdateDeliveryStatus = useCallback(async () => {
+    const nextDeliveryUpdateStatus = getEffectiveDeliveryUpdateStatus(order, deliveryUpdateStatus);
+    if (!nextDeliveryUpdateStatus) {
+      return;
+    }
+
     setDeliveryUpdating(true);
     setDeliveryUpdateError(null);
     setDeliveryUpdateSuccess(null);
 
     try {
       const response = await ApiService.updateOrderDeliveryStatus(id, {
-        status: deliveryUpdateStatus,
+        status: nextDeliveryUpdateStatus,
         partner: deliveryPartner,
         reason: deliveryReason,
       });
@@ -143,7 +181,7 @@ export default function OrderDetails() {
         setOrder(response.order);
         setNewStatus(response.order.status);
       }
-      setDeliveryUpdateSuccess(response?.action || deliveryUpdateStatus.toLowerCase());
+      setDeliveryUpdateSuccess(response?.action || nextDeliveryUpdateStatus.toLowerCase());
 
       const updatedEvents = await ApiService.getOrderDeliveryEvents(id);
       setDeliveryEvents(Array.isArray(updatedEvents) ? updatedEvents : []);
@@ -153,7 +191,7 @@ export default function OrderDetails() {
     } finally {
       setDeliveryUpdating(false);
     }
-  }, [id, deliveryUpdateStatus, deliveryPartner, deliveryReason]);
+  }, [id, order, deliveryUpdateStatus, deliveryPartner, deliveryReason]);
 
   const handleRetry = useCallback(() => {
     setLoading(true);
@@ -166,6 +204,10 @@ export default function OrderDetails() {
 
   const shipping = order.shipping || {};
   const deliveryStatus = order.deliveryStatus || order.delivery_status || null;
+  const normalizedDeliveryStatus = String(deliveryStatus || "").toLowerCase();
+  const availableDeliveryStatuses = getAvailableDeliveryStatuses(deliveryStatus);
+  const selectedDeliveryUpdateStatus = getEffectiveDeliveryUpdateStatus(order, deliveryUpdateStatus);
+  const isDeliveryTerminalReturned = normalizedDeliveryStatus === "returned";
   const deliveryFailCount = Number(order.deliveryFailCount ?? order.delivery_fail_count ?? NaN);
   const hasDeliveryFailCount = Number.isFinite(deliveryFailCount);
 
@@ -378,14 +420,28 @@ export default function OrderDetails() {
             flexWrap: "wrap",
           }}
         >
+          {isDeliveryTerminalReturned ? (
+            <div
+              style={{
+                width: "100%",
+                padding: "var(--spacing-md)",
+                borderRadius: "var(--radius-md)",
+                background: "#f8fafc",
+                color: "var(--color-text-muted)",
+                fontSize: "var(--font-size-sm)",
+              }}
+            >
+              This order has already been returned. Delivery status can no longer be updated.
+            </div>
+          ) : null}
           <select
-            value={deliveryUpdateStatus}
+            value={selectedDeliveryUpdateStatus}
             onChange={(event) => setDeliveryUpdateStatus(event.target.value)}
             className="form-select"
             style={{ width: "180px" }}
-            disabled={deliveryUpdating}
+            disabled={deliveryUpdating || isDeliveryTerminalReturned}
           >
-            {DELIVERY_CALLBACK_STATUSES.map((statusOption) => (
+            {availableDeliveryStatuses.map((statusOption) => (
               <option key={statusOption.value} value={statusOption.value}>
                 {statusOption.label}
               </option>
@@ -397,7 +453,7 @@ export default function OrderDetails() {
             className="form-input"
             placeholder="Partner / shipper"
             style={{ width: "180px" }}
-            disabled={deliveryUpdating}
+            disabled={deliveryUpdating || isDeliveryTerminalReturned}
           />
           <input
             value={deliveryReason}
@@ -405,12 +461,17 @@ export default function OrderDetails() {
             className="form-input"
             placeholder="Reason, required if failed"
             style={{ width: "260px" }}
-            disabled={deliveryUpdating}
+            disabled={deliveryUpdating || isDeliveryTerminalReturned}
           />
           <button
             className="btn-primary"
             onClick={handleUpdateDeliveryStatus}
-            disabled={deliveryUpdating || (deliveryUpdateStatus === "FAILED" && !deliveryReason.trim())}
+            disabled={
+              deliveryUpdating ||
+              isDeliveryTerminalReturned ||
+              !selectedDeliveryUpdateStatus ||
+              (selectedDeliveryUpdateStatus === "FAILED" && !deliveryReason.trim())
+            }
           >
             {deliveryUpdating ? "Updating..." : "Update Delivery"}
           </button>

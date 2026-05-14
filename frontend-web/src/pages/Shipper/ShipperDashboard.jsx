@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import ApiService from "../../api";
 import EmptyState from "../../components/ui/EmptyState";
 import ErrorMessage from "../../components/ui/ErrorMessage";
@@ -12,6 +13,20 @@ const DELIVERY_STATUSES = [
   { value: "FAILED", label: "Failed" },
   { value: "RETURNED", label: "Returned" },
 ];
+
+function getAvailableDeliveryStatuses(order) {
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+
+  if (deliveryStatus === "returned") {
+    return [];
+  }
+
+  if (deliveryStatus === "returning") {
+    return DELIVERY_STATUSES.filter((statusOption) => statusOption.value === "RETURNED");
+  }
+
+  return DELIVERY_STATUSES;
+}
 
 export default function ShipperDashboard() {
   const [orders, setOrders] = useState([]);
@@ -92,6 +107,13 @@ export default function ShipperDashboard() {
         >
           {orders.map((order) => (
             <div key={order.id} className="card" style={{ padding: "var(--spacing-lg)" }}>
+              {(() => {
+                const availableStatuses = getAvailableDeliveryStatuses(order);
+                const isTerminalReturned =
+                  String(order.deliveryStatus || "").toLowerCase() === "returned";
+
+                return (
+                  <>
               <div
                 style={{
                   display: "flex",
@@ -126,8 +148,38 @@ export default function ShipperDashboard() {
               <InfoRow label="Address" value={order.shipping?.fullAddress || "—"} />
               <InfoRow label="Payment" value={`${order.paymentGateway || "—"} · ${order.paymentStatus || "—"}`} />
               <InfoRow label="Items" value={`${order.items?.length || 0} line(s)`} />
+              <InfoRow label="Fail count" value={String(order.deliveryFailCount || 0)} />
+
+              {order.lastDeliveryFailedReason ? (
+                <InfoRow label="Last fail" value={order.lastDeliveryFailedReason} />
+              ) : null}
+
+              <Link
+                to={`/shipper/orders/${order.id}`}
+                className="btn-secondary btn-sm"
+                style={{
+                  display: "inline-flex",
+                  marginTop: "var(--spacing-sm)",
+                  textDecoration: "none",
+                }}
+              >
+                View order details
+              </Link>
 
               <div style={{ marginTop: "var(--spacing-md)" }}>
+                {isTerminalReturned ? (
+                  <div
+                    style={{
+                      padding: "var(--spacing-md)",
+                      borderRadius: "var(--radius-md)",
+                      background: "var(--color-bg-muted)",
+                      color: "var(--color-text-muted)",
+                      fontSize: "var(--font-size-sm)",
+                    }}
+                  >
+                    This order has already been returned. Delivery status can no longer be updated.
+                  </div>
+                ) : null}
                 <textarea
                   className="form-input"
                   value={deliveryReasons[order.id] || ""}
@@ -139,11 +191,11 @@ export default function ShipperDashboard() {
                   }
                   placeholder="Reason, required when marking failed"
                   rows={2}
-                  disabled={updatingOrderId === order.id}
+                  disabled={updatingOrderId === order.id || isTerminalReturned}
                   style={{ resize: "vertical", marginBottom: "var(--spacing-sm)" }}
                 />
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-sm)" }}>
-                  {DELIVERY_STATUSES.map((statusOption) => (
+                  {availableStatuses.map((statusOption) => (
                     <button
                       key={statusOption.value}
                       className={
@@ -160,6 +212,9 @@ export default function ShipperDashboard() {
                   ))}
                 </div>
               </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>

@@ -157,6 +157,9 @@ class ApiService {
   static async getShipperOrders() {
     return client.get('/shipper/orders');
   }
+  static async getShipperOrder(id) {
+    return client.get(`/shipper/orders/${id}`);
+  }
   static async updateShipperOrderDeliveryStatus(id, payload) {
     return client.post(`/shipper/orders/${id}/delivery-status`, payload);
   }

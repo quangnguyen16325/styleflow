@@ -2,8 +2,11 @@ import { Outlet } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import { getPortalRoleConfig, getStoredAdminUser } from "../../utils/auth";
 
 export default function AdminLayout() {
+  const user = getStoredAdminUser();
+  const roleConfig = getPortalRoleConfig(user?.role);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem("sidebar_collapsed");
     return saved === "true";
@@ -80,7 +83,7 @@ export default function AdminLayout() {
             flexShrink: 0,
           }}
         >
-          © 2026 StyleFlow • v0.5.0
+          © 2026 Ecloria • {roleConfig.title}
         </footer>
       </div>
     </div>

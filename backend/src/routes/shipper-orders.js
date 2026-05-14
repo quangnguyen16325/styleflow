@@ -123,7 +123,7 @@ router.post("/:id/delivery-status", async (req, res) => {
     );
     const updatedOrder = mapShipperOrderRow(rows[0]);
 
-    if (status === "FAILED") {
+    if (status === "FAILED" && !["duplicate_ignored", "terminal_ignored"].includes(result.action)) {
       void notifyDeliveryCallbackWebhook({
         order: updatedOrder,
         status,
@@ -197,6 +197,8 @@ const shipperOrdersBaseQuery = `
         json_build_object(
           'id', oi.id,
           'productId', oi.product_id,
+          'productName', p.name,
+          'imageUrl', p.image_url,
           'quantity', oi.quantity,
           'priceAtPurchase', oi.price_at_purchase
         )
@@ -207,6 +209,7 @@ const shipperOrdersBaseQuery = `
   FROM orders o
   JOIN customers c ON c.id = o.customer_id
   LEFT JOIN order_items oi ON oi.order_id = o.id
+  LEFT JOIN products p ON p.id = oi.product_id
 `;
 
 function normalizeDeliveryCallbackStatus(value) {
@@ -254,6 +257,8 @@ function mapShipperOrderRow(row) {
     items: row.items.map((item) => ({
       id: Number(item.id),
       productId: Number(item.productId ?? item.product_id),
+      productName: item.productName ?? item.product_name ?? null,
+      imageUrl: item.imageUrl ?? item.image_url ?? null,
       quantity: Number(item.quantity),
       priceAtPurchase: Number(item.priceAtPurchase ?? item.price_at_purchase),
     })),

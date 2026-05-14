@@ -15,6 +15,7 @@ import OrderList from './pages/Orders/OrderList';
 import OrderDetails from './pages/Orders/OrderDetails';
 import DeliveryAssignment from './pages/Delivery/DeliveryAssignment';
 import ShipperDashboard from './pages/Shipper/ShipperDashboard';
+import ShipperOrderDetails from './pages/Shipper/ShipperOrderDetails';
 import IssueList from './pages/Issues/IssueList';
 import IssueDetails from './pages/Issues/IssueDetails';
 import RefundRequestList from './pages/RefundRequests/RefundRequestList';
@@ -87,6 +88,7 @@ function App() {
             
             <Route element={<RoleRoute allowedRoles={['shipper']} />}>
               <Route path="shipper" element={<ShipperDashboard />} />
+              <Route path="shipper/orders/:id" element={<ShipperOrderDetails />} />
             </Route>
             
             {/* 404 */}

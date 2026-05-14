@@ -1,10 +1,17 @@
 import { useNavigate } from "react-router-dom";
 import { LogOut, Menu, Search } from "lucide-react";
-import { clearAdminSession, getStoredAdminUser } from "../../utils/auth";
+import {
+  clearAdminSession,
+  getPortalRoleConfig,
+  getStoredAdminUser,
+  normalizeRole,
+} from "../../utils/auth";
 
 export default function Header({ onToggleSidebar, isMobile }) {
   const navigate = useNavigate();
   const user = getStoredAdminUser();
+  const role = normalizeRole(user?.role);
+  const roleConfig = getPortalRoleConfig(role);
 
   const handleLogout = () => {
     clearAdminSession();
@@ -63,7 +70,7 @@ export default function Header({ onToggleSidebar, isMobile }) {
               letterSpacing: "-0.03em",
             }}
           >
-            Admin Portal
+            {roleConfig.headerTitle}
           </h1>
           {!isMobile && (
             <div
@@ -74,7 +81,7 @@ export default function Header({ onToggleSidebar, isMobile }) {
                 marginTop: "1px",
               }}
             >
-              Inventory, orders and operations
+              {roleConfig.headerSubtitle}
             </div>
           )}
         </div>
@@ -104,7 +111,7 @@ export default function Header({ onToggleSidebar, isMobile }) {
             }}
           >
             <Search size={15} />
-            <span>Search console</span>
+            <span>{roleConfig.searchPlaceholder}</span>
           </div>
         )}
         {user ? (

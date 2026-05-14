@@ -11,9 +11,9 @@ import {
   Tags,
   Truck,
 } from "lucide-react";
-import { getStoredAdminUser } from "../../utils/auth";
+import { getPortalRoleConfig, getStoredAdminUser, normalizeRole } from "../../utils/auth";
 
-const menuItems = [
+const adminMenuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/products", label: "Inventory", icon: Package },
   { to: "/categories", label: "Categories", icon: Tags },
@@ -23,11 +23,24 @@ const menuItems = [
   { to: "/refund-requests", label: "Refunds", icon: Receipt },
 ];
 
+const staffMenuItems = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/orders", label: "Orders", icon: ShoppingCart },
+  { to: "/delivery", label: "Delivery", icon: Truck },
+  { to: "/issues", label: "Issues", icon: AlertTriangle },
+  { to: "/refund-requests", label: "Refunds", icon: Receipt },
+  { to: "/products", label: "Inventory", icon: Package },
+  { to: "/categories", label: "Categories", icon: Tags },
+];
+
 const shipperMenuItems = [{ to: "/shipper", label: "My Deliveries", icon: Truck, end: true }];
 
 export default function Sidebar({ collapsed = false, onToggle, isMobile = false }) {
   const user = getStoredAdminUser();
-  const visibleMenuItems = user?.role === "shipper" ? shipperMenuItems : menuItems;
+  const role = normalizeRole(user?.role);
+  const roleConfig = getPortalRoleConfig(role);
+  const visibleMenuItems =
+    role === "shipper" ? shipperMenuItems : role === "staff" ? staffMenuItems : adminMenuItems;
   // Close sidebar on mobile when clicking outside
   useEffect(() => {
     if (!isMobile || collapsed) return;
@@ -169,7 +182,7 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
                     fontWeight: "var(--font-weight-medium)",
                   }}
                 >
-                  Admin console
+                  {roleConfig.sidebarSubtitle}
                 </div>
               </div>
             )}
@@ -266,9 +279,9 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
             }}
           >
             <div style={{ color: "var(--color-text)", fontWeight: "var(--font-weight-semibold)" }}>
-              Operations
+              {roleConfig.footerTitle}
             </div>
-            <div style={{ marginTop: 2 }}>v0.5.0</div>
+            <div style={{ marginTop: 2 }}>{roleConfig.footerVersion}</div>
           </div>
         )}
       </aside>
