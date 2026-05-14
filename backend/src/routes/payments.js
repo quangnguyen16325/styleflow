@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { applyOrderLifecycleTransition } from "./order-lifecycle.js";
+import { parseMomoOrderId, verifyMomoIpnSignature } from "../lib/momo.js";
 
 const router = Router();
 
@@ -157,6 +158,115 @@ router.post("/payment-events", async (req, res) => {
   }
 });
 
+router.post("/payments/momo/ipn", async (req, res) => {
+  if (!verifyMomoIpnSignature(req.body)) {
+    console.warn("POST /payments/momo/ipn invalid signature:", req.body?.orderId);
+    return res.status(400).json(validationError("Invalid MoMo signature"));
+  }
+
+  const orderId = parseMomoOrderId(req.body.orderId);
+  if (!orderId) {
+    return res.status(400).json(validationError("Invalid MoMo orderId"));
+  }
+
+  const momoAmount = Math.round(Number(req.body.amount));
+  if (!Number.isInteger(momoAmount) || momoAmount <= 0) {
+    return res.status(400).json(validationError("Invalid MoMo amount"));
+  }
+
+  const resultCode = Number(req.body.resultCode);
+  const nextPaymentStatus =
+    resultCode === 0 ? "paid" : resultCode === 9000 ? "paid_held" : "payment_failed";
+  const externalEventId = `momo-ipn-${req.body.requestId || orderId}-${req.body.transId || resultCode}`;
+  const transactionRef = req.body.transId
+    ? String(req.body.transId)
+    : String(req.body.requestId || "");
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `
+        SELECT id, status, payment_status, total_amount
+        FROM orders
+        WHERE id = $1 AND payment_gateway = 'MOMO'
+        FOR UPDATE
+      `,
+      [orderId],
+    );
+
+    if (rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json(notFoundError("Order not found"));
+    }
+
+    const order = rows[0];
+    const expectedAmount = Math.round(Number(order.total_amount));
+    if (expectedAmount !== momoAmount) {
+      await insertMomoPaymentLog(client, {
+        orderId,
+        externalEventId,
+        transactionRef,
+        paymentStatus: "payment_unknown",
+        body: req.body,
+        errorCode: "AMOUNT_MISMATCH",
+      });
+      await client.query(
+        `
+          UPDATE orders
+          SET payment_status = 'payment_unknown', updated_at = NOW()
+          WHERE id = $1
+        `,
+        [orderId],
+      );
+      await client.query("COMMIT");
+      return res.status(400).json(validationError("MoMo amount does not match order total"));
+    }
+
+    const inserted = await insertMomoPaymentLog(client, {
+      orderId,
+      externalEventId,
+      transactionRef,
+      paymentStatus: nextPaymentStatus,
+      body: req.body,
+      errorCode: resultCode === 0 ? null : String(resultCode),
+    });
+
+    if (!inserted) {
+      await client.query("COMMIT");
+      return res.status(204).send();
+    }
+
+    const nextOrderStatus = deriveOrderStatusFromPayment(nextPaymentStatus, order.status);
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          transaction_ref = COALESCE($2, transaction_ref),
+          payment_status = $3,
+          status = COALESCE($4, status),
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, transactionRef || null, nextPaymentStatus, nextOrderStatus],
+    );
+
+    if (nextOrderStatus && nextOrderStatus !== order.status) {
+      await applyOrderLifecycleTransition(client, orderId, order.status, nextOrderStatus);
+    }
+
+    await client.query("COMMIT");
+    return res.status(204).send();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("POST /payments/momo/ipn failed:", error);
+    return res.status(500).json(internalError("Failed to process MoMo IPN"));
+  } finally {
+    client.release();
+  }
+});
+
 router.post("/payment-events/expire-pending", async (req, res) => {
   const secretError = validateInternalWebhookSecret(req);
   if (secretError) {
@@ -169,10 +279,10 @@ router.post("/payment-events/expire-pending", async (req, res) => {
 
     const expiredOrdersResult = await client.query(
       `
-        SELECT id, status
+        SELECT id, status, payment_gateway
         FROM orders
         WHERE
-          payment_gateway = 'BANK_TRANSFER'
+          payment_gateway IN ('BANK_TRANSFER', 'MOMO')
           AND payment_status = 'payment_pending'
           AND status = 'pending'
           AND payment_expires_at <= NOW()
@@ -207,15 +317,16 @@ router.post("/payment-events/expire-pending", async (req, res) => {
             payment_status,
             raw_response
           )
-          VALUES ($1, $2, 'BANK_TRANSFER', 'schedule', 'PAYMENT_EXPIRED', 'payment_failed', $3::jsonb)
+          VALUES ($1, $2, $3, 'schedule', 'PAYMENT_EXPIRED', 'payment_failed', $4::jsonb)
           ON CONFLICT (external_event_id) DO NOTHING
         `,
         [
           order.id,
-          `bank-transfer-expired-${order.id}`,
+          `${String(order.payment_gateway).toLowerCase()}-expired-${order.id}`,
+          order.payment_gateway,
           JSON.stringify({
             orderId: Number(order.id),
-            reason: "BANK_TRANSFER payment expired",
+            reason: `${order.payment_gateway} payment expired`,
           }),
         ],
       );
@@ -237,6 +348,36 @@ router.post("/payment-events/expire-pending", async (req, res) => {
 });
 
 export default router;
+
+async function insertMomoPaymentLog(client, options) {
+  const result = await client.query(
+    `
+      INSERT INTO payment_logs (
+        order_id,
+        external_event_id,
+        gateway_name,
+        transaction_ref,
+        source,
+        error_code,
+        payment_status,
+        raw_response
+      )
+      VALUES ($1, $2, 'MOMO', $3, 'payment_service', $4, $5, $6::jsonb)
+      ON CONFLICT (external_event_id) DO NOTHING
+      RETURNING id
+    `,
+    [
+      options.orderId,
+      options.externalEventId,
+      options.transactionRef || null,
+      options.errorCode || null,
+      options.paymentStatus,
+      JSON.stringify(options.body),
+    ],
+  );
+
+  return result.rows.length > 0;
+}
 
 function validatePaymentEventPayload(body) {
   if (!body || typeof body !== "object") {

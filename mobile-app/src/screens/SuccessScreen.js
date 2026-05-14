@@ -16,12 +16,14 @@ import {
   buildBankTransferQrUrl,
   formatPaymentExpiresAt,
 } from "../components/BankTransferPaymentCard";
+import MomoPaymentCard from "../components/MomoPaymentCard";
 import AppIcon from "../components/AppIcon";
 
 export default function SuccessScreen({ route, navigation }) {
   const order = route?.params?.order || null;
   const orderId = route?.params?.orderId || order?.id;
   const isBankTransfer = order?.paymentGateway === "BANK_TRANSFER";
+  const isMomo = order?.paymentGateway === "MOMO";
   const paymentCode = orderId ? `ORD${orderId}` : "";
   const qrUrl = useMemo(
     () => (isBankTransfer ? buildBankTransferQrUrl(order) : null),
@@ -37,12 +39,14 @@ export default function SuccessScreen({ route, navigation }) {
             <AppIcon name="check" size={34} color="#1E1815" />
           </View>
           <Text style={styles.successTitle}>
-            {isBankTransfer ? "Đơn hàng đang chờ thanh toán" : "Đặt hàng thành công"}
+            {isBankTransfer || isMomo ? "Đơn hàng đang chờ thanh toán" : "Đặt hàng thành công"}
           </Text>
           <Text style={styles.successSubtitle}>
             {isBankTransfer
               ? "Quét mã QR hoặc chuyển khoản đúng nội dung bên dưới để hệ thống xác nhận đơn."
-              : "Cảm ơn bạn đã mua sắm tại Ecloria. Đơn hàng của bạn đang được xử lý."}
+              : isMomo
+                ? "Mở MoMo để hoàn tất thanh toán. Đơn sẽ được xử lý sau khi MoMo xác nhận."
+                : "Cảm ơn bạn đã mua sắm tại Ecloria. Đơn hàng của bạn đang được xử lý."}
           </Text>
         </View>
 
@@ -87,6 +91,8 @@ export default function SuccessScreen({ route, navigation }) {
               </TouchableOpacity>
             ) : null}
           </View>
+        ) : isMomo ? (
+          <MomoPaymentCard order={order} payment={order?.payment} />
         ) : (
           <View style={styles.statusCard}>
             <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>

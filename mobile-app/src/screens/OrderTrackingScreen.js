@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView } f
 import BankTransferPaymentCard, {
   shouldShowBankTransferPayment,
 } from "../components/BankTransferPaymentCard";
+import MomoPaymentCard, { shouldShowMomoPayment } from "../components/MomoPaymentCard";
 import BackPillButton from "../components/BackPillButton";
 import AppImage from "../components/AppImage";
 import api, {
@@ -74,11 +75,7 @@ function OrderItemRow({ item }) {
   return (
     <View style={styles.orderItemRow}>
       {item.imageUrl ? (
-        <AppImage
-          source={{ uri: item.imageUrl }}
-          style={styles.productImage}
-          resizeMode="cover"
-        />
+        <AppImage source={{ uri: item.imageUrl }} style={styles.productImage} resizeMode="cover" />
       ) : (
         <View style={styles.productToken}>
           <Text style={styles.productTokenText}>#{item.productId}</Text>
@@ -164,6 +161,7 @@ export default function OrderTrackingScreen({ route, navigation }) {
         <Stepper currentStep={progressStep} />
 
         {shouldShowBankTransferPayment(order) ? <BankTransferPaymentCard order={order} /> : null}
+        {shouldShowMomoPayment(order) ? <MomoPaymentCard order={order} /> : null}
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>

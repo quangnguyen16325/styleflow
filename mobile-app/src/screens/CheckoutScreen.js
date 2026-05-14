@@ -26,7 +26,14 @@ const PAYMENT_OPTIONS = [
   {
     value: "BANK_TRANSFER",
     title: "Chuyển khoản ngân hàng",
-    description: "Vui lòng chuyển khoản bằng cách quét mã QR. Đơn sẽ được xử lý sau khi nhận được thanh toán.",
+    description:
+      "Vui lòng chuyển khoản bằng cách quét mã QR. Đơn sẽ được xử lý sau khi nhận được thanh toán.",
+  },
+  {
+    value: "MOMO",
+    title: "Ví MoMo",
+    description:
+      "Thanh toán online qua ví MoMo. Đơn sẽ được xử lý sau khi MoMo xác nhận thanh toán.",
   },
 ];
 

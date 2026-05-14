@@ -197,6 +197,7 @@ export const PAYMENT_STATUS_LABEL = {
 export const PAYMENT_GATEWAY_LABEL = {
   COD: "Thanh toán khi nhận hàng",
   BANK_TRANSFER: "Chuyển khoản ngân hàng",
+  MOMO: "Ví MoMo",
 };
 
 export const DELIVERY_STATUS_LABEL = {
