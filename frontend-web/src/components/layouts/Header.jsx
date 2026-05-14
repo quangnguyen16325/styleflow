@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut, Menu, Search } from "lucide-react";
 import {
@@ -12,10 +13,20 @@ export default function Header({ onToggleSidebar, isMobile }) {
   const user = getStoredAdminUser();
   const role = normalizeRole(user?.role);
   const roleConfig = getPortalRoleConfig(role);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleLogout = () => {
     clearAdminSession();
     navigate("/login");
+  };
+
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    const term = searchTerm.trim();
+    if (!term) return;
+
+    const targetPath = role === "shipper" ? "/shipper" : "/orders";
+    navigate(`${targetPath}?q=${encodeURIComponent(term)}`);
   };
 
   const initials = user?.fullName
@@ -95,7 +106,8 @@ export default function Header({ onToggleSidebar, isMobile }) {
         }}
       >
         {!isMobile && (
-          <div
+          <form
+            onSubmit={handleSearchSubmit}
             style={{
               display: "flex",
               alignItems: "center",
@@ -111,8 +123,23 @@ export default function Header({ onToggleSidebar, isMobile }) {
             }}
           >
             <Search size={15} />
-            <span>{roleConfig.searchPlaceholder}</span>
-          </div>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder={roleConfig.searchPlaceholder}
+              aria-label={roleConfig.searchPlaceholder}
+              style={{
+                width: "100%",
+                border: 0,
+                outline: 0,
+                padding: 0,
+                background: "transparent",
+                color: "var(--color-text)",
+                font: "inherit",
+              }}
+            />
+          </form>
         )}
         {user ? (
           <>

@@ -68,12 +68,12 @@ export default function OrderList() {
     searchParams.get("deliveryStatus"),
     allowedDeliveryStatuses,
   );
+  const searchTerm = searchParams.get("q") || "";
   const statusFilter = statusFromQuery;
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -100,14 +100,30 @@ export default function OrderList() {
 
   const updateFilterParam = useCallback(
     (key, nextValue) => {
-      setLoading(true);
       setError(null);
+      if (key === "status") {
+        setLoading(true);
+      }
 
       const nextParams = new URLSearchParams(searchParams);
       if (nextValue === "ALL") {
         nextParams.delete(key);
       } else {
         nextParams.set(key, nextValue);
+      }
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const updateSearchParam = useCallback(
+    (nextValue) => {
+      const nextParams = new URLSearchParams(searchParams);
+      const normalizedValue = nextValue.trimStart();
+      if (normalizedValue) {
+        nextParams.set("q", normalizedValue);
+      } else {
+        nextParams.delete("q");
       }
       setSearchParams(nextParams, { replace: true });
     },
@@ -123,14 +139,45 @@ export default function OrderList() {
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const matchesSearch = (() => {
-        if (!searchTerm) return true;
-        const term = searchTerm.toLowerCase();
-        return (
-          order.id.toString().includes(term) ||
-          (order.customer?.fullName || "").toLowerCase().includes(term) ||
-          (order.customer?.phone || "").includes(term) ||
-          (order.customer?.email || "").toLowerCase().includes(term)
-        );
+        const term = normalizeSearchText(searchTerm);
+        if (!term) return true;
+
+        const compactTerm = term.replace(/\s+/g, "");
+        const digitTerm = term.replace(/\D/g, "");
+        const orderId = String(order.id || "");
+        const orderAliases = [orderId, `#${orderId}`, `ord${orderId}`, `order${orderId}`];
+        const searchableValues = [
+          ...orderAliases,
+          order.status,
+          order.paymentStatus,
+          order.paymentGateway,
+          order.deliveryStatus,
+          order.transactionRef,
+          order.incidentId,
+          order.customer?.fullName,
+          order.customer?.phone,
+          order.customer?.email,
+          order.assignedShipper?.fullName,
+          order.assignedShipper?.phone,
+          order.assignedShipper?.email,
+          order.shipping?.receiverName,
+          order.shipping?.receiverPhone,
+          order.shipping?.fullAddress,
+          order.shippingAddress,
+          order.city,
+        ];
+
+        return searchableValues.some((value) => {
+          const normalizedValue = normalizeSearchText(value);
+          if (!normalizedValue) return false;
+
+          const compactValue = normalizedValue.replace(/\s+/g, "");
+          if (normalizedValue.includes(term) || compactValue.includes(compactTerm)) {
+            return true;
+          }
+
+          return digitTerm && normalizedValue.replace(/\D/g, "").includes(digitTerm);
+        });
       })();
 
       const matchesPaymentStatus =
@@ -183,9 +230,9 @@ export default function OrderList() {
           type="text"
           placeholder="Search by ID, name, phone, email..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => updateSearchParam(e.target.value)}
           className="form-input"
-          aria-label="Search orders by ID, name, phone, or email"
+          aria-label="Search orders by ID, name, phone, email, address, or transaction"
         />
         <select
           value={statusFilter}
@@ -334,6 +381,16 @@ function normalizeFilterValue(value, allowedValues, options = {}) {
 
   const normalized = options.preserveCase ? value.trim().toUpperCase() : value.trim().toLowerCase();
   return allowedValues.includes(normalized) ? normalized : "ALL";
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .trim()
+    .toLowerCase();
 }
 
 function formatCurrency(value) {

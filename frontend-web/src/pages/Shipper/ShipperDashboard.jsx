@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import ApiService from "../../api";
 import EmptyState from "../../components/ui/EmptyState";
 import ErrorMessage from "../../components/ui/ErrorMessage";
@@ -85,6 +85,8 @@ function getDeliveryLockMessage(order, availableStatuses) {
 }
 
 export default function ShipperDashboard() {
+  const [searchParams] = useSearchParams();
+  const searchTerm = searchParams.get("q") || "";
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -109,7 +111,12 @@ export default function ShipperDashboard() {
   }, [loadOrders]);
 
   const sortedOrders = useMemo(() => {
-    return [...orders].sort((a, b) => {
+    const term = normalizeSearchText(searchTerm);
+    const filteredOrders = term
+      ? orders.filter((order) => matchesDeliverySearch(order, term))
+      : orders;
+
+    return [...filteredOrders].sort((a, b) => {
       const aPriority = getDeliverySortPriority(a);
       const bPriority = getDeliverySortPriority(b);
 
@@ -119,7 +126,7 @@ export default function ShipperDashboard() {
 
       return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
     });
-  }, [orders]);
+  }, [orders, searchTerm]);
 
   const updateDeliveryStatus = async (orderId, status) => {
     try {
@@ -149,6 +156,7 @@ export default function ShipperDashboard() {
           <h2 className="page-title">My Deliveries</h2>
           <p className="page-subtitle">
             Orders assigned to you. Update delivery status after each real delivery event.
+            {searchTerm ? ` Showing matches for "${searchTerm}".` : ""}
           </p>
         </div>
       </div>
@@ -162,8 +170,12 @@ export default function ShipperDashboard() {
       {sortedOrders.length === 0 ? (
         <div className="card" style={{ padding: "var(--spacing-xl)" }}>
           <EmptyState
-            title="No Assigned Orders"
-            description="You do not have delivery orders assigned right now."
+            title={searchTerm ? "No Deliveries Found" : "No Assigned Orders"}
+            description={
+              searchTerm
+                ? "No assigned deliveries match your current search."
+                : "You do not have delivery orders assigned right now."
+            }
           />
         </div>
       ) : (
@@ -327,6 +339,45 @@ function ReturnPickupBadge() {
       Return pickup
     </span>
   );
+}
+
+function matchesDeliverySearch(order, term) {
+  const compactTerm = term.replace(/\s+/g, "");
+  const digitTerm = term.replace(/\D/g, "");
+  const orderId = String(order.id || "");
+  const values = [
+    orderId,
+    `#${orderId}`,
+    `ord${orderId}`,
+    order.status,
+    order.deliveryStatus,
+    order.paymentStatus,
+    order.paymentGateway,
+    order.shipping?.receiverName,
+    order.shipping?.receiverPhone,
+    order.shipping?.fullAddress,
+    order.customer?.fullName,
+    order.customer?.phone,
+  ];
+
+  return values.some((value) => {
+    const normalizedValue = normalizeSearchText(value);
+    if (!normalizedValue) return false;
+    if (normalizedValue.includes(term) || normalizedValue.replace(/\s+/g, "").includes(compactTerm)) {
+      return true;
+    }
+    return digitTerm && normalizedValue.replace(/\D/g, "").includes(digitTerm);
+  });
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .trim()
+    .toLowerCase();
 }
 
 function formatCurrency(value) {
