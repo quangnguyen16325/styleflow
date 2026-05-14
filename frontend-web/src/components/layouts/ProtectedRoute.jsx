@@ -3,7 +3,7 @@ import {
   clearAdminSession,
   getStoredAdminToken,
   getStoredAdminUser,
-  isPrivilegedRole,
+  isPortalRole,
   isTokenExpired,
 } from '../../utils/auth';
 import { ShieldAlert } from 'lucide-react';
@@ -25,8 +25,8 @@ export default function ProtectedRoute() {
     return <Navigate to="/login" state={{ from: location, expired: true }} replace />;
   }
 
-  // User doesn't have admin/staff role - show access denied
-  if (!isPrivilegedRole(user.role)) {
+  // User doesn't have a role allowed in the operations portal.
+  if (!isPortalRole(user.role)) {
     clearAdminSession();
     return (
       <div
@@ -75,7 +75,7 @@ export default function ProtectedRoute() {
               lineHeight: 'var(--line-height-relaxed)',
             }}
           >
-            You don't have permission to access the admin portal. Only admin and staff accounts are allowed.
+            You don't have permission to access the operations portal.
           </p>
           <button
             onClick={() => {

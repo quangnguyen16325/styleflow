@@ -20,174 +20,28 @@ router.post("/delivery-callback", async (req, res) => {
 
   try {
     await client.query("BEGIN");
-
-    const orderResult = await client.query(
-      `
-        SELECT
-          o.id,
-          o.status,
-          o.delivery_fail_count,
-          o.delivery_status,
-          c.email AS customer_email
-        FROM orders o
-        JOIN customers c ON c.id = o.customer_id
-        WHERE o.id = $1
-        LIMIT 1
-      `,
-      [orderId],
-    );
-
-    if (orderResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json(notFoundError("Order not found"));
-    }
-
-    const order = orderResult.rows[0];
-    const deliveryEventResult = await client.query(
-      `
-        INSERT INTO delivery_events (
-          order_id,
-          partner,
-          external_event_id,
-          status,
-          reason,
-          payload
-        )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-        ON CONFLICT (external_event_id) DO NOTHING
-        RETURNING id
-      `,
-      [orderId, partner, externalEventId, status, reason, JSON.stringify(req.body)],
-    );
-
-    if (externalEventId && deliveryEventResult.rows.length === 0) {
-      await client.query("COMMIT");
-      return res.json({
-        success: true,
-        action: "duplicate_ignored",
-        customerEmail: order.customer_email,
-      });
-    }
-
-    let action = "updated";
-    let failCount = Number(order.delivery_fail_count);
-    if (status === "DELIVERED") {
-      await client.query(
-        `
-          UPDATE orders
-          SET
-            status = 'completed',
-            delivery_status = 'delivered',
-            updated_at = NOW()
-          WHERE id = $1
-        `,
-        [orderId],
-      );
-      await applyOrderLifecycleTransition(client, orderId, order.status, "completed");
-      action = "delivered";
-      failCount = 0;
-    } else if (status === "RETURNED") {
-      if (order.status === "completed" && order.delivery_status !== "returned") {
-        await applyOrderReturn(client, orderId);
-      }
-
-      await client.query(
-        `
-          UPDATE orders
-          SET
-            status = CASE WHEN status = 'completed' THEN 'failed' ELSE status END,
-            delivery_status = 'returned',
-            delivery_partner = COALESCE($2, delivery_partner),
-            updated_at = NOW()
-          WHERE id = $1
-        `,
-        [orderId, partner],
-      );
-      action = "returned";
-      failCount = Number(order.delivery_fail_count);
-    } else if (status === "FAILED") {
-      const nextFailCount = Number(order.delivery_fail_count) + 1;
-      const nextDeliveryStatus = nextFailCount >= 3 ? "returning" : "retry_pending";
-      const nextOrderStatus = nextFailCount >= 3 ? "failed" : order.status;
-
-      await client.query(
-        `
-          UPDATE orders
-          SET
-            status = $2,
-            delivery_status = $3,
-            delivery_partner = COALESCE($4, delivery_partner),
-            delivery_fail_count = $5,
-            last_delivery_failed_reason = $6,
-            updated_at = NOW()
-          WHERE id = $1
-        `,
-        [orderId, nextOrderStatus, nextDeliveryStatus, partner, nextFailCount, reason],
-      );
-
-      await applyOrderLifecycleTransition(client, orderId, order.status, nextOrderStatus);
-
-      if (nextFailCount >= 3) {
-        await client.query(
-          `
-            INSERT INTO issues (
-              order_id,
-              type,
-              severity,
-              status,
-              log_history
-            )
-            VALUES (
-              $1,
-              'DELIVERY_FAILED',
-              'high',
-              'open',
-              jsonb_build_array(
-                jsonb_build_object(
-                  'timestamp', NOW(),
-                  'message', $2::text
-                )
-              )
-            )
-          `,
-          [orderId, `Delivery failed ${nextFailCount} times. Reason: ${reason}`],
-        );
-      }
-
-      action = nextFailCount >= 3 ? "returning" : "retry_pending";
-      failCount = nextFailCount;
-    } else {
-      const nextDeliveryStatus = mapCallbackStatusToDeliveryStatus(status);
-      const nextOrderStatus =
-        ["handover", "in_transit"].includes(nextDeliveryStatus) &&
-        ["pending", "processing"].includes(order.status)
-          ? "shipping"
-          : order.status;
-
-      await client.query(
-        `
-          UPDATE orders
-          SET
-            status = $2,
-            delivery_status = $3,
-            delivery_partner = COALESCE($4, delivery_partner),
-            updated_at = NOW()
-          WHERE id = $1
-        `,
-        [orderId, nextOrderStatus, nextDeliveryStatus, partner],
-      );
-      failCount = Number(order.delivery_fail_count);
-    }
+    const result = await applyDeliveryStatusUpdate(client, {
+      orderId,
+      status,
+      reason,
+      partner,
+      externalEventId,
+      payload: req.body,
+    });
 
     await client.query("COMMIT");
     return res.json({
       success: true,
-      action,
-      failCount,
-      customerEmail: order.customer_email,
+      action: result.action,
+      failCount: result.failCount,
+      customerEmail: result.customerEmail,
     });
   } catch (error) {
     await client.query("ROLLBACK");
+    if (error instanceof DeliveryNotFoundError) {
+      return res.status(404).json(notFoundError("Order not found"));
+    }
+
     console.error("POST /delivery-callback failed:", error);
     return res.status(500).json(internalError("Failed to process delivery callback"));
   } finally {
@@ -196,6 +50,213 @@ router.post("/delivery-callback", async (req, res) => {
 });
 
 export default router;
+
+export class DeliveryNotFoundError extends Error {}
+
+export async function applyDeliveryStatusUpdate(
+  client,
+  { orderId, status, reason = null, partner = null, externalEventId = null, payload = {} },
+) {
+  const orderResult = await client.query(
+    `
+      SELECT
+        o.id,
+        o.status,
+        o.payment_status,
+        o.payment_gateway,
+        o.delivery_fail_count,
+        o.delivery_status,
+        c.email AS customer_email
+      FROM orders o
+      JOIN customers c ON c.id = o.customer_id
+      WHERE o.id = $1
+      LIMIT 1
+    `,
+    [orderId],
+  );
+
+  if (orderResult.rows.length === 0) {
+    throw new DeliveryNotFoundError("Order not found");
+  }
+
+  const order = orderResult.rows[0];
+  const deliveryEventResult = await client.query(
+    `
+      INSERT INTO delivery_events (
+        order_id,
+        partner,
+        external_event_id,
+        status,
+        reason,
+        payload
+      )
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+      ON CONFLICT (external_event_id) DO NOTHING
+      RETURNING id
+    `,
+    [orderId, partner, externalEventId, status, reason, JSON.stringify(payload)],
+  );
+
+  if (externalEventId && deliveryEventResult.rows.length === 0) {
+    return {
+      action: "duplicate_ignored",
+      failCount: Number(order.delivery_fail_count),
+      customerEmail: order.customer_email,
+    };
+  }
+
+  let action = "updated";
+  let failCount = Number(order.delivery_fail_count);
+  if (status === "DELIVERED") {
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          status = 'completed',
+          delivery_status = 'delivered',
+          delivery_partner = COALESCE($2, delivery_partner),
+          delivery_fail_count = 0,
+          last_delivery_failed_reason = NULL,
+          payment_status = CASE
+            WHEN payment_gateway = 'COD' THEN 'paid'
+            ELSE payment_status
+          END,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, partner],
+    );
+
+    if (order.payment_gateway === "COD" && order.payment_status !== "paid") {
+      await client.query(
+        `
+          INSERT INTO payment_logs (
+            order_id,
+            external_event_id,
+            gateway_name,
+            source,
+            payment_status,
+            raw_response
+          )
+          VALUES ($1, $2, 'COD', 'delivery_callback', 'paid', $3::jsonb)
+          ON CONFLICT (external_event_id) DO NOTHING
+        `,
+        [
+          orderId,
+          `cod-delivered-${orderId}`,
+          JSON.stringify({
+            orderId,
+            status,
+            partner,
+            reason,
+            source: "delivery_callback",
+          }),
+        ],
+      );
+    }
+
+    await applyOrderLifecycleTransition(client, orderId, order.status, "completed");
+    action = "delivered";
+    failCount = 0;
+  } else if (status === "RETURNED") {
+    if (order.status === "completed" && order.delivery_status !== "returned") {
+      await applyOrderReturn(client, orderId);
+    }
+
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          status = CASE WHEN status = 'completed' THEN 'failed' ELSE status END,
+          delivery_status = 'returned',
+          delivery_partner = COALESCE($2, delivery_partner),
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, partner],
+    );
+    action = "returned";
+    failCount = Number(order.delivery_fail_count);
+  } else if (status === "FAILED") {
+    const nextFailCount = Number(order.delivery_fail_count) + 1;
+    const nextDeliveryStatus = nextFailCount >= 3 ? "returning" : "retry_pending";
+    const nextOrderStatus = nextFailCount >= 3 ? "failed" : order.status;
+
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          status = $2,
+          delivery_status = $3,
+          delivery_partner = COALESCE($4, delivery_partner),
+          delivery_fail_count = $5,
+          last_delivery_failed_reason = $6,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, nextOrderStatus, nextDeliveryStatus, partner, nextFailCount, reason],
+    );
+
+    await applyOrderLifecycleTransition(client, orderId, order.status, nextOrderStatus);
+
+    if (nextFailCount >= 3) {
+      await client.query(
+        `
+          INSERT INTO issues (
+            order_id,
+            type,
+            severity,
+            status,
+            log_history
+          )
+          VALUES (
+            $1,
+            'DELIVERY_FAILED',
+            'high',
+            'open',
+            jsonb_build_array(
+              jsonb_build_object(
+                'timestamp', NOW(),
+                'message', $2::text
+              )
+            )
+          )
+        `,
+        [orderId, `Delivery failed ${nextFailCount} times. Reason: ${reason}`],
+      );
+    }
+
+    action = nextFailCount >= 3 ? "returning" : "retry_pending";
+    failCount = nextFailCount;
+  } else {
+    const nextDeliveryStatus = mapCallbackStatusToDeliveryStatus(status);
+    const nextOrderStatus =
+      ["handover", "in_transit"].includes(nextDeliveryStatus) &&
+      ["pending", "processing"].includes(order.status)
+        ? "shipping"
+        : order.status;
+
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          status = $2,
+          delivery_status = $3,
+          delivery_partner = COALESCE($4, delivery_partner),
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, nextOrderStatus, nextDeliveryStatus, partner],
+    );
+    failCount = Number(order.delivery_fail_count);
+  }
+
+  return {
+    action,
+    failCount,
+    customerEmail: order.customer_email,
+  };
+}
 
 function validateInternalWebhookSecret(req) {
   const configuredSecret = process.env.INTERNAL_WEBHOOK_SECRET?.trim();

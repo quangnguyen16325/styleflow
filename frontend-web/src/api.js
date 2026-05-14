@@ -129,8 +129,17 @@ class ApiService {
   static async getOrder(id) {
     return client.get(`/admin/orders/${id}`);
   }
+  static async getShippers() {
+    return client.get('/admin/shippers');
+  }
+  static async assignOrderShipper(id, shipperId) {
+    return client.post(`/admin/orders/${id}/assign-shipper`, { shipperId });
+  }
   static async updateOrderStatus(id, status) {
     return client.patch(`/admin/orders/${id}/status`, { status });
+  }
+  static async updateOrderDeliveryStatus(id, payload) {
+    return client.post(`/admin/orders/${id}/delivery-status`, payload);
   }
   static async getOrderDeliveryEvents(id) {
     return client.get(`/admin/orders/${id}/delivery-events`);
@@ -142,6 +151,14 @@ class ApiService {
     }
 
     return client.post(`/admin/orders/${id}/address-change-decision`, payload);
+  }
+
+  // SHIPPER
+  static async getShipperOrders() {
+    return client.get('/shipper/orders');
+  }
+  static async updateShipperOrderDeliveryStatus(id, payload) {
+    return client.post(`/shipper/orders/${id}/delivery-status`, payload);
   }
 
   // ISSUES

@@ -6,7 +6,12 @@ const STATUS_COLORS = {
   // Order statuses - Cloudflare colors
   pending:          { color: '#F59E0B', bg: '#FEF3C7', icon: Clock },
   awaiting_payment: { color: '#F59E0B', bg: '#FEF3C7', icon: CreditCard },
+  unpaid:           { color: '#6B7280', bg: '#F3F4F6', icon: CreditCard },
+  payment_pending:  { color: '#F59E0B', bg: '#FEF3C7', icon: Clock },
+  payment_unknown:  { color: '#6B7280', bg: '#F3F4F6', icon: AlertTriangle },
   paid:             { color: '#3B82F6', bg: '#DBEAFE', icon: Check },
+  paid_held:        { color: '#8B5CF6', bg: '#EDE9FE', icon: Eye },
+  payment_failed:   { color: '#DC2626', bg: '#FEE2E2', icon: X },
   processing:       { color: '#8B5CF6', bg: '#EDE9FE', icon: Settings },
   shipping:         { color: '#06B6D4', bg: '#CFFAFE', icon: Truck },
   completed:        { color: '#059669', bg: '#D1FAE5', icon: Check },
@@ -41,6 +46,7 @@ const STATUS_COLORS = {
   DELIVERY_FAILED:  { color: '#DC2626', bg: '#FEE2E2', icon: Truck },
 
   // Refund statuses
+  refund_pending:         { color: '#F59E0B', bg: '#FEF3C7', icon: RefreshCw },
   manual_review_required: { color: '#8B5CF6', bg: '#EDE9FE', icon: Eye },
   approved:               { color: '#059669', bg: '#D1FAE5', icon: Check },
   rejected:               { color: '#DC2626', bg: '#FEE2E2', icon: X },

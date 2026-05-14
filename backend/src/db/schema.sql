@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS customers (
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash TEXT,
   role VARCHAR(30) NOT NULL DEFAULT 'customer' CHECK (
-    role IN ('customer', 'admin', 'staff')
+    role IN ('customer', 'admin', 'staff', 'shipper')
   ),
   abuse_score INTEGER NOT NULL DEFAULT 0 CHECK (abuse_score >= 0),
   is_blacklisted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -253,7 +253,7 @@ DROP CONSTRAINT IF EXISTS customers_role_check;
 
 ALTER TABLE customers
 ADD CONSTRAINT customers_role_check CHECK (
-  role IN ('customer', 'admin', 'staff')
+  role IN ('customer', 'admin', 'staff', 'shipper')
 );
 
 ALTER TABLE customers
@@ -261,6 +261,9 @@ ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS customer_address_id BIGINT REFERENCES customer_addresses(id) ON DELETE SET NULL;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS assigned_shipper_id BIGINT REFERENCES customers(id) ON DELETE SET NULL;
 
 ALTER TABLE customer_addresses
 ADD COLUMN IF NOT EXISTS province_code VARCHAR(20);
@@ -335,6 +338,13 @@ ADD CONSTRAINT orders_status_check CHECK (
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS payment_gateway VARCHAR(50);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS payment_expires_at TIMESTAMPTZ;
+
+UPDATE orders
+SET payment_expires_at = NULL
+WHERE payment_gateway = 'COD';
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS transaction_ref VARCHAR(120);
@@ -589,6 +599,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_customer_address_id ON orders(customer_add
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_status ON orders(delivery_status);
+CREATE INDEX IF NOT EXISTS idx_orders_assigned_shipper_id ON orders(assigned_shipper_id);
 CREATE INDEX IF NOT EXISTS idx_orders_shipping_province_code ON orders(shipping_province_code);
 CREATE INDEX IF NOT EXISTS idx_orders_shipping_district_code ON orders(shipping_district_code);
 CREATE INDEX IF NOT EXISTS idx_orders_shipping_ward_code ON orders(shipping_ward_code);

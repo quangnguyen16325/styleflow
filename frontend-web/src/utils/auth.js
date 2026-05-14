@@ -1,4 +1,5 @@
 const ADMIN_ROLES = new Set(['admin', 'staff']);
+const PORTAL_ROLES = new Set(['admin', 'staff', 'shipper']);
 const TOKEN_STORAGE_KEY = 'admin_token';
 const USER_STORAGE_KEY = 'admin_user';
 
@@ -10,6 +11,13 @@ export function isPrivilegedRole(role) {
     return false;
   }
   return ADMIN_ROLES.has(role.trim().toLowerCase());
+}
+
+export function isPortalRole(role) {
+  if (typeof role !== 'string') {
+    return false;
+  }
+  return PORTAL_ROLES.has(role.trim().toLowerCase());
 }
 
 /**
@@ -96,7 +104,7 @@ export function hasValidAdminSession() {
   const token = getStoredAdminToken();
   const user = getStoredAdminUser();
 
-  if (!token || !user || !isPrivilegedRole(user.role)) {
+  if (!token || !user || !isPortalRole(user.role)) {
     return false;
   }
 

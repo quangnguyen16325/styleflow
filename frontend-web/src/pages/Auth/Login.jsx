@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ApiService from "../../api";
 import ErrorMessage from "../../components/ui/ErrorMessage";
-import { clearAdminSession, isPrivilegedRole, storeAdminSession } from "../../utils/auth";
+import { clearAdminSession, isPortalRole, storeAdminSession } from "../../utils/auth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -26,11 +26,11 @@ export default function Login() {
         throw new Error("Invalid response from server");
       }
 
-      if (!isPrivilegedRole(response.customer.role)) {
+      if (!isPortalRole(response.customer.role)) {
         clearAdminSession();
         setError({
           code: "FORBIDDEN",
-          message: "Only admin/staff accounts can access the admin portal.",
+          message: "Only admin, staff, or shipper accounts can access this portal.",
         });
         return;
       }
@@ -107,7 +107,7 @@ export default function Login() {
                 color: "var(--color-text-muted)",
               }}
             >
-              Admin and staff operations
+              Admin, staff and shipper operations
             </p>
           </div>
         </div>

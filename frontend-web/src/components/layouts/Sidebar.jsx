@@ -9,18 +9,25 @@ import {
   Receipt,
   ShoppingCart,
   Tags,
+  Truck,
 } from "lucide-react";
+import { getStoredAdminUser } from "../../utils/auth";
 
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/products", label: "Inventory", icon: Package },
   { to: "/categories", label: "Categories", icon: Tags },
   { to: "/orders", label: "Orders", icon: ShoppingCart },
+  { to: "/delivery", label: "Delivery", icon: Truck },
   { to: "/issues", label: "Issues", icon: AlertTriangle },
   { to: "/refund-requests", label: "Refunds", icon: Receipt },
 ];
 
+const shipperMenuItems = [{ to: "/shipper", label: "My Deliveries", icon: Truck, end: true }];
+
 export default function Sidebar({ collapsed = false, onToggle, isMobile = false }) {
+  const user = getStoredAdminUser();
+  const visibleMenuItems = user?.role === "shipper" ? shipperMenuItems : menuItems;
   // Close sidebar on mobile when clicking outside
   useEffect(() => {
     if (!isMobile || collapsed) return;
@@ -227,7 +234,7 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
             overflowX: "hidden",
           }}
         >
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
