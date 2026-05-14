@@ -25,6 +25,13 @@ import api, {
 const ADDRESS_CHANGE_WEBHOOK_URL =
   process.env.EXPO_PUBLIC_N8N_ADDRESS_CHANGE_WEBHOOK_URL ||
   "https://n8n.ecloria.co.uk/webhook/address-change-request";
+const ADDRESS_CHANGE_PROCESSING_FEE = 10000;
+const ADDRESS_CHANGE_PROCESSING_FEE_STATUSES = [
+  "ready_to_ship",
+  "handover",
+  "in_transit",
+  "retry_pending",
+];
 
 const TABS = [
   { key: "all", label: "Tất cả" },
@@ -126,6 +133,21 @@ function canChangeAddress(order) {
   );
 }
 
+function getAddressChangeProcessingFee(order) {
+  return ADDRESS_CHANGE_PROCESSING_FEE_STATUSES.includes(
+    String(order?.deliveryStatus || "").toLowerCase(),
+  )
+    ? ADDRESS_CHANGE_PROCESSING_FEE
+    : 0;
+}
+
+function isApprovedReturn(order) {
+  return (
+    String(order?.latestRefundRequestStatus || "").toLowerCase() === "approved" &&
+    String(order?.deliveryStatus || "").toLowerCase() !== "returned"
+  );
+}
+
 function hasRefundRequest(latestRefundRequestStatus) {
   return (
     typeof latestRefundRequestStatus === "string" && latestRefundRequestStatus.trim().length > 0
@@ -177,6 +199,11 @@ function getCustomerFacingBadges(order) {
   const refundStatus = String(order?.latestRefundRequestStatus || "").toLowerCase();
   const badges = [];
 
+  if (deliveryStatus === "returned") {
+    badges.push({ label: "Đã trả hàng", tone: "#1C7C54", bg: "#E4F2EA" });
+    return badges;
+  }
+
   if (refundStatus) {
     badges.push(getRefundStatusMeta(refundStatus));
     if (["refunded", "approved"].includes(refundStatus)) {
@@ -197,7 +224,7 @@ function getCustomerFacingBadges(order) {
   if (["returning", "returned"].includes(deliveryStatus)) {
     badges.push(
       deliveryStatus === "returned"
-        ? { label: "Đã hoàn hàng", tone: "#7B4E9B", bg: "#F1E7F8" }
+        ? { label: "Đã trả hàng", tone: "#1C7C54", bg: "#E4F2EA" }
         : { label: "Đang hoàn hàng", tone: "#7B4E9B", bg: "#F1E7F8" },
     );
     return badges;
@@ -310,19 +337,49 @@ function AddressPickerModal({
                 )}
               </View>
               <View style={[styles.shippingPreviewRow, styles.shippingPreviewDeltaRow]}>
-                <Text style={styles.shippingPreviewDeltaLabel}>Chênh lệch</Text>
+                <Text style={styles.shippingPreviewDeltaLabel}>Chênh lệch phí ship</Text>
                 {loadingShippingQuote ? (
                   <ActivityIndicator size="small" color="#9B4B1F" />
                 ) : (
                   <Text
                     style={[
                       styles.shippingPreviewDeltaValue,
-                      shippingQuote?.delta > 0 && styles.shippingPreviewDeltaIncrease,
-                      shippingQuote?.delta < 0 && styles.shippingPreviewDeltaDecrease,
+                      shippingQuote?.shippingDelta > 0 && styles.shippingPreviewDeltaIncrease,
+                      shippingQuote?.shippingDelta < 0 && styles.shippingPreviewDeltaDecrease,
                     ]}
                   >
                     {shippingQuote
-                      ? `${shippingQuote.delta > 0 ? "+" : ""}${formatPrice(shippingQuote.delta)}`
+                      ? `${shippingQuote.shippingDelta > 0 ? "+" : ""}${formatPrice(
+                          shippingQuote.shippingDelta,
+                        )}`
+                      : "Chưa rõ"}
+                  </Text>
+                )}
+              </View>
+              {shippingQuote?.processingFee > 0 ? (
+                <View style={styles.shippingPreviewRow}>
+                  <Text style={styles.shippingPreviewLabel}>Phí xử lý đổi địa chỉ</Text>
+                  <Text style={styles.shippingPreviewValue}>
+                    {formatPrice(shippingQuote.processingFee)}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={[styles.shippingPreviewRow, styles.shippingPreviewTotalRow]}>
+                <Text style={styles.shippingPreviewDeltaLabel}>Tổng chênh lệch</Text>
+                {loadingShippingQuote ? (
+                  <ActivityIndicator size="small" color="#9B4B1F" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.shippingPreviewDeltaValue,
+                      shippingQuote?.totalDelta > 0 && styles.shippingPreviewDeltaIncrease,
+                      shippingQuote?.totalDelta < 0 && styles.shippingPreviewDeltaDecrease,
+                    ]}
+                  >
+                    {shippingQuote
+                      ? `${shippingQuote.totalDelta > 0 ? "+" : ""}${formatPrice(
+                          shippingQuote.totalDelta,
+                        )}`
                       : "Chưa rõ"}
                   </Text>
                 )}
@@ -380,6 +437,17 @@ function StatusPill({ meta }) {
   return (
     <View style={[styles.statusPill, { backgroundColor: meta.bg }]}>
       <Text style={[styles.statusPillText, { color: meta.tone }]}>{meta.label}</Text>
+    </View>
+  );
+}
+
+function ApprovedReturnNotice({ compact = false }) {
+  return (
+    <View style={[styles.approvedReturnNotice, compact && styles.approvedReturnNoticeCompact]}>
+      <Text style={styles.approvedReturnTitle}>Yêu cầu trả hàng đã được duyệt</Text>
+      <Text style={styles.approvedReturnText}>
+        Vui lòng đóng gói sản phẩm đầy đủ và đợi shipper tới lấy hàng.
+      </Text>
     </View>
   );
 }
@@ -494,10 +562,14 @@ export default function OrderScreen({ navigation }) {
       const quote = await getShippingQuote({ addressId });
       const currentShippingFee = Number(activeAddressOrder?.shippingFee || 0);
       const newShippingFee = Number(quote.shippingFee ?? 0);
+      const processingFee = getAddressChangeProcessingFee(activeAddressOrder);
+      const shippingDelta = newShippingFee - currentShippingFee;
       setAddressChangeQuote({
         currentShippingFee,
         newShippingFee,
-        delta: newShippingFee - currentShippingFee,
+        shippingDelta,
+        processingFee,
+        totalDelta: shippingDelta + processingFee,
       });
     } catch (error) {
       console.warn("Lỗi tính phí ship đổi địa chỉ:", error);
@@ -605,6 +677,7 @@ export default function OrderScreen({ navigation }) {
             const itemCount = (order.items || []).reduce((sum, item) => sum + item.quantity, 0);
             const completed = isCompletedStatus(order.status);
             const refundRequested = hasRefundRequest(order.latestRefundRequestStatus);
+            const approvedReturn = isApprovedReturn(order);
             const needsBankTransferPayment = shouldShowBankTransferPayment(order);
 
             return (
@@ -683,6 +756,8 @@ export default function OrderScreen({ navigation }) {
                     </TouchableOpacity>
                   </View>
                 ) : null}
+
+                {approvedReturn ? <ApprovedReturnNotice compact /> : null}
 
                 <View style={styles.actionsRow}>
                   {canChangeAddress(order) ? (
@@ -980,6 +1055,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
+  approvedReturnNotice: {
+    borderRadius: 18,
+    padding: 14,
+    marginTop: 12,
+    backgroundColor: "#EAF7F3",
+    borderWidth: 1,
+    borderColor: "#B8DED2",
+  },
+  approvedReturnNoticeCompact: {
+    marginBottom: 0,
+  },
+  approvedReturnTitle: {
+    color: "#1B6F5B",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 5,
+  },
+  approvedReturnText: {
+    color: "#3F6F62",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -1137,6 +1235,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   shippingPreviewDeltaRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#F0E5D8",
+    marginTop: 4,
+    paddingTop: 10,
+  },
+  shippingPreviewTotalRow: {
     borderTopWidth: 1,
     borderTopColor: "#F0E5D8",
     marginTop: 4,

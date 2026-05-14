@@ -92,6 +92,24 @@ function OrderItemRow({ item }) {
   );
 }
 
+function isApprovedReturn(order) {
+  return (
+    String(order?.latestRefundRequestStatus || "").toLowerCase() === "approved" &&
+    String(order?.deliveryStatus || "").toLowerCase() !== "returned"
+  );
+}
+
+function ApprovedReturnNotice() {
+  return (
+    <View style={styles.approvedReturnNotice}>
+      <Text style={styles.approvedReturnTitle}>Yêu cầu trả hàng đã được duyệt</Text>
+      <Text style={styles.approvedReturnText}>
+        Vui lòng đóng gói sản phẩm đầy đủ và đợi shipper tới lấy hàng.
+      </Text>
+    </View>
+  );
+}
+
 export default function OrderTrackingScreen({ route, navigation }) {
   const { orderId } = route?.params || {};
   const [order, setOrder] = useState(null);
@@ -162,6 +180,7 @@ export default function OrderTrackingScreen({ route, navigation }) {
 
         {shouldShowBankTransferPayment(order) ? <BankTransferPaymentCard order={order} /> : null}
         {shouldShowMomoPayment(order) ? <MomoPaymentCard order={order} /> : null}
+        {isApprovedReturn(order) ? <ApprovedReturnNotice /> : null}
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
@@ -331,6 +350,26 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
     marginBottom: 14,
+  },
+  approvedReturnNotice: {
+    backgroundColor: "#EAF7F3",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#B8DED2",
+    padding: 18,
+    marginBottom: 14,
+  },
+  approvedReturnTitle: {
+    color: "#1B6F5B",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  approvedReturnText: {
+    color: "#3F6F62",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "700",
   },
   summaryRow: {
     flexDirection: "row",
