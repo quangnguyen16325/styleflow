@@ -159,112 +159,40 @@ router.post("/payment-events", async (req, res) => {
 });
 
 router.post("/payments/momo/ipn", async (req, res) => {
-  if (!verifyMomoIpnSignature(req.body)) {
-    console.warn("POST /payments/momo/ipn invalid signature:", req.body?.orderId);
-    return res.status(400).json(validationError("Invalid MoMo signature"));
+  const result = await processMomoPaymentCallback(req.body, "ipn");
+  if (!result.ok) {
+    if (result.logMessage) {
+      console.warn(result.logMessage, req.body?.orderId);
+    }
+    return res.status(result.status).json(result.body);
   }
 
-  const orderId = parseMomoOrderId(req.body.orderId);
-  if (!orderId) {
-    return res.status(400).json(validationError("Invalid MoMo orderId"));
+  return res.status(204).send();
+});
+
+router.get("/payments/momo/return", async (req, res) => {
+  const result = await processMomoPaymentCallback(req.query, "return");
+  const redirectUrl = buildMomoReturnRedirectUrl(result);
+
+  if (!result.ok) {
+    if (result.logMessage) {
+      console.warn(result.logMessage, req.query?.orderId);
+    }
+    if (redirectUrl) {
+      return res.redirect(302, redirectUrl);
+    }
+    return res.status(result.status).json(result.body);
   }
 
-  const momoAmount = Math.round(Number(req.body.amount));
-  if (!Number.isInteger(momoAmount) || momoAmount <= 0) {
-    return res.status(400).json(validationError("Invalid MoMo amount"));
+  if (redirectUrl) {
+    return res.redirect(302, redirectUrl);
   }
 
-  const resultCode = Number(req.body.resultCode);
-  const nextPaymentStatus =
-    resultCode === 0 ? "paid" : resultCode === 9000 ? "paid_held" : "payment_failed";
-  const externalEventId = `momo-ipn-${req.body.requestId || orderId}-${req.body.transId || resultCode}`;
-  const transactionRef = req.body.transId
-    ? String(req.body.transId)
-    : String(req.body.requestId || "");
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    const { rows } = await client.query(
-      `
-        SELECT id, status, payment_status, total_amount
-        FROM orders
-        WHERE id = $1 AND payment_gateway = 'MOMO'
-        FOR UPDATE
-      `,
-      [orderId],
-    );
-
-    if (rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json(notFoundError("Order not found"));
-    }
-
-    const order = rows[0];
-    const expectedAmount = Math.round(Number(order.total_amount));
-    if (expectedAmount !== momoAmount) {
-      await insertMomoPaymentLog(client, {
-        orderId,
-        externalEventId,
-        transactionRef,
-        paymentStatus: "payment_unknown",
-        body: req.body,
-        errorCode: "AMOUNT_MISMATCH",
-      });
-      await client.query(
-        `
-          UPDATE orders
-          SET payment_status = 'payment_unknown', updated_at = NOW()
-          WHERE id = $1
-        `,
-        [orderId],
-      );
-      await client.query("COMMIT");
-      return res.status(400).json(validationError("MoMo amount does not match order total"));
-    }
-
-    const inserted = await insertMomoPaymentLog(client, {
-      orderId,
-      externalEventId,
-      transactionRef,
-      paymentStatus: nextPaymentStatus,
-      body: req.body,
-      errorCode: resultCode === 0 ? null : String(resultCode),
-    });
-
-    if (!inserted) {
-      await client.query("COMMIT");
-      return res.status(204).send();
-    }
-
-    const nextOrderStatus = deriveOrderStatusFromPayment(nextPaymentStatus, order.status);
-    await client.query(
-      `
-        UPDATE orders
-        SET
-          transaction_ref = COALESCE($2, transaction_ref),
-          payment_status = $3,
-          status = COALESCE($4, status),
-          updated_at = NOW()
-        WHERE id = $1
-      `,
-      [orderId, transactionRef || null, nextPaymentStatus, nextOrderStatus],
-    );
-
-    if (nextOrderStatus && nextOrderStatus !== order.status) {
-      await applyOrderLifecycleTransition(client, orderId, order.status, nextOrderStatus);
-    }
-
-    await client.query("COMMIT");
-    return res.status(204).send();
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("POST /payments/momo/ipn failed:", error);
-    return res.status(500).json(internalError("Failed to process MoMo IPN"));
-  } finally {
-    client.release();
-  }
+  return res.json({
+    success: true,
+    orderId: result.orderId,
+    paymentStatus: result.paymentStatus,
+  });
 });
 
 router.post("/payment-events/expire-pending", async (req, res) => {
@@ -348,6 +276,173 @@ router.post("/payment-events/expire-pending", async (req, res) => {
 });
 
 export default router;
+
+async function processMomoPaymentCallback(payload, callbackSource) {
+  if (!verifyMomoIpnSignature(payload)) {
+    return {
+      ok: false,
+      status: 400,
+      body: validationError("Invalid MoMo signature"),
+      logMessage: `MoMo ${callbackSource} invalid signature:`,
+    };
+  }
+
+  const orderId = parseMomoOrderId(payload.orderId);
+  if (!orderId) {
+    return {
+      ok: false,
+      status: 400,
+      body: validationError("Invalid MoMo orderId"),
+    };
+  }
+
+  const momoAmount = Math.round(Number(payload.amount));
+  if (!Number.isInteger(momoAmount) || momoAmount <= 0) {
+    return {
+      ok: false,
+      status: 400,
+      body: validationError("Invalid MoMo amount"),
+      orderId,
+    };
+  }
+
+  const resultCode = Number(payload.resultCode);
+  const nextPaymentStatus =
+    resultCode === 0 ? "paid" : resultCode === 9000 ? "paid_held" : "payment_failed";
+  const externalEventId = `momo-${payload.requestId || orderId}-${payload.transId || resultCode}`;
+  const transactionRef = payload.transId ? String(payload.transId) : String(payload.requestId || "");
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `
+        SELECT id, status, payment_status, total_amount
+        FROM orders
+        WHERE id = $1 AND payment_gateway = 'MOMO'
+        FOR UPDATE
+      `,
+      [orderId],
+    );
+
+    if (rows.length === 0) {
+      await client.query("ROLLBACK");
+      return {
+        ok: false,
+        status: 404,
+        body: notFoundError("Order not found"),
+        orderId,
+      };
+    }
+
+    const order = rows[0];
+    const expectedAmount = Math.round(Number(order.total_amount));
+    if (expectedAmount !== momoAmount) {
+      await insertMomoPaymentLog(client, {
+        orderId,
+        externalEventId,
+        transactionRef,
+        paymentStatus: "payment_unknown",
+        body: payload,
+        errorCode: "AMOUNT_MISMATCH",
+      });
+      await client.query(
+        `
+          UPDATE orders
+          SET payment_status = 'payment_unknown', updated_at = NOW()
+          WHERE id = $1
+        `,
+        [orderId],
+      );
+      await client.query("COMMIT");
+      return {
+        ok: false,
+        status: 400,
+        body: validationError("MoMo amount does not match order total"),
+        orderId,
+        paymentStatus: "payment_unknown",
+      };
+    }
+
+    const inserted = await insertMomoPaymentLog(client, {
+      orderId,
+      externalEventId,
+      transactionRef,
+      paymentStatus: nextPaymentStatus,
+      body: payload,
+      errorCode: resultCode === 0 ? null : String(resultCode),
+    });
+
+    if (!inserted) {
+      await client.query("COMMIT");
+      return {
+        ok: true,
+        duplicate: true,
+        orderId,
+        paymentStatus: nextPaymentStatus,
+      };
+    }
+
+    const nextOrderStatus = deriveOrderStatusFromPayment(nextPaymentStatus, order.status);
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          transaction_ref = COALESCE($2, transaction_ref),
+          payment_status = $3,
+          status = COALESCE($4, status),
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, transactionRef || null, nextPaymentStatus, nextOrderStatus],
+    );
+
+    if (nextOrderStatus && nextOrderStatus !== order.status) {
+      await applyOrderLifecycleTransition(client, orderId, order.status, nextOrderStatus);
+    }
+
+    await client.query("COMMIT");
+    return {
+      ok: true,
+      orderId,
+      paymentStatus: nextPaymentStatus,
+      orderStatus: nextOrderStatus || order.status,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`MoMo ${callbackSource} failed:`, error);
+    return {
+      ok: false,
+      status: 500,
+      body: internalError("Failed to process MoMo callback"),
+      orderId,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+function buildMomoReturnRedirectUrl(result) {
+  const baseUrl =
+    process.env.MOMO_RETURN_DEEPLINK_URL?.trim() ||
+    process.env.MOBILE_APP_DEEPLINK_URL?.trim() ||
+    "ecloria://payment/momo-return";
+
+  try {
+    const url = new URL(baseUrl);
+    if (result?.orderId) {
+      url.searchParams.set("orderId", String(result.orderId));
+    }
+    if (result?.paymentStatus) {
+      url.searchParams.set("paymentStatus", result.paymentStatus);
+    }
+    url.searchParams.set("success", result?.ok ? "true" : "false");
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 
 async function insertMomoPaymentLog(client, options) {
   const result = await client.query(

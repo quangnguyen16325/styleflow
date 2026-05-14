@@ -14,6 +14,7 @@ export function getMomoConfig() {
 
   const publicApiBaseUrl =
     process.env.PUBLIC_API_BASE_URL?.trim() || process.env.API_BASE_URL?.trim();
+  const normalizedPublicApiBaseUrl = publicApiBaseUrl?.replace(/\/$/, "");
 
   return {
     endpoint: process.env.MOMO_ENDPOINT?.trim() || DEFAULT_MOMO_ENDPOINT,
@@ -23,11 +24,12 @@ export function getMomoConfig() {
     storeId: process.env.MOMO_STORE_ID?.trim() || "ECLORIA",
     redirectUrl:
       process.env.MOMO_REDIRECT_URL?.trim() ||
-      process.env.MOBILE_APP_DEEPLINK_URL?.trim() ||
-      "https://ecloria.co.uk",
+      (normalizedPublicApiBaseUrl
+        ? `${normalizedPublicApiBaseUrl}/payments/momo/return`
+        : process.env.MOBILE_APP_DEEPLINK_URL?.trim() || "ecloria://payment/momo-return"),
     ipnUrl:
       process.env.MOMO_IPN_URL?.trim() ||
-      (publicApiBaseUrl ? `${publicApiBaseUrl.replace(/\/$/, "")}/payments/momo/ipn` : ""),
+      (normalizedPublicApiBaseUrl ? `${normalizedPublicApiBaseUrl}/payments/momo/ipn` : ""),
   };
 }
 
