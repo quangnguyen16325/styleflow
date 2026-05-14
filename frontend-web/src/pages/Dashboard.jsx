@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import ApiService from '../api';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
-import StatusBadge from '../components/ui/StatusBadge';
-import ErrorMessage from '../components/ui/ErrorMessage';
-import { Package, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { useEffect, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
+import ApiService from "../api";
+import LoadingSpinner from "../components/ui/LoadingSpinner";
+import StatusBadge from "../components/ui/StatusBadge";
+import ErrorMessage from "../components/ui/ErrorMessage";
+import { AlertTriangle, ArrowUpRight, Package, Receipt, ShoppingCart, Truck } from "lucide-react";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -31,36 +31,37 @@ export default function Dashboard() {
         if (!isActive) return;
 
         const [productsRes, ordersRes, issuesRes, refundsRes] = results;
-        const products = productsRes.status === 'fulfilled' ? productsRes.value : [];
-        const orders = ordersRes.status === 'fulfilled' ? ordersRes.value : [];
-        const issues = issuesRes.status === 'fulfilled' ? issuesRes.value : [];
-        const refundRequests = refundsRes.status === 'fulfilled' ? refundsRes.value : [];
+        const products = productsRes.status === "fulfilled" ? productsRes.value : [];
+        const orders = ordersRes.status === "fulfilled" ? ordersRes.value : [];
+        const issues = issuesRes.status === "fulfilled" ? issuesRes.value : [];
+        const refundRequests = refundsRes.status === "fulfilled" ? refundsRes.value : [];
 
         const lowStockCount = Array.isArray(products)
-          ? products.filter(p => p.availableQty < p.minStockLevel).length
+          ? products.filter((p) => p.availableQty < p.minStockLevel).length
           : 0;
 
         const pendingOrders = Array.isArray(orders)
-          ? orders.filter(o => o.status === 'pending' || o.status === 'awaiting_payment').length
+          ? orders.filter((o) => o.status === "pending" || o.status === "awaiting_payment").length
           : 0;
 
         const openIssues = Array.isArray(issues)
-          ? issues.filter(i => i.status === 'open' || i.status === 'investigating').length
+          ? issues.filter((i) => i.status === "open" || i.status === "investigating").length
           : 0;
 
         const pendingRefundRequests = Array.isArray(refundRequests)
-          ? refundRequests.filter((r) => r.status === 'pending').length
+          ? refundRequests.filter((r) => r.status === "pending").length
           : 0;
 
         const returningOrFailedOrders = Array.isArray(orders)
           ? orders.filter((o) => {
-            const deliveryStatus = (o.deliveryStatus || o.delivery_status || '').toLowerCase();
-            const deliveryFailCount = Number(o.deliveryFailCount ?? o.delivery_fail_count ?? 0);
-            return (
-              ['returning', 'returned', 'delivery_failed', 'retry_pending'].includes(deliveryStatus) ||
-              deliveryFailCount > 0
-            );
-          }).length
+              const deliveryStatus = (o.deliveryStatus || o.delivery_status || "").toLowerCase();
+              const deliveryFailCount = Number(o.deliveryFailCount ?? o.delivery_fail_count ?? 0);
+              return (
+                ["returning", "returned", "delivery_failed", "retry_pending"].includes(
+                  deliveryStatus,
+                ) || deliveryFailCount > 0
+              );
+            }).length
           : 0;
 
         setStats({
@@ -102,32 +103,40 @@ export default function Dashboard() {
     };
   }, []);
 
-  const cards = useMemo(() => [
-    {
-      title: 'Products',
-      total: stats.products?.total ?? 0,
-      sub: `${stats.products?.lowStock ?? 0} low stock`,
-      subColor: (stats.products?.lowStock ?? 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
-      link: '/products',
-      icon: Package,
-    },
-    {
-      title: 'Orders',
-      total: stats.orders?.total ?? 0,
-      sub: `${stats.orders?.pending ?? 0} pending`,
-      subColor: (stats.orders?.pending ?? 0) > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)',
-      link: '/orders',
-      icon: ShoppingCart,
-    },
-    {
-      title: 'Issues',
-      total: stats.issues?.total ?? 0,
-      sub: `${stats.issues?.open ?? 0} open`,
-      subColor: (stats.issues?.open ?? 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
-      link: '/issues',
-      icon: AlertTriangle,
-    },
-  ], [stats]);
+  const cards = useMemo(
+    () => [
+      {
+        title: "Products",
+        total: stats.products?.total ?? 0,
+        sub: `${stats.products?.lowStock ?? 0} low stock`,
+        subColor:
+          (stats.products?.lowStock ?? 0) > 0 ? "var(--color-danger)" : "var(--color-text-muted)",
+        link: "/products",
+        icon: Package,
+        accent: "#f6821f",
+      },
+      {
+        title: "Orders",
+        total: stats.orders?.total ?? 0,
+        sub: `${stats.orders?.pending ?? 0} pending`,
+        subColor:
+          (stats.orders?.pending ?? 0) > 0 ? "var(--color-warning)" : "var(--color-text-muted)",
+        link: "/orders",
+        icon: ShoppingCart,
+        accent: "#2563eb",
+      },
+      {
+        title: "Issues",
+        total: stats.issues?.total ?? 0,
+        sub: `${stats.issues?.open ?? 0} open`,
+        subColor: (stats.issues?.open ?? 0) > 0 ? "var(--color-danger)" : "var(--color-text-muted)",
+        link: "/issues",
+        icon: AlertTriangle,
+        accent: "#c52828",
+      },
+    ],
+    [stats],
+  );
 
   if (loading) return <LoadingSpinner message="Loading dashboard..." />;
   if (error) return <ErrorMessage error={error} onRetry={() => window.location.reload()} />;
@@ -136,57 +145,107 @@ export default function Dashboard() {
     <div className="animate-fadeIn">
       <div className="page-header">
         <div className="page-header-content">
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "var(--spacing-xs)",
+              padding: "4px 8px",
+              borderRadius: "var(--radius-full)",
+              background: "var(--color-primary-light)",
+              color: "var(--color-primary-active)",
+              fontSize: "11px",
+              fontWeight: "var(--font-weight-bold)",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              marginBottom: "var(--spacing-sm)",
+            }}
+          >
+            Live console
+          </div>
           <h2 className="page-title">Dashboard</h2>
-          <p className="page-subtitle">Overview of your store</p>
+          <p className="page-subtitle">
+            Operational overview for inventory, orders, and customer issues.
+          </p>
         </div>
       </div>
 
-      <div 
-        style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: 'var(--spacing-lg)', 
-          marginBottom: 'var(--spacing-xl)' 
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "var(--spacing-lg)",
+          marginBottom: "var(--spacing-xl)",
         }}
       >
         {cards.map((card) => (
           <Link
             key={card.title}
             to={card.link}
-            style={{ textDecoration: 'none', color: 'inherit' }}
+            style={{ textDecoration: "none", color: "inherit" }}
           >
-            <div className="card" style={{ padding: 'var(--spacing-lg)', cursor: 'pointer', height: '100%' }}>
-              <div 
-                style={{ 
-                  fontSize: 'var(--font-size-xs)', 
-                  fontWeight: 'var(--font-weight-medium)', 
-                  color: 'var(--color-text-secondary)', 
-                  textTransform: 'uppercase', 
-                  letterSpacing: '0.5px', 
-                  marginBottom: 'var(--spacing-md)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)',
+            <div
+              className="card"
+              style={{
+                padding: "var(--spacing-lg)",
+                cursor: "pointer",
+                height: "100%",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "var(--spacing-lg)",
                 }}
               >
-                <card.icon size={16} />
-                <span>{card.title}</span>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "var(--radius-md)",
+                    background: `${card.accent}14`,
+                    color: card.accent,
+                  }}
+                >
+                  <card.icon size={18} />
+                </div>
+                <ArrowUpRight size={16} color="var(--color-text-muted)" />
               </div>
-              <div 
-                style={{ 
-                  fontSize: 'var(--font-size-3xl)', 
-                  fontWeight: 'var(--font-weight-bold)', 
-                  color: 'var(--color-dark)', 
-                  marginBottom: 'var(--spacing-xs)' 
+              <div
+                style={{
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: "var(--font-weight-bold)",
+                  color: "var(--color-text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.055em",
+                  marginBottom: "var(--spacing-xs)",
+                }}
+              >
+                {card.title}
+              </div>
+              <div
+                style={{
+                  fontSize: "var(--font-size-3xl)",
+                  fontWeight: "var(--font-weight-bold)",
+                  color: "var(--color-dark)",
+                  marginBottom: "var(--spacing-xs)",
+                  letterSpacing: "-0.04em",
                 }}
               >
                 {card.total}
               </div>
-              <div 
-                style={{ 
-                  fontSize: 'var(--font-size-sm)', 
-                  fontWeight: 'var(--font-weight-normal)', 
-                  color: card.subColor 
+              <div
+                style={{
+                  fontSize: "var(--font-size-sm)",
+                  fontWeight: "var(--font-weight-medium)",
+                  color: card.subColor,
                 }}
               >
                 {card.sub}
@@ -196,37 +255,95 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="card" style={{ padding: 'var(--spacing-lg)', marginBottom: 'var(--spacing-lg)' }}>
-        <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-md)', color: 'var(--color-dark)' }}>
-          Quick Actions
-        </h3>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-          <Link to="/orders?status=pending" className="btn-primary" style={{ textDecoration: 'none' }}>
+      <div
+        className="card"
+        style={{ padding: "var(--spacing-lg)", marginBottom: "var(--spacing-lg)" }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--spacing-md)",
+            marginBottom: "var(--spacing-md)",
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0, fontSize: "var(--font-size-md)", color: "var(--color-dark)" }}>
+              Quick Actions
+            </h3>
+            <p
+              style={{
+                color: "var(--color-text-muted)",
+                fontSize: "var(--font-size-sm)",
+                marginTop: 3,
+              }}
+            >
+              Jump into the queues that need attention.
+            </p>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "var(--spacing-sm)", flexWrap: "wrap" }}>
+          <Link
+            to="/orders?status=pending"
+            className="btn-primary"
+            style={{ textDecoration: "none" }}
+          >
             Pending Orders
           </Link>
-          <Link to="/issues?status=open" className="btn-danger" style={{ textDecoration: 'none' }}>
+          <Link to="/issues?status=open" className="btn-danger" style={{ textDecoration: "none" }}>
             Open Issues
           </Link>
-          <Link to="/refund-requests?status=pending" className="btn-secondary" style={{ textDecoration: 'none' }}>
+          <Link
+            to="/refund-requests?status=pending"
+            className="btn-secondary"
+            style={{ textDecoration: "none" }}
+          >
             Pending Refunds
           </Link>
-          <Link to="/products" className="btn-secondary" style={{ textDecoration: 'none' }}>
+          <Link to="/products" className="btn-secondary" style={{ textDecoration: "none" }}>
             Inventory
           </Link>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--spacing-lg)' }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "var(--spacing-lg)",
+        }}
+      >
         <Link
           to="/refund-requests?status=pending"
-          style={{ textDecoration: 'none', color: 'inherit' }}
+          style={{ textDecoration: "none", color: "inherit" }}
         >
-          <div className="card" style={{ padding: 'var(--spacing-lg)', cursor: 'pointer', height: '100%' }}>
-            <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              Refund Requests
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-dark)' }}>
+          <div
+            className="card"
+            style={{ padding: "var(--spacing-lg)", cursor: "pointer", height: "100%" }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--spacing-sm)",
+                marginBottom: "var(--spacing-md)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              <Receipt size={16} />
+              <h3 style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "inherit" }}>
+                Refund Requests
+              </h3>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div
+                style={{
+                  fontSize: "var(--font-size-3xl)",
+                  fontWeight: "var(--font-weight-bold)",
+                  color: "var(--color-dark)",
+                }}
+              >
                 {stats.refunds?.pending ?? 0}
               </div>
               <StatusBadge value="pending" showIcon />
@@ -234,16 +351,33 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        <Link
-          to="/orders"
-          style={{ textDecoration: 'none', color: 'inherit' }}
-        >
-          <div className="card" style={{ padding: 'var(--spacing-lg)', cursor: 'pointer', height: '100%' }}>
-            <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              Delivery Issues
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-dark)' }}>
+        <Link to="/orders" style={{ textDecoration: "none", color: "inherit" }}>
+          <div
+            className="card"
+            style={{ padding: "var(--spacing-lg)", cursor: "pointer", height: "100%" }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--spacing-sm)",
+                marginBottom: "var(--spacing-md)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              <Truck size={16} />
+              <h3 style={{ margin: 0, fontSize: "var(--font-size-sm)", color: "inherit" }}>
+                Delivery Issues
+              </h3>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div
+                style={{
+                  fontSize: "var(--font-size-3xl)",
+                  fontWeight: "var(--font-weight-bold)",
+                  color: "var(--color-dark)",
+                }}
+              >
                 {stats.deliveryRisk?.returningOrFailed ?? 0}
               </div>
               <StatusBadge value="returned" showIcon />

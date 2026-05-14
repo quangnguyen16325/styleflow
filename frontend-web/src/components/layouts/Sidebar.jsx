@@ -1,14 +1,23 @@
-import { NavLink } from 'react-router-dom';
-import { useEffect } from 'react';
-import { LayoutDashboard, Package, Tags, ShoppingCart, AlertTriangle, Receipt } from 'lucide-react';
+import { NavLink } from "react-router-dom";
+import { useEffect } from "react";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  Package,
+  Receipt,
+  ShoppingCart,
+  Tags,
+} from "lucide-react";
 
 const menuItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/products', label: 'Inventory', icon: Package },
-  { to: '/categories', label: 'Categories', icon: Tags },
-  { to: '/orders', label: 'Orders', icon: ShoppingCart },
-  { to: '/issues', label: 'Issues', icon: AlertTriangle },
-  { to: '/refund-requests', label: 'Refunds', icon: Receipt },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/products", label: "Inventory", icon: Package },
+  { to: "/categories", label: "Categories", icon: Tags },
+  { to: "/orders", label: "Orders", icon: ShoppingCart },
+  { to: "/issues", label: "Issues", icon: AlertTriangle },
+  { to: "/refund-requests", label: "Refunds", icon: Receipt },
 ];
 
 export default function Sidebar({ collapsed = false, onToggle, isMobile = false }) {
@@ -17,44 +26,46 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
     if (!isMobile || collapsed) return;
 
     const handleClickOutside = (e) => {
-      const sidebar = document.getElementById('sidebar');
+      const sidebar = document.getElementById("sidebar");
       if (sidebar && !sidebar.contains(e.target)) {
         onToggle();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isMobile, collapsed, onToggle]);
 
   const linkStyle = ({ isActive }) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--spacing-sm)',
-    padding: collapsed ? 'var(--spacing-md)' : '10px var(--spacing-md)',
-    color: isActive ? 'var(--color-primary)' : '#64748b',
-    backgroundColor: isActive ? 'var(--color-primary-light)' : 'transparent',
-    borderLeft: isActive ? '2px solid var(--color-primary)' : '2px solid transparent',
-    textDecoration: 'none',
-    fontWeight: 'var(--font-weight-medium)',
-    fontSize: 'var(--font-size-sm)',
-    borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
-    marginBottom: '2px',
-    transition: 'all var(--transition-fast)',
-    justifyContent: collapsed ? 'center' : 'flex-start',
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: collapsed ? "10px" : "9px 12px",
+    color: isActive ? "#111827" : "#5f6b7a",
+    backgroundColor: isActive ? "#fff4e8" : "transparent",
+    border: isActive ? "1px solid #ffd2a8" : "1px solid transparent",
+    textDecoration: "none",
+    fontWeight: isActive ? "var(--font-weight-semibold)" : "var(--font-weight-medium)",
+    fontSize: "var(--font-size-sm)",
+    borderRadius: "var(--radius-md)",
+    marginBottom: "4px",
+    transition: "all var(--transition-fast)",
+    justifyContent: collapsed ? "center" : "flex-start",
   });
 
   const hoverStyle = (e) => {
-    if (!e.currentTarget.classList.contains('active')) {
-      e.currentTarget.style.backgroundColor = 'var(--color-bg)';
-      e.currentTarget.style.color = 'var(--color-text)';
+    if (!e.currentTarget.classList.contains("active")) {
+      e.currentTarget.style.backgroundColor = "#f8fafc";
+      e.currentTarget.style.color = "var(--color-text)";
+      e.currentTarget.style.borderColor = "var(--color-border-light)";
     }
   };
 
   const leaveStyle = (e) => {
-    if (!e.currentTarget.classList.contains('active')) {
-      e.currentTarget.style.backgroundColor = 'transparent';
-      e.currentTarget.style.color = '#64748b';
+    if (!e.currentTarget.classList.contains("active")) {
+      e.currentTarget.style.backgroundColor = "transparent";
+      e.currentTarget.style.color = "#5f6b7a";
+      e.currentTarget.style.borderColor = "transparent";
     }
   };
 
@@ -70,13 +81,13 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
       {isMobile && !collapsed && (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'var(--color-overlay)',
-            zIndex: 'var(--z-modal-backdrop)',
+            backgroundColor: "var(--color-overlay)",
+            zIndex: "var(--z-modal-backdrop)",
           }}
           onClick={onToggle}
         />
@@ -85,59 +96,73 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
       <aside
         id="sidebar"
         style={{
-          width: collapsed ? (isMobile ? '0' : '64px') : '220px',
-          backgroundColor: 'var(--color-surface)',
-          borderRight: '1px solid var(--color-border)',
-          display: 'flex',
-          flexDirection: 'column',
+          width: collapsed ? (isMobile ? "0" : "72px") : "248px",
+          backgroundColor: "rgba(255, 255, 255, 0.96)",
+          borderRight: "1px solid var(--color-border)",
+          display: "flex",
+          flexDirection: "column",
           flexShrink: 0,
-          transition: 'width var(--transition-normal)',
-          position: isMobile ? 'fixed' : 'relative',
+          transition: "width var(--transition-normal)",
+          position: isMobile ? "fixed" : "relative",
           top: 0,
           left: 0,
-          height: '100vh',
-          zIndex: isMobile ? 'var(--z-modal)' : 'auto',
-          overflow: 'hidden',
+          height: "100vh",
+          zIndex: isMobile ? "var(--z-modal)" : "auto",
+          overflow: "hidden",
+          boxShadow: isMobile && !collapsed ? "var(--shadow-md)" : "none",
+          backdropFilter: "blur(14px)",
         }}
       >
         <div
           style={{
-            padding: collapsed ? 'var(--spacing-lg) var(--spacing-sm)' : 'var(--spacing-lg) var(--spacing-md)',
-            borderBottom: '1px solid var(--color-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'space-between',
-            gap: 'var(--spacing-sm)',
+            padding: collapsed ? "18px 12px" : "18px 16px",
+            borderBottom: "1px solid var(--color-border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "space-between",
+            gap: "var(--spacing-sm)",
             flexShrink: 0,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sm)" }}>
             <div
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--color-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 'var(--font-size-md)',
-                fontWeight: 'var(--font-weight-bold)',
-                color: '#fff',
+                width: "34px",
+                height: "34px",
+                borderRadius: "var(--radius-sm)",
+                background: "linear-gradient(135deg, #f6821f 0%, #f45d01 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "12px",
+                fontWeight: "var(--font-weight-bold)",
+                color: "#fff",
+                boxShadow: "0 8px 18px rgba(246, 130, 31, 0.28)",
               }}
             >
-              SF
+              EC
             </div>
             {!collapsed && (
               <div>
                 <div
                   style={{
-                    fontSize: 'var(--font-size-md)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                    color: 'var(--color-dark)',
+                    fontSize: "var(--font-size-md)",
+                    fontWeight: "var(--font-weight-bold)",
+                    color: "var(--color-dark)",
+                    letterSpacing: "-0.03em",
                   }}
                 >
-                  StyleFlow
+                  Ecloria
+                </div>
+                <div
+                  style={{
+                    marginTop: "1px",
+                    color: "var(--color-text-muted)",
+                    fontSize: "11px",
+                    fontWeight: "var(--font-weight-medium)",
+                  }}
+                >
+                  Admin console
                 </div>
               </div>
             )}
@@ -146,20 +171,20 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
             <button
               onClick={onToggle}
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--color-text-muted)',
-                cursor: 'pointer',
-                padding: 'var(--spacing-xs)',
-                fontSize: 'var(--font-size-md)',
-                transition: 'color var(--transition-fast)',
+                background: "transparent",
+                border: "none",
+                color: "var(--color-text-muted)",
+                cursor: "pointer",
+                padding: "var(--spacing-xs)",
+                transition: "color var(--transition-fast)",
+                display: "inline-flex",
               }}
-              onMouseEnter={(e) => (e.target.style.color = 'var(--color-text)')}
-              onMouseLeave={(e) => (e.target.style.color = 'var(--color-text-muted)')}
+              onMouseEnter={(e) => (e.target.style.color = "var(--color-text)")}
+              onMouseLeave={(e) => (e.target.style.color = "var(--color-text-muted)")}
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
             >
-              ◀
+              <ChevronLeft size={16} />
             </button>
           )}
         </div>
@@ -168,37 +193,38 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
           <button
             onClick={onToggle}
             style={{
-              background: 'transparent',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-muted)',
-              cursor: 'pointer',
-              padding: 'var(--spacing-xs)',
-              fontSize: 'var(--font-size-md)',
-              margin: 'var(--spacing-sm)',
-              borderRadius: 'var(--radius-sm)',
-              transition: 'all var(--transition-fast)',
+              background: "transparent",
+              border: "1px solid var(--color-border)",
+              color: "var(--color-text-muted)",
+              cursor: "pointer",
+              padding: "8px",
+              margin: "var(--spacing-sm)",
+              borderRadius: "var(--radius-sm)",
+              transition: "all var(--transition-fast)",
+              display: "inline-flex",
+              justifyContent: "center",
             }}
             onMouseEnter={(e) => {
-              e.target.style.background = 'var(--color-bg)';
-              e.target.style.color = 'var(--color-text)';
+              e.target.style.background = "var(--color-bg)";
+              e.target.style.color = "var(--color-text)";
             }}
             onMouseLeave={(e) => {
-              e.target.style.background = 'transparent';
-              e.target.style.color = 'var(--color-text-muted)';
+              e.target.style.background = "transparent";
+              e.target.style.color = "var(--color-text-muted)";
             }}
             title="Expand sidebar"
             aria-label="Expand sidebar"
           >
-            ▶
+            <ChevronRight size={16} />
           </button>
         )}
 
-        <nav 
-          style={{ 
-            flex: 1, 
-            padding: 'var(--spacing-md) var(--spacing-sm) var(--spacing-md) 0', 
-            overflowY: 'auto',
-            overflowX: 'hidden',
+        <nav
+          style={{
+            flex: 1,
+            padding: collapsed ? "14px 8px" : "14px 12px",
+            overflowY: "auto",
+            overflowX: "hidden",
           }}
         >
           {menuItems.map((item) => (
@@ -207,15 +233,15 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
               to={item.to}
               style={linkStyle}
               end={item.end}
-              className={({ isActive }) => (isActive ? 'active' : '')}
+              className={({ isActive }) => (isActive ? "active" : "")}
               onMouseEnter={hoverStyle}
               onMouseLeave={leaveStyle}
               onClick={handleNavClick}
-              title={collapsed ? item.label : ''}
+              title={collapsed ? item.label : ""}
               aria-label={item.label}
             >
-              <span style={{ display: 'flex', alignItems: 'center' }}>
-                <item.icon size={20} strokeWidth={2} />
+              <span style={{ display: "flex", alignItems: "center", color: "inherit" }}>
+                <item.icon size={18} strokeWidth={2} />
               </span>
               {!collapsed && <span>{item.label}</span>}
             </NavLink>
@@ -225,15 +251,17 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
         {!collapsed && (
           <div
             style={{
-              padding: 'var(--spacing-md)',
-              borderTop: '1px solid var(--color-border)',
-              fontSize: 'var(--font-size-xs)',
-              color: 'var(--color-text-muted)',
-              textAlign: 'center',
+              padding: "var(--spacing-md)",
+              borderTop: "1px solid var(--color-border)",
+              fontSize: "var(--font-size-xs)",
+              color: "var(--color-text-muted)",
               flexShrink: 0,
             }}
           >
-            v0.5.0
+            <div style={{ color: "var(--color-text)", fontWeight: "var(--font-weight-semibold)" }}>
+              Operations
+            </div>
+            <div style={{ marginTop: 2 }}>v0.5.0</div>
           </div>
         )}
       </aside>
