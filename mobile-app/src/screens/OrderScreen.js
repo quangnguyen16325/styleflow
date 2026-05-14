@@ -16,6 +16,7 @@ import { shouldShowBankTransferPayment } from "../components/BankTransferPayment
 import api, {
   DELIVERY_STATUS_LABEL,
   formatPrice,
+  getShippingQuote,
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL,
   PAYMENT_GATEWAY_LABEL,
@@ -120,7 +121,7 @@ function canChangeAddress(order) {
   if (["completed", "cancelled", "failed"].includes(status)) {
     return false;
   }
-  return ["pending", "ready_to_ship", "retry_pending"].includes(
+  return ["pending", "ready_to_ship", "handover", "in_transit", "retry_pending"].includes(
     String(order?.deliveryStatus || "").toLowerCase(),
   );
 }
@@ -228,6 +229,9 @@ function AddressPickerModal({
   loading,
   selectedAddressId,
   currentOrderAddressId,
+  currentShippingFee,
+  shippingQuote,
+  loadingShippingQuote,
   submitting,
   onClose,
   onSelect,
@@ -288,6 +292,43 @@ function AddressPickerModal({
               })
             )}
           </ScrollView>
+          {selectedAddressId ? (
+            <View style={styles.shippingPreviewCard}>
+              <Text style={styles.shippingPreviewTitle}>Phí giao hàng sau khi đổi</Text>
+              <View style={styles.shippingPreviewRow}>
+                <Text style={styles.shippingPreviewLabel}>Phí ship hiện tại</Text>
+                <Text style={styles.shippingPreviewValue}>{formatPrice(currentShippingFee)}</Text>
+              </View>
+              <View style={styles.shippingPreviewRow}>
+                <Text style={styles.shippingPreviewLabel}>Phí ship mới</Text>
+                {loadingShippingQuote ? (
+                  <ActivityIndicator size="small" color="#9B4B1F" />
+                ) : (
+                  <Text style={styles.shippingPreviewValue}>
+                    {shippingQuote ? formatPrice(shippingQuote.newShippingFee) : "Chưa tính được"}
+                  </Text>
+                )}
+              </View>
+              <View style={[styles.shippingPreviewRow, styles.shippingPreviewDeltaRow]}>
+                <Text style={styles.shippingPreviewDeltaLabel}>Chênh lệch</Text>
+                {loadingShippingQuote ? (
+                  <ActivityIndicator size="small" color="#9B4B1F" />
+                ) : (
+                  <Text
+                    style={[
+                      styles.shippingPreviewDeltaValue,
+                      shippingQuote?.delta > 0 && styles.shippingPreviewDeltaIncrease,
+                      shippingQuote?.delta < 0 && styles.shippingPreviewDeltaDecrease,
+                    ]}
+                  >
+                    {shippingQuote
+                      ? `${shippingQuote.delta > 0 ? "+" : ""}${formatPrice(shippingQuote.delta)}`
+                      : "Chưa rõ"}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : null}
           <View style={styles.modalActions}>
             <TouchableOpacity
               style={styles.modalSecondaryBtn}
@@ -299,11 +340,12 @@ function AddressPickerModal({
             <TouchableOpacity
               style={[
                 styles.modalCloseBtn,
-                (!selectedAddressId || submitting) && styles.modalCloseBtnDisabled,
+                (!selectedAddressId || submitting || loadingShippingQuote) &&
+                  styles.modalCloseBtnDisabled,
               ]}
               onPress={onConfirm}
-              activeOpacity={selectedAddressId && !submitting ? 0.88 : 1}
-              disabled={!selectedAddressId || submitting}
+              activeOpacity={selectedAddressId && !submitting && !loadingShippingQuote ? 0.88 : 1}
+              disabled={!selectedAddressId || submitting || loadingShippingQuote}
             >
               {submitting ? (
                 <ActivityIndicator size="small" color="#FFFDF9" />
@@ -351,6 +393,8 @@ export default function OrderScreen({ navigation }) {
   const [addresses, setAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [addressChangeQuote, setAddressChangeQuote] = useState(null);
+  const [loadingAddressChangeQuote, setLoadingAddressChangeQuote] = useState(false);
   const [submittingAddressChange, setSubmittingAddressChange] = useState(false);
 
   useFocusEffect(
@@ -424,6 +468,7 @@ export default function OrderScreen({ navigation }) {
   const openAddressChange = async (orderId) => {
     setAddressModalOrderId(orderId);
     setSelectedAddressId(null);
+    setAddressChangeQuote(null);
     setLoadingAddresses(true);
     try {
       const res = await api.get("/me/addresses");
@@ -433,6 +478,32 @@ export default function OrderScreen({ navigation }) {
       setAddresses([]);
     } finally {
       setLoadingAddresses(false);
+    }
+  };
+
+  const handleSelectAddressForChange = async (addressId) => {
+    setSelectedAddressId(addressId);
+    setAddressChangeQuote(null);
+
+    if (!addressId || activeAddressOrder?.customerAddressId === addressId) {
+      return;
+    }
+
+    try {
+      setLoadingAddressChangeQuote(true);
+      const quote = await getShippingQuote({ addressId });
+      const currentShippingFee = Number(activeAddressOrder?.shippingFee || 0);
+      const newShippingFee = Number(quote.shippingFee ?? 0);
+      setAddressChangeQuote({
+        currentShippingFee,
+        newShippingFee,
+        delta: newShippingFee - currentShippingFee,
+      });
+    } catch (error) {
+      console.warn("Lỗi tính phí ship đổi địa chỉ:", error);
+      setAddressChangeQuote(null);
+    } finally {
+      setLoadingAddressChangeQuote(false);
     }
   };
 
@@ -663,8 +734,12 @@ export default function OrderScreen({ navigation }) {
         onClose={() => {
           setAddressModalOrderId(null);
           setSelectedAddressId(null);
+          setAddressChangeQuote(null);
         }}
-        onSelect={setSelectedAddressId}
+        currentShippingFee={Number(activeAddressOrder?.shippingFee || 0)}
+        shippingQuote={addressChangeQuote}
+        loadingShippingQuote={loadingAddressChangeQuote}
+        onSelect={handleSelectAddressForChange}
         onConfirm={handleAddressChange}
       />
     </SafeAreaView>
@@ -1031,6 +1106,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     marginTop: 8,
+  },
+  shippingPreviewCard: {
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+    padding: 14,
+    marginTop: 8,
+  },
+  shippingPreviewTitle: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  shippingPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+  },
+  shippingPreviewLabel: {
+    color: "#6D5D51",
+    fontSize: 13,
+  },
+  shippingPreviewValue: {
+    color: "#1E1815",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  shippingPreviewDeltaRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#F0E5D8",
+    marginTop: 4,
+    paddingTop: 10,
+  },
+  shippingPreviewDeltaLabel: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  shippingPreviewDeltaValue: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  shippingPreviewDeltaIncrease: {
+    color: "#B66A1E",
+  },
+  shippingPreviewDeltaDecrease: {
+    color: "#1C7C54",
   },
   modalActions: {
     flexDirection: "row",

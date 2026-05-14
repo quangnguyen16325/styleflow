@@ -1221,7 +1221,13 @@ function validateShippingAddressPayload(address) {
 const ORDER_STATUSES = ["pending", "processing", "shipping", "completed", "cancelled", "failed"];
 const PAYMENT_GATEWAYS = ["COD", "BANK_TRANSFER", "MOMO"];
 
-const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = ["pending", "ready_to_ship", "retry_pending"];
+const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = [
+  "pending",
+  "ready_to_ship",
+  "handover",
+  "in_transit",
+  "retry_pending",
+];
 
 function normalizePaymentGateway(value) {
   if (value == null || value === "") {
