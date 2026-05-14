@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
     const { rows } = await pool.query(
       `${shipperOrdersBaseQuery}
        WHERE o.assigned_shipper_id = $1
-       GROUP BY o.id, c.id
+       ${shipperOrdersGroupByClause}
        ORDER BY o.updated_at DESC, o.created_at DESC`,
       [req.authCustomer.id],
     );
@@ -36,7 +36,7 @@ router.get("/:id", async (req, res) => {
     const { rows } = await pool.query(
       `${shipperOrdersBaseQuery}
        WHERE o.id = $1 AND o.assigned_shipper_id = $2
-       GROUP BY o.id, c.id
+       ${shipperOrdersGroupByClause}
        ORDER BY o.updated_at DESC, o.created_at DESC`,
       [orderId, req.authCustomer.id],
     );
@@ -117,7 +117,7 @@ router.post("/:id/delivery-status", async (req, res) => {
     const { rows } = await pool.query(
       `${shipperOrdersBaseQuery}
        WHERE o.id = $1 AND o.assigned_shipper_id = $2
-       GROUP BY o.id, c.id
+       ${shipperOrdersGroupByClause}
        ORDER BY o.updated_at DESC, o.created_at DESC`,
       [orderId, req.authCustomer.id],
     );
@@ -192,6 +192,8 @@ const shipperOrdersBaseQuery = `
     c.full_name,
     c.phone,
     c.email,
+    latest_rr.id AS latest_refund_request_id,
+    latest_rr.status AS latest_refund_request_status,
     COALESCE(
       json_agg(
         json_build_object(
@@ -208,8 +210,23 @@ const shipperOrdersBaseQuery = `
     ) AS items
   FROM orders o
   JOIN customers c ON c.id = o.customer_id
+  LEFT JOIN LATERAL (
+    SELECT rr.id, rr.status
+    FROM refund_requests rr
+    WHERE rr.order_id = o.id
+    ORDER BY rr.created_at DESC, rr.id DESC
+    LIMIT 1
+  ) latest_rr ON TRUE
   LEFT JOIN order_items oi ON oi.order_id = o.id
   LEFT JOIN products p ON p.id = oi.product_id
+`;
+
+const shipperOrdersGroupByClause = `
+  GROUP BY
+    o.id,
+    c.id,
+    latest_rr.id,
+    latest_rr.status
 `;
 
 function normalizeDeliveryCallbackStatus(value) {
@@ -231,6 +248,9 @@ function mapShipperOrderRow(row) {
     deliveryPartner: row.delivery_partner,
     deliveryFailCount: row.delivery_fail_count,
     lastDeliveryFailedReason: row.last_delivery_failed_reason,
+    latestRefundRequestStatus: row.latest_refund_request_status ?? null,
+    latestRefundRequestId:
+      row.latest_refund_request_id == null ? null : Number(row.latest_refund_request_id),
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
     shippingAddress: row.shipping_address,

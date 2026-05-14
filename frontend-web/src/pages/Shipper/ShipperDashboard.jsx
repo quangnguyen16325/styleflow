@@ -16,6 +16,8 @@ const DELIVERY_STATUSES = [
 
 function getAvailableDeliveryStatuses(order) {
   const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  const orderStatus = String(order.status || "").toLowerCase();
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
 
   if (deliveryStatus === "returned") {
     return [];
@@ -25,7 +27,38 @@ function getAvailableDeliveryStatuses(order) {
     return DELIVERY_STATUSES.filter((statusOption) => statusOption.value === "RETURNED");
   }
 
+  if (orderStatus === "completed" || deliveryStatus === "delivered") {
+    if (refundStatus === "approved") {
+      return DELIVERY_STATUSES.filter((statusOption) =>
+        ["HANDOVER", "FAILED", "RETURNED"].includes(statusOption.value),
+      );
+    }
+
+    return [];
+  }
+
   return DELIVERY_STATUSES;
+}
+
+function getDeliveryLockMessage(order, availableStatuses) {
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  const orderStatus = String(order.status || "").toLowerCase();
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
+
+  if (deliveryStatus === "returned") {
+    return "This order has already been returned. Delivery status can no longer be updated.";
+  }
+
+  if (
+    availableStatuses.length === 0 &&
+    (orderStatus === "completed" || deliveryStatus === "delivered")
+  ) {
+    return refundStatus === "approved"
+      ? ""
+      : "This delivery is already completed. Return handling unlocks after a return request is approved.";
+  }
+
+  return "";
 }
 
 export default function ShipperDashboard() {
@@ -109,8 +142,8 @@ export default function ShipperDashboard() {
             <div key={order.id} className="card" style={{ padding: "var(--spacing-lg)" }}>
               {(() => {
                 const availableStatuses = getAvailableDeliveryStatuses(order);
-                const isTerminalReturned =
-                  String(order.deliveryStatus || "").toLowerCase() === "returned";
+                const deliveryLockMessage = getDeliveryLockMessage(order, availableStatuses);
+                const isDeliveryLocked = availableStatuses.length === 0;
 
                 return (
                   <>
@@ -140,6 +173,9 @@ export default function ShipperDashboard() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}>
                   <StatusBadge value={order.status} />
                   <StatusBadge value={order.deliveryStatus || "pending"} />
+                  {order.latestRefundRequestStatus === "approved" ? (
+                    <ReturnPickupBadge />
+                  ) : null}
                 </div>
               </div>
 
@@ -148,6 +184,7 @@ export default function ShipperDashboard() {
               <InfoRow label="Address" value={order.shipping?.fullAddress || "—"} />
               <InfoRow label="Payment" value={`${order.paymentGateway || "—"} · ${order.paymentStatus || "—"}`} />
               <InfoRow label="Items" value={`${order.items?.length || 0} line(s)`} />
+              <InfoRow label="Return request" value={order.latestRefundRequestStatus || "—"} />
               <InfoRow label="Fail count" value={String(order.deliveryFailCount || 0)} />
 
               {order.lastDeliveryFailedReason ? (
@@ -167,7 +204,7 @@ export default function ShipperDashboard() {
               </Link>
 
               <div style={{ marginTop: "var(--spacing-md)" }}>
-                {isTerminalReturned ? (
+                {deliveryLockMessage ? (
                   <div
                     style={{
                       padding: "var(--spacing-md)",
@@ -177,7 +214,7 @@ export default function ShipperDashboard() {
                       fontSize: "var(--font-size-sm)",
                     }}
                   >
-                    This order has already been returned. Delivery status can no longer be updated.
+                    {deliveryLockMessage}
                   </div>
                 ) : null}
                 <textarea
@@ -189,9 +226,9 @@ export default function ShipperDashboard() {
                       [order.id]: event.target.value,
                     }))
                   }
-                  placeholder="Reason, required when marking failed"
+                  placeholder="Reason, required when marking failed; optional for return handover"
                   rows={2}
-                  disabled={updatingOrderId === order.id || isTerminalReturned}
+                  disabled={updatingOrderId === order.id || isDeliveryLocked}
                   style={{ resize: "vertical", marginBottom: "var(--spacing-sm)" }}
                 />
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-sm)" }}>
@@ -237,6 +274,28 @@ function InfoRow({ label, value }) {
       <strong style={{ color: "var(--color-text-secondary)" }}>{label}:</strong>
       <span style={{ overflowWrap: "anywhere" }}>{value}</span>
     </div>
+  );
+}
+
+function ReturnPickupBadge() {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "3px 10px",
+        borderRadius: "var(--radius-sm)",
+        background: "#ecfdf5",
+        color: "#047857",
+        border: "1px solid #10b98130",
+        fontSize: "13px",
+        fontWeight: "var(--font-weight-medium)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      Return pickup
+    </span>
   );
 }
 

@@ -71,6 +71,7 @@ export default function ShipperOrderDetails() {
           <StatusBadge value={order.status} showIcon />
           <StatusBadge value={order.deliveryStatus || "pending"} showIcon />
           <StatusBadge value={order.paymentStatus || "unpaid"} showIcon />
+          {order.latestRefundRequestStatus === "approved" ? <ReturnPickupBadge /> : null}
         </div>
       </div>
 
@@ -156,6 +157,16 @@ export default function ShipperOrderDetails() {
             <InfoRow label="Payment status" value={<StatusBadge value={order.paymentStatus || "unpaid"} />} />
             <InfoRow label="Shipping fee" value={formatCurrency(order.shippingFee)} />
             <InfoRow label="Total collect" value={formatCurrency(order.totalAmount)} strong />
+            <InfoRow
+              label="Return request"
+              value={
+                order.latestRefundRequestStatus ? (
+                  <StatusBadge value={order.latestRefundRequestStatus} />
+                ) : (
+                  "—"
+                )
+              }
+            />
           </section>
 
           <section className="card" style={{ padding: "var(--spacing-lg)" }}>
@@ -177,6 +188,28 @@ export default function ShipperOrderDetails() {
         </aside>
       </div>
     </div>
+  );
+}
+
+function ReturnPickupBadge() {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "4px 12px",
+        borderRadius: "var(--radius-sm)",
+        background: "#ecfdf5",
+        color: "#047857",
+        border: "1px solid #10b98130",
+        fontSize: "14px",
+        fontWeight: "var(--font-weight-medium)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      Return pickup
+    </span>
   );
 }
 

@@ -26,7 +26,7 @@ router.get("/", async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id, s.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery}${whereClause} ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       params,
     );
 
@@ -55,7 +55,7 @@ router.get("/:id", async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id, s.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -240,7 +240,7 @@ router.patch("/:id/status", async (req, res) => {
     await client.query("COMMIT");
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id, s.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -316,7 +316,7 @@ router.post("/:id/delivery-status", async (req, res) => {
     await client.query("COMMIT");
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id, s.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -431,7 +431,7 @@ router.post("/:id/assign-shipper", async (req, res) => {
     await client.query("COMMIT");
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id, s.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -678,6 +678,14 @@ const listOrdersBaseQuery = `
     s.full_name AS shipper_full_name,
     s.phone AS shipper_phone,
     s.email AS shipper_email,
+    latest_rr.id AS latest_refund_request_id,
+    latest_rr.status AS latest_refund_request_status,
+    latest_rr.image_url AS latest_refund_request_image_url,
+    latest_rr.reason AS latest_refund_request_reason,
+    latest_rr.abuse_score_snapshot AS latest_refund_request_abuse_score_snapshot,
+    latest_rr.review_note AS latest_refund_request_review_note,
+    latest_rr.created_at AS latest_refund_request_created_at,
+    latest_rr.updated_at AS latest_refund_request_updated_at,
     COALESCE(
       json_agg(
         json_build_object(
@@ -693,7 +701,37 @@ const listOrdersBaseQuery = `
   FROM orders o
   JOIN customers c ON c.id = o.customer_id
   LEFT JOIN customers s ON s.id = o.assigned_shipper_id
+  LEFT JOIN LATERAL (
+    SELECT
+      rr.id,
+      rr.status,
+      rr.image_url,
+      rr.reason,
+      rr.abuse_score_snapshot,
+      rr.review_note,
+      rr.created_at,
+      rr.updated_at
+    FROM refund_requests rr
+    WHERE rr.order_id = o.id
+    ORDER BY rr.created_at DESC, rr.id DESC
+    LIMIT 1
+  ) latest_rr ON TRUE
   LEFT JOIN order_items oi ON oi.order_id = o.id
+`;
+
+const listOrdersGroupByClause = `
+  GROUP BY
+    o.id,
+    c.id,
+    s.id,
+    latest_rr.id,
+    latest_rr.status,
+    latest_rr.image_url,
+    latest_rr.reason,
+    latest_rr.abuse_score_snapshot,
+    latest_rr.review_note,
+    latest_rr.created_at,
+    latest_rr.updated_at
 `;
 
 function normalizeStatusFilter(value) {
@@ -760,6 +798,8 @@ function mapOrderRow(row) {
       row.address_change_fee_delta == null ? null : Number(row.address_change_fee_delta),
     shippingFeeApproved: row.shipping_fee_approved,
     addressChangePayload: mapAddressChangePayload(row.address_change_payload),
+    latestRefundRequestStatus: row.latest_refund_request_status ?? null,
+    latestRefundRequest: mapLatestRefundRequestRow(row),
     shipping: mapShippingRow(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -791,6 +831,26 @@ function mapAddressChangePayload(payload) {
     processingFee: payload.processingFee == null ? null : Number(payload.processingFee),
     currentShippingFee:
       payload.currentShippingFee == null ? null : Number(payload.currentShippingFee),
+  };
+}
+
+function mapLatestRefundRequestRow(row) {
+  if (row.latest_refund_request_id == null) {
+    return null;
+  }
+
+  return {
+    id: Number(row.latest_refund_request_id),
+    status: row.latest_refund_request_status,
+    imageUrl: row.latest_refund_request_image_url,
+    reason: row.latest_refund_request_reason,
+    abuseScoreSnapshot:
+      row.latest_refund_request_abuse_score_snapshot == null
+        ? null
+        : Number(row.latest_refund_request_abuse_score_snapshot),
+    reviewNote: row.latest_refund_request_review_note,
+    createdAt: row.latest_refund_request_created_at,
+    updatedAt: row.latest_refund_request_updated_at,
   };
 }
 

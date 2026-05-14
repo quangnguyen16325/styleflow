@@ -66,9 +66,17 @@ export async function applyDeliveryStatusUpdate(
         o.payment_gateway,
         o.delivery_fail_count,
         o.delivery_status,
+        latest_rr.status AS latest_refund_request_status,
         c.email AS customer_email
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
+      LEFT JOIN LATERAL (
+        SELECT rr.status
+        FROM refund_requests rr
+        WHERE rr.order_id = o.id
+        ORDER BY rr.created_at DESC, rr.id DESC
+        LIMIT 1
+      ) latest_rr ON TRUE
       WHERE o.id = $1
       LIMIT 1
     `,
@@ -80,7 +88,7 @@ export async function applyDeliveryStatusUpdate(
   }
 
   const order = orderResult.rows[0];
-  if (isTerminalDeliveryUpdateIgnored(order.delivery_status, status)) {
+  if (isDeliveryUpdateIgnored(order, status)) {
     return {
       action: "terminal_ignored",
       failCount: Number(order.delivery_fail_count),
@@ -166,6 +174,20 @@ export async function applyDeliveryStatusUpdate(
     await applyOrderLifecycleTransition(client, orderId, order.status, "completed");
     action = "delivered";
     failCount = 0;
+  } else if (status === "FAILED" && isApprovedReturnFlow(order)) {
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          delivery_partner = COALESCE($2, delivery_partner),
+          last_delivery_failed_reason = $3,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, partner, reason],
+    );
+    action = "return_pickup_failed";
+    failCount = Number(order.delivery_fail_count);
   } else if (status === "RETURNED") {
     if (order.status === "completed" && order.delivery_status !== "returned") {
       await applyOrderReturn(client, orderId);
@@ -266,7 +288,11 @@ export async function applyDeliveryStatusUpdate(
   };
 }
 
-function isTerminalDeliveryUpdateIgnored(currentDeliveryStatus, nextCallbackStatus) {
+function isDeliveryUpdateIgnored(order, nextCallbackStatus) {
+  const currentDeliveryStatus = String(order.delivery_status || "").toLowerCase();
+  const currentOrderStatus = String(order.status || "").toLowerCase();
+  const latestRefundStatus = String(order.latest_refund_request_status || "").toLowerCase();
+
   if (currentDeliveryStatus === "returned") {
     return true;
   }
@@ -275,7 +301,24 @@ function isTerminalDeliveryUpdateIgnored(currentDeliveryStatus, nextCallbackStat
     return true;
   }
 
+  if (
+    (currentOrderStatus === "completed" || currentDeliveryStatus === "delivered") &&
+    !(
+      latestRefundStatus === "approved" &&
+      ["HANDOVER", "FAILED", "RETURNED"].includes(nextCallbackStatus)
+    )
+  ) {
+    return true;
+  }
+
   return false;
+}
+
+function isApprovedReturnFlow(order) {
+  const currentOrderStatus = String(order.status || "").toLowerCase();
+  const latestRefundStatus = String(order.latest_refund_request_status || "").toLowerCase();
+
+  return currentOrderStatus === "completed" && latestRefundStatus === "approved";
 }
 
 function validateInternalWebhookSecret(req) {

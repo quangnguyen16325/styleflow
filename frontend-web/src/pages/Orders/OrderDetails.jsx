@@ -224,6 +224,8 @@ export default function OrderDetails() {
   );
   const computedSubtotal = Number(order.totalAmount || 0) - Number(order.shippingFee || 0);
   const paymentHint = getPaymentHint(order.paymentStatus, order.paymentGateway);
+  const latestRefundRequest = order.latestRefundRequest || null;
+  const refundRequestMeta = getRefundRequestMeta(latestRefundRequest?.status);
 
   return (
     <div className="animate-fadeIn">
@@ -329,6 +331,80 @@ export default function OrderDetails() {
                 <strong>Delivery Fail Count:</strong> {deliveryFailCount}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {latestRefundRequest && (
+        <div
+          className="card"
+          style={{ padding: "var(--spacing-lg)", marginBottom: "var(--spacing-xl)" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: "var(--spacing-md)",
+              marginBottom: "var(--spacing-md)",
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  margin: "0 0 var(--spacing-xs) 0",
+                  fontSize: "var(--font-size-md)",
+                  color: "var(--color-dark)",
+                }}
+              >
+                Return / Refund Request
+              </h3>
+              <p
+                style={{
+                  margin: 0,
+                  color: "var(--color-text-muted)",
+                  fontSize: "var(--font-size-sm)",
+                  lineHeight: 1.5,
+                }}
+              >
+                {refundRequestMeta.description}
+              </p>
+            </div>
+            <StatusBadge value={latestRefundRequest.status} showIcon />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: "var(--spacing-md)",
+            }}
+          >
+            <DetailRow
+              label="Request"
+              value={
+                <Link to={`/refund-requests/${latestRefundRequest.id}`} className="link">
+                  #{latestRefundRequest.id}
+                </Link>
+              }
+            />
+            <DetailRow label="Meaning" value={refundRequestMeta.label} />
+            <DetailRow label="Requested" value={formatDate(latestRefundRequest.createdAt)} />
+            <DetailRow label="Updated" value={formatDate(latestRefundRequest.updatedAt)} />
+            <DetailRow label="Reason" value={latestRefundRequest.reason || "—"} />
+            <DetailRow label="Review Note" value={latestRefundRequest.reviewNote || "—"} />
+            <DetailRow
+              label="Evidence"
+              value={
+                latestRefundRequest.imageUrl ? (
+                  <a href={latestRefundRequest.imageUrl} target="_blank" rel="noreferrer" className="link">
+                    Open image
+                  </a>
+                ) : (
+                  "No image"
+                )
+              }
+            />
           </div>
         </div>
       )}
@@ -1167,6 +1243,50 @@ function getPaymentHint(paymentStatus, paymentGateway) {
   if (status === "payment_unknown") return "Payment state is unknown. Check payment events.";
   if (gateway === "COD") return "COD order does not require online prepayment.";
   return "Payment has not been confirmed yet.";
+}
+
+function getRefundRequestMeta(status) {
+  const normalizedStatus = String(status || "").toLowerCase();
+
+  if (normalizedStatus === "pending") {
+    return {
+      label: "Customer requested a return",
+      description: "The customer has submitted a return request. Staff should review it.",
+    };
+  }
+
+  if (normalizedStatus === "manual_review_required") {
+    return {
+      label: "Manual review required",
+      description: "The return request has risk signals and needs manual review.",
+    };
+  }
+
+  if (normalizedStatus === "approved") {
+    return {
+      label: "Return approved",
+      description: "The return request has been approved. Coordinate return handling.",
+    };
+  }
+
+  if (normalizedStatus === "rejected") {
+    return {
+      label: "Return rejected",
+      description: "The return request was rejected. Check the review note for context.",
+    };
+  }
+
+  if (normalizedStatus === "refunded") {
+    return {
+      label: "Return/refund completed",
+      description: "The return request has been completed and marked as refunded.",
+    };
+  }
+
+  return {
+    label: "Return request",
+    description: "This order has a return/refund request.",
+  };
 }
 
 function SummaryCard({ label, value, description }) {
