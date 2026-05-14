@@ -69,7 +69,7 @@ export default function DeliveryAssignment() {
         <div className="page-header-content">
           <h2 className="page-title">Delivery Assignment</h2>
           <p className="page-subtitle">
-            Assign active orders to shipper accounts and move them into ready-to-ship.
+            Assign active orders to shipper accounts and move them into handover.
           </p>
         </div>
       </div>

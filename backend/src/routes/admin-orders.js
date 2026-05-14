@@ -419,7 +419,7 @@ router.post("/:id/assign-shipper", async (req, res) => {
         SET
           assigned_shipper_id = $2,
           delivery_status = CASE
-            WHEN $2::bigint IS NOT NULL AND delivery_status = 'pending' THEN 'ready_to_ship'
+            WHEN $2::bigint IS NOT NULL AND delivery_status = 'pending' THEN 'handover'
             ELSE delivery_status
           END,
           updated_at = NOW()

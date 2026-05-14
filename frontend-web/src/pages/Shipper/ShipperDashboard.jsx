@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ApiService from "../../api";
 import EmptyState from "../../components/ui/EmptyState";
@@ -7,12 +7,23 @@ import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import StatusBadge from "../../components/ui/StatusBadge";
 
 const DELIVERY_STATUSES = [
-  { value: "HANDOVER", label: "Handover" },
   { value: "IN_TRANSIT", label: "In transit" },
   { value: "DELIVERED", label: "Delivered" },
   { value: "FAILED", label: "Failed" },
   { value: "RETURNED", label: "Returned" },
 ];
+
+const DELIVERY_SORT_PRIORITY = {
+  in_transit: 0,
+  handover: 1,
+  ready_to_ship: 1,
+  delivered: 2,
+  delivery_failed: 3,
+  retry_pending: 3,
+  failed: 3,
+  returning: 4,
+  returned: 5,
+};
 
 function getAvailableDeliveryStatuses(order) {
   const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
@@ -30,7 +41,7 @@ function getAvailableDeliveryStatuses(order) {
   if (orderStatus === "completed" || deliveryStatus === "delivered") {
     if (refundStatus === "approved") {
       return DELIVERY_STATUSES.filter((statusOption) =>
-        ["HANDOVER", "FAILED", "RETURNED"].includes(statusOption.value),
+        ["FAILED", "RETURNED"].includes(statusOption.value),
       );
     }
 
@@ -85,6 +96,21 @@ export default function ShipperDashboard() {
     loadOrders();
   }, [loadOrders]);
 
+  const sortedOrders = useMemo(() => {
+    return [...orders].sort((a, b) => {
+      const aDeliveryStatus = String(a.deliveryStatus || "").toLowerCase();
+      const bDeliveryStatus = String(b.deliveryStatus || "").toLowerCase();
+      const aPriority = DELIVERY_SORT_PRIORITY[aDeliveryStatus] ?? 6;
+      const bPriority = DELIVERY_SORT_PRIORITY[bDeliveryStatus] ?? 6;
+
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+
+      return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+    });
+  }, [orders]);
+
   const updateDeliveryStatus = async (orderId, status) => {
     try {
       setUpdatingOrderId(orderId);
@@ -123,7 +149,7 @@ export default function ShipperDashboard() {
         </div>
       )}
 
-      {orders.length === 0 ? (
+      {sortedOrders.length === 0 ? (
         <div className="card" style={{ padding: "var(--spacing-xl)" }}>
           <EmptyState
             title="No Assigned Orders"
@@ -138,7 +164,7 @@ export default function ShipperDashboard() {
             gap: "var(--spacing-lg)",
           }}
         >
-          {orders.map((order) => (
+          {sortedOrders.map((order) => (
             <div key={order.id} className="card" style={{ padding: "var(--spacing-lg)" }}>
               {(() => {
                 const availableStatuses = getAvailableDeliveryStatuses(order);
@@ -226,7 +252,7 @@ export default function ShipperDashboard() {
                       [order.id]: event.target.value,
                     }))
                   }
-                  placeholder="Reason, required when marking failed; optional for return handover"
+                  placeholder="Reason, required when marking failed"
                   rows={2}
                   disabled={updatingOrderId === order.id || isDeliveryLocked}
                   style={{ resize: "vertical", marginBottom: "var(--spacing-sm)" }}
