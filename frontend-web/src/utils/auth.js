@@ -47,7 +47,7 @@ export function getPortalRoleConfig(role) {
       sidebarSubtitle: 'Operations workspace',
       headerTitle: 'Staff Portal',
       headerSubtitle: 'Orders, delivery and support operations',
-      searchPlaceholder: 'Search operations',
+      searchPlaceholder: 'Search functions',
       footerTitle: 'Staff operations',
       footerVersion: 'Operations workspace',
     };
@@ -59,7 +59,7 @@ export function getPortalRoleConfig(role) {
     sidebarSubtitle: 'Admin console',
     headerTitle: 'Admin Portal',
     headerSubtitle: 'Inventory, orders and operations',
-    searchPlaceholder: 'Search console',
+    searchPlaceholder: 'Search functions',
     footerTitle: 'Operations',
     footerVersion: 'v0.5.0',
   };

@@ -48,6 +48,14 @@ const DELIVERY_STATUSES = [
   { value: "delivered", label: "Delivered" },
 ];
 
+const PAGE_SIZE_OPTIONS = [
+  { value: "10", label: "10 rows" },
+  { value: "25", label: "25 rows" },
+  { value: "50", label: "50 rows" },
+  { value: "100", label: "100 rows" },
+  { value: "ALL", label: "All rows" },
+];
+
 export default function OrderList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const allowedStatuses = ORDER_STATUSES.map((status) => status.value);
@@ -69,6 +77,8 @@ export default function OrderList() {
     allowedDeliveryStatuses,
   );
   const searchTerm = searchParams.get("q") || "";
+  const pageSize = normalizePageSize(searchParams.get("pageSize"));
+  const currentPage = normalizePage(searchParams.get("page"));
   const statusFilter = statusFromQuery;
 
   const [orders, setOrders] = useState([]);
@@ -111,6 +121,34 @@ export default function OrderList() {
       } else {
         nextParams.set(key, nextValue);
       }
+      nextParams.delete("page");
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const updatePageSizeParam = useCallback(
+    (nextValue) => {
+      const nextParams = new URLSearchParams(searchParams);
+      if (nextValue === "25") {
+        nextParams.delete("pageSize");
+      } else {
+        nextParams.set("pageSize", nextValue);
+      }
+      nextParams.delete("page");
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const updatePageParam = useCallback(
+    (nextPage) => {
+      const nextParams = new URLSearchParams(searchParams);
+      if (nextPage <= 1) {
+        nextParams.delete("page");
+      } else {
+        nextParams.set("page", String(nextPage));
+      }
       setSearchParams(nextParams, { replace: true });
     },
     [searchParams, setSearchParams],
@@ -125,6 +163,7 @@ export default function OrderList() {
       } else {
         nextParams.delete("q");
       }
+      nextParams.delete("page");
       setSearchParams(nextParams, { replace: true });
     },
     [searchParams, setSearchParams],
@@ -199,6 +238,32 @@ export default function OrderList() {
   const totalAmount = useMemo(() => {
     return filteredOrders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
   }, [filteredOrders]);
+
+  const pagination = useMemo(() => {
+    if (pageSize === "ALL") {
+      return {
+        page: 1,
+        totalPages: 1,
+        startIndex: filteredOrders.length > 0 ? 1 : 0,
+        endIndex: filteredOrders.length,
+        rows: filteredOrders,
+      };
+    }
+
+    const numericPageSize = Number(pageSize);
+    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / numericPageSize));
+    const safePage = Math.min(currentPage, totalPages);
+    const startOffset = (safePage - 1) * numericPageSize;
+    const rows = filteredOrders.slice(startOffset, startOffset + numericPageSize);
+
+    return {
+      page: safePage,
+      totalPages,
+      startIndex: filteredOrders.length > 0 ? startOffset + 1 : 0,
+      endIndex: Math.min(startOffset + numericPageSize, filteredOrders.length),
+      rows,
+    };
+  }, [filteredOrders, pageSize, currentPage]);
 
   if (loading) return <LoadingSpinner message="Loading orders..." />;
   if (error) return <ErrorMessage error={error} onRetry={handleRetry} />;
@@ -282,6 +347,18 @@ export default function OrderList() {
             </option>
           ))}
         </select>
+        <select
+          value={pageSize}
+          onChange={(e) => updatePageSizeParam(e.target.value)}
+          className="form-select"
+          aria-label="Rows per page"
+        >
+          {PAGE_SIZE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {!orders || orders.length === 0 ? (
@@ -293,81 +370,119 @@ export default function OrderList() {
         />
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Order ID</th>
-                <th>Order</th>
-                <th>Payment</th>
-                <th>Delivery</th>
-                <th>Total</th>
-                <th>Customer</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr key={order.id}>
-                  <td style={{ fontWeight: "var(--font-weight-bold)" }}>#{order.id}</td>
-                  <td>
-                    <StatusBadge value={order.status} showIcon />
-                    {order.addressChangeStatus && order.addressChangeStatus !== "none" ? (
-                      <div style={{ marginTop: "var(--spacing-xs)" }}>
-                        <StatusBadge value={order.addressChangeStatus} size="sm" showIcon />
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>
-                    <div
-                      style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}
-                    >
-                      <StatusBadge value={order.paymentStatus || "unpaid"} size="sm" showIcon />
-                      <span
-                        style={{
-                          color: "var(--color-text-muted)",
-                          fontSize: "var(--font-size-xs)",
-                        }}
-                      >
-                        {formatPaymentGateway(order.paymentGateway)}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <StatusBadge value={order.deliveryStatus || "pending"} size="sm" showIcon />
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: "var(--font-weight-semibold)" }}>
-                      {formatCurrency(order.totalAmount)}
-                    </div>
-                    <div
-                      style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}
-                    >
-                      Ship {formatCurrency(order.shippingFee)}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: "var(--font-weight-medium)" }}>
-                      {order.customer?.fullName || "—"}
-                    </div>
-                    <div
-                      style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}
-                    >
-                      {order.customer?.phone || "—"}
-                    </div>
-                  </td>
-                  <td style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
-                    {new Date(order.createdAt).toLocaleString()}
-                  </td>
-                  <td>
-                    <Link to={`/orders/${order.id}`} className="link">
-                      View
-                    </Link>
-                  </td>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Order</th>
+                  <th>Payment</th>
+                  <th>Delivery</th>
+                  <th>Total</th>
+                  <th>Customer</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pagination.rows.map((order) => (
+                  <tr key={order.id}>
+                    <td style={{ fontWeight: "var(--font-weight-bold)" }}>#{order.id}</td>
+                    <td>
+                      <StatusBadge value={order.status} showIcon />
+                      {order.addressChangeStatus && order.addressChangeStatus !== "none" ? (
+                        <div style={{ marginTop: "var(--spacing-xs)" }}>
+                          <StatusBadge value={order.addressChangeStatus} size="sm" showIcon />
+                        </div>
+                      ) : null}
+                    </td>
+                    <td>
+                      <div
+                        style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}
+                      >
+                        <StatusBadge value={order.paymentStatus || "unpaid"} size="sm" showIcon />
+                        <span
+                          style={{
+                            color: "var(--color-text-muted)",
+                            fontSize: "var(--font-size-xs)",
+                          }}
+                        >
+                          {formatPaymentGateway(order.paymentGateway)}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <StatusBadge value={order.deliveryStatus || "pending"} size="sm" showIcon />
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: "var(--font-weight-semibold)" }}>
+                        {formatCurrency(order.totalAmount)}
+                      </div>
+                      <div
+                        style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}
+                      >
+                        Ship {formatCurrency(order.shippingFee)}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: "var(--font-weight-medium)" }}>
+                        {order.customer?.fullName || "—"}
+                      </div>
+                      <div
+                        style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}
+                      >
+                        {order.customer?.phone || "—"}
+                      </div>
+                    </td>
+                    <td style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
+                      {new Date(order.createdAt).toLocaleString()}
+                    </td>
+                    <td>
+                      <Link to={`/orders/${order.id}`} className="link">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--spacing-md)",
+              padding: "var(--spacing-md)",
+              borderTop: "1px solid var(--color-border)",
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+              Showing {pagination.startIndex}-{pagination.endIndex} of {filteredOrders.length}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sm)" }}>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => updatePageParam(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+              >
+                Previous
+              </button>
+              <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+                Page {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                onClick={() => updatePageParam(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -381,6 +496,18 @@ function normalizeFilterValue(value, allowedValues, options = {}) {
 
   const normalized = options.preserveCase ? value.trim().toUpperCase() : value.trim().toLowerCase();
   return allowedValues.includes(normalized) ? normalized : "ALL";
+}
+
+function normalizePageSize(value) {
+  const normalizedValue = String(value || "25").trim().toUpperCase();
+  return PAGE_SIZE_OPTIONS.some((option) => option.value === normalizedValue)
+    ? normalizedValue
+    : "25";
+}
+
+function normalizePage(value) {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 function normalizeSearchText(value) {
