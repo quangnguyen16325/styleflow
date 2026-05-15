@@ -175,7 +175,7 @@ export default function Sidebar({ collapsed = false, onToggle, isMobile = false 
                     letterSpacing: "-0.03em",
                   }}
                 >
-                  Ecloria
+                  Ecloria Shop
                 </div>
                 <div
                   style={{

@@ -98,7 +98,7 @@ export default function Login() {
                 letterSpacing: "-0.04em",
               }}
             >
-              Ecloria Console
+              Ecloria Shop
             </h1>
             <p
               style={{
@@ -192,7 +192,7 @@ export default function Login() {
             color: "var(--color-text-muted)",
           }}
         >
-          Ecloria Admin • Internal Use Only
+          Ecloria Shop • Internal Use Only
         </div>
       </div>
     </div>
