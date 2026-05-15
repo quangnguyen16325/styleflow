@@ -310,7 +310,9 @@ async function processMomoPaymentCallback(payload, callbackSource) {
   const nextPaymentStatus =
     resultCode === 0 ? "paid" : resultCode === 9000 ? "paid_held" : "payment_failed";
   const externalEventId = `momo-${payload.requestId || orderId}-${payload.transId || resultCode}`;
-  const transactionRef = payload.transId ? String(payload.transId) : String(payload.requestId || "");
+  const transactionRef = payload.transId
+    ? String(payload.transId)
+    : String(payload.requestId || "");
 
   const client = await pool.connect();
   try {

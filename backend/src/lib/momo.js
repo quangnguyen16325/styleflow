@@ -122,7 +122,10 @@ export async function createMomoPaymentRequest({ order, customer, items = [] }) 
   }
 
   const paymentUrl =
-    responseBody.payUrl ?? responseBody.deeplink ?? responseBody.qrCodeUrl ?? responseBody.shortLink;
+    responseBody.payUrl ??
+    responseBody.deeplink ??
+    responseBody.qrCodeUrl ??
+    responseBody.shortLink;
   if (Number(responseBody.resultCode) !== 0 || !paymentUrl) {
     const error = new Error(responseBody.message || "MoMo create payment failed");
     error.response = responseBody;

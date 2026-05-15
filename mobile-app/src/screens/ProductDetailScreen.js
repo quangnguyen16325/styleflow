@@ -492,4 +492,3 @@ const styles = StyleSheet.create({
     color: "#FFFDF9",
   },
 });
-

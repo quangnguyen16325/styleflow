@@ -108,16 +108,12 @@ export default function OrderDetailScreen({ navigation }) {
           <View style={styles.cardTopRow}>
             <Text style={styles.orderIdText}>Đơn #{order.id}</Text>
             <View style={styles.qtyBadge}>
-              <Text style={styles.qtyBadgeText}>
-                {totalQuantity} sản phẩm
-              </Text>
+              <Text style={styles.qtyBadgeText}>{totalQuantity} sản phẩm</Text>
             </View>
           </View>
 
           {/* Hình thức thanh toán */}
-          <Text style={styles.paymentMethodText}>
-            {getPaymentLabel(order.paymentGateway)}
-          </Text>
+          <Text style={styles.paymentMethodText}>{getPaymentLabel(order.paymentGateway)}</Text>
 
           {/* Tổng tiền */}
           {order.totalAmount ? (
@@ -132,10 +128,7 @@ export default function OrderDetailScreen({ navigation }) {
               </Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.trackBtn}
-              onPress={() => handlePressItem(order.id)}
-            >
+            <TouchableOpacity style={styles.trackBtn} onPress={() => handlePressItem(order.id)}>
               <Text style={styles.trackBtnText}>Chi tiết</Text>
               <Text style={styles.trackBtnArrow}>→</Text>
             </TouchableOpacity>
@@ -159,11 +152,7 @@ export default function OrderDetailScreen({ navigation }) {
         contentContainerStyle={styles.scrollList}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#9B4B1F"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9B4B1F" />
         }
       >
         {loading ? (

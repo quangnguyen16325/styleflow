@@ -99,7 +99,11 @@ function MainTabsWithNavigation({ navigation }) {
     <View style={styles.mainContainer}>
       {/* Render tab content */}
       <View style={styles.screenContainer}>
-        <ActiveScreen navigation={navigation} onSettingsPress={handleSettingsPress} onTabSwitch={setActiveTab} />
+        <ActiveScreen
+          navigation={navigation}
+          onSettingsPress={handleSettingsPress}
+          onTabSwitch={setActiveTab}
+        />
       </View>
 
       {/* Custom Bottom Tab Bar */}

@@ -710,7 +710,9 @@ export default function OrderScreen({ navigation }) {
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Hình thức TT</Text>
                     <Text style={styles.summaryValue}>
-                      {PAYMENT_GATEWAY_LABEL[order.paymentGateway] || order.paymentGateway || "Chưa rõ"}
+                      {PAYMENT_GATEWAY_LABEL[order.paymentGateway] ||
+                        order.paymentGateway ||
+                        "Chưa rõ"}
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
