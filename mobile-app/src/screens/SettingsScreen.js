@@ -72,9 +72,7 @@ export default function SettingsScreen({ navigation }) {
             icon="other"
             label="Chế độ tối"
             onPress={() => setDarkMode(!darkMode)}
-            renderRight={() => (
-              <Text style={styles.toggleText}>{darkMode ? "Bật" : "Tắt"}</Text>
-            )}
+            renderRight={() => <Text style={styles.toggleText}>{darkMode ? "Bật" : "Tắt"}</Text>}
           />
           <MenuRow
             icon="bell"

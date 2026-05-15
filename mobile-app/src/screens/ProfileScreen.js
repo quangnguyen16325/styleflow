@@ -162,7 +162,10 @@ export default function ProfileScreen({ navigation, onSettingsPress, onTabSwitch
             label="Thông tin cá nhân"
             sub={profile?.email || ""}
             onPress={() =>
-              Alert.alert("Thông tin cá nhân", "Tính năng chỉnh sửa thông tin đang được phát triển.")
+              Alert.alert(
+                "Thông tin cá nhân",
+                "Tính năng chỉnh sửa thông tin đang được phát triển.",
+              )
             }
           />
           <MenuItem
@@ -180,11 +183,7 @@ export default function ProfileScreen({ navigation, onSettingsPress, onTabSwitch
           />
         </View>
 
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          onPress={handleLogout}
-          activeOpacity={0.88}
-        >
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.88}>
           <Text style={styles.logoutBtnText}>Đăng xuất</Text>
         </TouchableOpacity>
       </ScrollView>

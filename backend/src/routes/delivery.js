@@ -359,9 +359,7 @@ function validateDeliveryPayload(body) {
 
   const status = typeof body.status === "string" ? body.status.trim().toUpperCase() : "";
   if (
-    !["FAILED", "DELIVERED", "IN_TRANSIT", "READY_TO_SHIP", "HANDOVER", "RETURNED"].includes(
-      status,
-    )
+    !["FAILED", "DELIVERED", "IN_TRANSIT", "READY_TO_SHIP", "HANDOVER", "RETURNED"].includes(status)
   ) {
     return "status is invalid";
   }

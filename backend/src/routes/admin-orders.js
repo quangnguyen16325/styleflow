@@ -362,9 +362,7 @@ router.post("/:id/assign-shipper", async (req, res) => {
   }
 
   const shipperId =
-    req.body?.shipperId == null || req.body.shipperId === ""
-      ? null
-      : Number(req.body.shipperId);
+    req.body?.shipperId == null || req.body.shipperId === "" ? null : Number(req.body.shipperId);
   if (shipperId != null && (!Number.isInteger(shipperId) || shipperId <= 0)) {
     return res.status(400).json({
       error: {
@@ -779,8 +777,7 @@ function mapOrderRow(row) {
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
     customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
-    assignedShipperId:
-      row.assigned_shipper_id == null ? null : Number(row.assigned_shipper_id),
+    assignedShipperId: row.assigned_shipper_id == null ? null : Number(row.assigned_shipper_id),
     assignedShipper:
       row.assigned_shipper_id == null
         ? null
