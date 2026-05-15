@@ -62,7 +62,7 @@ export default function AdminLayout() {
         >
           <div
             style={{
-              padding: isMobile ? "18px" : "28px 32px",
+              padding: isMobile ? "12px" : "28px 32px",
               maxWidth: "1480px",
               margin: "0 auto",
               width: "100%",
@@ -81,6 +81,7 @@ export default function AdminLayout() {
             color: "var(--color-text-muted)",
             textAlign: "center",
             flexShrink: 0,
+            display: isMobile ? "none" : "block",
           }}
         >
           © 2026 Ecloria • {roleConfig.title}

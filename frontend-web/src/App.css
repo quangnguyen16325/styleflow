@@ -139,10 +139,12 @@
   .page-header-actions {
     width: 100%;
     justify-content: stretch;
+    flex-wrap: wrap;
   }
   
   .page-header-actions > * {
-    flex: 1;
+    flex: 1 1 160px;
+    min-width: 0;
   }
   
   .grid-2,
@@ -171,6 +173,19 @@
   
   .page-title {
     font-size: var(--font-size-xl);
+  }
+
+  .page-header-actions {
+    flex-direction: column;
+  }
+
+  .page-header-actions > * {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .grid-auto {
+    grid-template-columns: 1fr;
   }
 }
 

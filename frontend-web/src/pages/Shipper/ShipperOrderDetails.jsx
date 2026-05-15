@@ -71,18 +71,11 @@ export default function ShipperOrderDetails() {
           <StatusBadge value={order.status} showIcon />
           <StatusBadge value={order.deliveryStatus || "pending"} showIcon />
           <StatusBadge value={order.paymentStatus || "unpaid"} showIcon />
-          {order.latestRefundRequestStatus === "approved" ? <ReturnPickupBadge /> : null}
+          {shouldShowReturnPickupBadge(order) ? <ReturnPickupBadge /> : null}
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.2fr) minmax(300px, 0.8fr)",
-          gap: "var(--spacing-lg)",
-          alignItems: "start",
-        }}
-      >
+      <div className="responsive-detail-grid">
         <div style={{ display: "grid", gap: "var(--spacing-lg)" }}>
           <section className="card" style={{ padding: "var(--spacing-lg)" }}>
             <SectionTitle title="Receiver" />
@@ -100,11 +93,8 @@ export default function ShipperOrderDetails() {
                 items.map((item) => (
                   <div
                     key={item.id}
+                    className="responsive-item-row"
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "56px minmax(0, 1fr) auto",
-                      gap: "var(--spacing-md)",
-                      alignItems: "center",
                       paddingBottom: "var(--spacing-md)",
                       borderBottom: "1px solid var(--color-border)",
                     }}
@@ -136,7 +126,12 @@ export default function ShipperOrderDetails() {
                       >
                         {item.productName || `Product #${item.productId}`}
                       </div>
-                      <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+                      <div
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--font-size-sm)",
+                        }}
+                      >
                         Product #{item.productId} · Qty {item.quantity}
                       </div>
                     </div>
@@ -154,9 +149,13 @@ export default function ShipperOrderDetails() {
           <section className="card" style={{ padding: "var(--spacing-lg)" }}>
             <SectionTitle title="Payment" />
             <InfoRow label="Gateway" value={order.paymentGateway || "—"} />
-            <InfoRow label="Payment status" value={<StatusBadge value={order.paymentStatus || "unpaid"} />} />
+            <InfoRow
+              label="Payment status"
+              value={<StatusBadge value={order.paymentStatus || "unpaid"} />}
+            />
             <InfoRow label="Shipping fee" value={formatCurrency(order.shippingFee)} />
-            <InfoRow label="Total collect" value={formatCurrency(order.totalAmount)} strong />
+            <InfoRow label="Order total" value={formatCurrency(order.totalAmount)} />
+            <InfoRow label="Shipper collect" value={formatShipperCollectionAmount(order)} strong />
             <InfoRow
               label="Return request"
               value={
@@ -213,6 +212,38 @@ function ReturnPickupBadge() {
   );
 }
 
+function shouldShowReturnPickupBadge(order) {
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  return refundStatus === "approved" && deliveryStatus !== "returned";
+}
+
+function getShipperCollectionAmount(order) {
+  const paymentGateway = String(order.paymentGateway || "").toUpperCase();
+  const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+
+  if (["returned", "returning"].includes(deliveryStatus)) {
+    return 0;
+  }
+
+  if (["paid", "paid_held", "refunded"].includes(paymentStatus)) {
+    return 0;
+  }
+
+  if (paymentGateway !== "COD") {
+    return 0;
+  }
+
+  const amount = Number(order.totalAmount);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function formatShipperCollectionAmount(order) {
+  const amount = getShipperCollectionAmount(order);
+  return amount > 0 ? formatCurrency(amount) : "No extra collection";
+}
+
 function SectionTitle({ title, aside }) {
   return (
     <div
@@ -241,11 +272,8 @@ function ContactRow({ icon, label, value }) {
 
   return (
     <div
+      className="responsive-contact-row"
       style={{
-        display: "grid",
-        gridTemplateColumns: "28px 92px minmax(0, 1fr)",
-        gap: "var(--spacing-sm)",
-        alignItems: "start",
         marginBottom: "var(--spacing-sm)",
         color: "var(--color-text)",
       }}
@@ -260,11 +288,8 @@ function ContactRow({ icon, label, value }) {
 function InfoRow({ label, value, strong = false }) {
   return (
     <div
+      className="responsive-info-row"
       style={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: "var(--spacing-md)",
-        alignItems: "center",
         padding: "9px 0",
         borderBottom: "1px solid var(--color-border-light)",
       }}

@@ -102,46 +102,48 @@ export default function RefundRequestList() {
         />
       ) : (
         <div className="card" style={{ overflow: 'hidden' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Order ID</th>
-                <th>Customer ID</th>
-                <th>Status</th>
-                <th>Abuse Score Snapshot</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {refundRequests.map((request) => (
-                <tr key={request.id}>
-                  <td style={{ fontWeight: 'var(--font-weight-bold)' }}>#{request.id}</td>
-                  <td>
-                    {request.orderId ? (
-                      <Link to={`/orders/${request.orderId}`} className="link">
-                        Order #{request.orderId}
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>{request.customerId || '—'}</td>
-                  <td><StatusBadge value={request.status} /></td>
-                  <td>{request.abuseScoreSnapshot ?? '—'}</td>
-                  <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
-                    {request.createdAt ? new Date(request.createdAt).toLocaleString() : '—'}
-                  </td>
-                  <td>
-                    <Link to={`/refund-requests/${request.id}`} className="link">
-                      View
-                    </Link>
-                  </td>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ minWidth: '760px' }}>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Order ID</th>
+                  <th>Customer ID</th>
+                  <th>Status</th>
+                  <th>Abuse Score Snapshot</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {refundRequests.map((request) => (
+                  <tr key={request.id}>
+                    <td style={{ fontWeight: 'var(--font-weight-bold)' }}>#{request.id}</td>
+                    <td>
+                      {request.orderId ? (
+                        <Link to={`/orders/${request.orderId}`} className="link">
+                          Order #{request.orderId}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td>{request.customerId || '—'}</td>
+                    <td><StatusBadge value={request.status} /></td>
+                    <td>{request.abuseScoreSnapshot ?? '—'}</td>
+                    <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+                      {request.createdAt ? new Date(request.createdAt).toLocaleString() : '—'}
+                    </td>
+                    <td>
+                      <Link to={`/refund-requests/${request.id}`} className="link">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
