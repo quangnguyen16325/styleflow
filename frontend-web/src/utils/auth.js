@@ -1,4 +1,5 @@
 const ADMIN_ROLES = new Set(['admin', 'staff']);
+const PORTAL_ROLES = new Set(['admin', 'staff', 'shipper']);
 const TOKEN_STORAGE_KEY = 'admin_token';
 const USER_STORAGE_KEY = 'admin_user';
 
@@ -10,6 +11,58 @@ export function isPrivilegedRole(role) {
     return false;
   }
   return ADMIN_ROLES.has(role.trim().toLowerCase());
+}
+
+export function isPortalRole(role) {
+  return PORTAL_ROLES.has(normalizeRole(role));
+}
+
+export function normalizeRole(role) {
+  if (typeof role !== 'string') {
+    return '';
+  }
+  return role.trim().toLowerCase();
+}
+
+export function getPortalRoleConfig(role) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === 'shipper') {
+    return {
+      role: 'shipper',
+      title: 'Shipper Portal',
+      sidebarSubtitle: 'Delivery workspace',
+      headerTitle: 'Shipper Portal',
+      headerSubtitle: 'Assigned deliveries and status updates',
+      searchPlaceholder: 'Search deliveries',
+      footerTitle: 'Delivery',
+      footerVersion: 'Shipper workspace',
+    };
+  }
+
+  if (normalizedRole === 'staff') {
+    return {
+      role: 'staff',
+      title: 'Staff Console',
+      sidebarSubtitle: 'Operations workspace',
+      headerTitle: 'Staff Portal',
+      headerSubtitle: 'Orders, delivery and support operations',
+      searchPlaceholder: 'Search functions',
+      footerTitle: 'Staff operations',
+      footerVersion: 'Operations workspace',
+    };
+  }
+
+  return {
+    role: 'admin',
+    title: 'Admin Console',
+    sidebarSubtitle: 'Admin console',
+    headerTitle: 'Admin Portal',
+    headerSubtitle: 'Inventory, orders and operations',
+    searchPlaceholder: 'Search functions',
+    footerTitle: 'Operations',
+    footerVersion: 'v0.5.0',
+  };
 }
 
 /**
@@ -96,7 +149,7 @@ export function hasValidAdminSession() {
   const token = getStoredAdminToken();
   const user = getStoredAdminUser();
 
-  if (!token || !user || !isPrivilegedRole(user.role)) {
+  if (!token || !user || !isPortalRole(user.role)) {
     return false;
   }
 

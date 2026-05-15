@@ -11,8 +11,10 @@ import adminOrdersRouter from "./routes/admin-orders.js";
 import adminPaymentIncidentsRouter from "./routes/admin-payment-incidents.js";
 import adminProductsRouter from "./routes/admin-products.js";
 import adminRefundRequestsRouter from "./routes/admin-refund-requests.js";
+import adminShippersRouter from "./routes/admin-shippers.js";
 import adminSystemConfigRouter from "./routes/admin-system-config.js";
 import adminUploadsRouter from "./routes/admin-uploads.js";
+import adminUsersRouter from "./routes/admin-users.js";
 import authRouter from "./routes/auth.js";
 import categoriesRouter from "./routes/categories.js";
 import addressesRouter from "./routes/addresses.js";
@@ -24,6 +26,7 @@ import paymentsRouter from "./routes/payments.js";
 import productsRouter from "./routes/products.js";
 import refundRequestsRouter from "./routes/refund-requests.js";
 import ordersRouter from "./routes/orders.js";
+import shipperOrdersRouter from "./routes/shipper-orders.js";
 
 const app = express();
 
@@ -50,6 +53,7 @@ app.use("/admin/inventory", requireAuth, requireRole("admin", "staff"), adminInv
 app.use("/admin/payment-logs", requireAuth, requireRole("admin", "staff"), adminPaymentLogsRouter);
 app.use("/admin/orders", requireAuth, requireRole("admin", "staff"), adminOrdersRouter);
 app.use("/admin/products", requireAuth, requireRole("admin", "staff"), adminProductsRouter);
+app.use("/admin/shippers", requireAuth, requireRole("admin", "staff"), adminShippersRouter);
 app.use(
   "/admin/payment-incidents",
   requireAuth,
@@ -70,11 +74,13 @@ app.use(
   adminSystemConfigRouter,
 );
 app.use("/admin/uploads", requireAuth, requireRole("admin", "staff"), adminUploadsRouter);
+app.use("/admin/users", requireAuth, requireRole("admin", "staff"), adminUsersRouter);
 app.use("/customers/:customerId/addresses", addressesRouter);
 app.use("/categories", categoriesRouter);
 app.use("/locations", locationsRouter);
 app.use("/products", productsRouter);
 app.use("/orders", ordersRouter);
+app.use("/shipper/orders", requireAuth, requireRole("shipper"), shipperOrdersRouter);
 
 const PORT = Number(process.env.PORT || 5000);
 

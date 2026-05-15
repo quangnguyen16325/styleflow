@@ -1,16 +1,5 @@
 /* eslint-disable react/prop-types */
-/**
- * CheckoutScreen.js
- * Commit 5 — Thanh toán & Chốt đơn
- *
- * Tuân thủ MOBILE_MANIFESTO:
- *  - KHÔNG gửi priceAtPurchase / totalAmount lên API
- *  - Chỉ gửi: items[{productId, quantity}], paymentMethod, shippingAddressId
- *  - Timeout 30s → Alert "Chuyển sang Chuyển khoản"
- *  - Thành công → clearCart() → navigate("Success")
- *  - KHÔNG sửa App.js
- */
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -21,200 +10,95 @@ import {
   ActivityIndicator,
   Modal,
   SafeAreaView,
-  Image,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import AppImage from "../components/AppImage";
 import { useCart } from "../context/CartContext";
-import api, { formatPrice } from "../services/api";
-import { COLORS } from "../constants/colors";
+import api, { createOrder, formatPrice, getShippingQuote } from "../services/api";
+import AppIcon from "../components/AppIcon";
 
-// MOCK_ADDRESSES removed — will load from API
-
-// ── Danh sách phương thức thanh toán ─────────────────────────────────────────
-
-const PAYMENT_METHODS = [
+const PAYMENT_OPTIONS = [
   {
-    key: "CARD",
-    label: "Card",
-    sublabel: "Thẻ Tín dụng / Ghi nợ",
-    image:
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png",
+    value: "COD",
+    title: "Thanh toán khi nhận hàng",
+    description: "Trả tiền mặt hoặc chuyển khoản cho shipper khi nhận đơn.",
   },
   {
-    key: "COD",
-    label: "COD",
-    sublabel: "Thanh toán khi nhận hàng",
-    image: "https://cdn-icons-png.flaticon.com/512/1554/1554401.png",
+    value: "BANK_TRANSFER",
+    title: "Chuyển khoản ngân hàng",
+    description:
+      "Vui lòng chuyển khoản bằng cách quét mã QR. Đơn sẽ được xử lý sau khi nhận được thanh toán.",
   },
   {
-    key: "MOMO",
-    label: "MoMo",
-    sublabel: "Ví điện tử MoMo",
-    image: "https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png",
-  },
-  {
-    key: "BANK_TRANSFER",
-    label: "Bank Transfer",
-    sublabel: "Chuyển khoản ngân hàng",
-    image: "https://cdn-icons-png.flaticon.com/512/2830/2830284.png",
-  },
-  {
-    key: "PAYPAL",
-    label: "PayPal",
-    sublabel: "Thanh toán qua PayPal",
-    image: "https://upload.wikimedia.org/wikipedia/commons/a/a4/Paypal_2014_logo.png",
+    value: "MOMO",
+    title: "Ví MoMo",
+    description:
+      "Thanh toán online qua ví MoMo. Đơn sẽ được xử lý sau khi MoMo xác nhận thanh toán.",
   },
 ];
 
-// ── Shipping options ──────────────────────────────────────────────────────────
-
-const SHIPPING_OPTIONS = [
-  {
-    key: "standard",
-    label: "Giao hàng tiêu chuẩn",
-    duration: "5–7 ngày",
-    priceLabel: "Miễn phí",
-    price: 0,
-  },
-  {
-    key: "express",
-    label: "Giao hàng hỏa tốc",
-    duration: "1–2 ngày",
-    priceLabel: formatPrice(25000),
-    price: 25000,
-  },
-];
-
-// ── Helper ────────────────────────────────────────────────────────────────────
-
-// Removed formatUSD, using formatPrice from api
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function SectionHeader({ title }) {
-  return <Text style={styles.sectionHeader}>{title}</Text>;
-}
-
-function AddressCard({ address, onEdit }) {
-  return (
-    <View style={styles.infoCard}>
-      <View style={styles.infoCardContent}>
-        <Text style={styles.infoCardTitle}>Shipping Address</Text>
-        <Text style={styles.infoCardText} numberOfLines={3}>
-          {address.fullAddress}
-        </Text>
-        <View style={styles.contactInfoCard}>
-          <Text style={styles.infoCardTitle}>Contact Information</Text>
-          <Text style={styles.infoCardText}>{address.phone}</Text>
-          <Text style={styles.infoCardText}>{address.email}</Text>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.editCircleBtn} onPress={onEdit}>
-        <Text style={styles.editCircleIcon}>›</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function ShippingOptionRow({ option, selected, onSelect }) {
-  return (
-    <TouchableOpacity
-      style={[styles.shippingRow, selected && styles.shippingRowSelected]}
-      onPress={() => onSelect(option.key)}
-      activeOpacity={0.8}
-    >
-      <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-        {selected && <View style={styles.radioInner} />}
-      </View>
-      <View style={styles.shippingInfo}>
-        <Text style={[styles.shippingLabel, selected && styles.shippingLabelSelected]}>
-          {option.label}
-        </Text>
-        <Text style={styles.shippingDuration}>{option.duration}</Text>
-      </View>
-      <Text style={[styles.shippingPrice, option.price === 0 && styles.shippingPriceFree]}>
-        {option.priceLabel}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-function PaymentMethodRow({ method, selected, onSelect }) {
-  return (
-    <TouchableOpacity
-      style={[styles.paymentRow, selected && styles.paymentRowSelected]}
-      onPress={() => onSelect(method.key)}
-      activeOpacity={0.8}
-    >
-      <Image source={{ uri: method.image }} style={styles.paymentLogo} resizeMode="contain" />
-      <View style={styles.paymentInfo}>
-        <Text style={[styles.paymentLabel, selected && styles.paymentLabelSelected]}>
-          {method.label}
-        </Text>
-        <Text style={styles.paymentSublabel}>{method.sublabel}</Text>
-      </View>
-      <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-        {selected && <View style={styles.radioInner} />}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function CartItemSummaryRow({ item }) {
-  return (
-    <View style={styles.summaryItemRow}>
-      <View style={styles.summaryQtyBadge}>
-        <Text style={styles.summaryQtyText}>{item.quantity}</Text>
-      </View>
-      <Text style={styles.summaryItemName} numberOfLines={2}>
-        {item.name}
-      </Text>
-      <Text style={styles.summaryItemPrice}>{formatPrice(item.basePrice)}</Text>
-    </View>
-  );
-}
-
-// ── Address Picker Modal ──────────────────────────────────────────────────────
-
-function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose }) {
+function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose, onAddAddress }) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Chọn địa chỉ giao hàng</Text>
+
           <ScrollView
-            style={{ maxHeight: "75%" }}
+            style={styles.modalScroll}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={styles.modalScrollContent}
           >
-            {addresses.map((addr) => (
-              <TouchableOpacity
-                key={addr.id}
-                style={[styles.addrOption, selectedId === addr.id && styles.addrOptionSelected]}
-                onPress={() => {
-                  onSelect(addr.id);
-                  onClose();
-                }}
-                activeOpacity={0.8}
-              >
-                <View style={styles.addrOptionLeft}>
-                  <Text style={styles.addrOptionLabel}>{addr.label}</Text>
-                  <Text style={styles.addrOptionText} numberOfLines={2}>
-                    {addr.fullAddress}
-                  </Text>
-                  <Text style={styles.addrOptionPhone}>{addr.phone}</Text>
-                </View>
-                {selectedId === addr.id && (
-                  <View style={styles.addrOptionCheck}>
-                    <Text style={styles.addrOptionCheckIcon}>✓</Text>
+            {addresses.length === 0 ? (
+              <View style={styles.modalEmptyState}>
+                <Text style={styles.modalEmptyTitle}>Bạn chưa có địa chỉ nào</Text>
+                <Text style={styles.modalEmptyText}>
+                  Thêm địa chỉ để backend có thể tạo đơn hàng đúng theo thông tin giao nhận.
+                </Text>
+              </View>
+            ) : (
+              addresses.map((addr) => (
+                <TouchableOpacity
+                  key={addr.id}
+                  style={[styles.addrOption, selectedId === addr.id && styles.addrOptionSelected]}
+                  onPress={() => {
+                    onSelect(addr.id);
+                    onClose();
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.addrOptionLeft}>
+                    <View style={styles.addrOptionTop}>
+                      <Text style={styles.addrOptionLabel}>{addr.label}</Text>
+                      {addr.isDefault ? (
+                        <View style={styles.addrDefaultBadge}>
+                          <Text style={styles.addrDefaultBadgeText}>Mặc định</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.addrOptionReceiver}>{addr.receiverName}</Text>
+                    <Text style={styles.addrOptionPhone}>{addr.receiverPhone}</Text>
+                    <Text style={styles.addrOptionText} numberOfLines={3}>
+                      {addr.fullAddress}
+                    </Text>
                   </View>
-                )}
-              </TouchableOpacity>
-            ))}
+                  {selectedId === addr.id ? (
+                    <View style={styles.addrOptionCheck}>
+                      <AppIcon name="check" size={14} color="#FFFDF9" />
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
-          <View style={{ flexDirection: "row", gap: 10, paddingTop: 10 }}>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
-              <Text style={styles.modalCloseBtnText}>Đóng</Text>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onAddAddress}>
+              <Text style={styles.modalSecondaryBtnText}>Thêm địa chỉ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={onClose}>
+              <Text style={styles.modalPrimaryBtnText}>Đóng</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -223,97 +107,159 @@ function AddressPickerModal({ visible, addresses, selectedId, onSelect, onClose 
   );
 }
 
-// ── Main Screen ───────────────────────────────────────────────────────────────
+function CheckoutItemRow({ item }) {
+  const imageUri = item.imageUrl || item.image || null;
+  return (
+    <View style={styles.itemRow}>
+      <AppImage source={{ uri: imageUri }} style={styles.itemImage} />
+      <View style={styles.itemInfo}>
+        <Text style={styles.itemName} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <Text style={styles.itemMeta}>SL {item.quantity}</Text>
+      </View>
+      <Text style={styles.itemPrice}>{formatPrice(item.basePrice * item.quantity)}</Text>
+    </View>
+  );
+}
 
 export default function CheckoutScreen({ navigation }) {
   const { items, subtotal, clearCart } = useCart();
-
-  // ── State ───────────────
   const [apiAddresses, setApiAddresses] = useState([]);
   const [shippingAddressId, setShippingAddressId] = useState(null);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("CARD");
-  const [selectedShipping, setSelectedShipping] = useState("standard");
   const [addressModalVisible, setAddressModalVisible] = useState(false);
-  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [voucherModalVisible, setVoucherModalVisible] = useState(false);
-  const [voucherCode, setVoucherCode] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [shippingCost, setShippingCost] = useState(0);
+  const [loadingShippingQuote, setLoadingShippingQuote] = useState(false);
+  const [paymentGateway, setPaymentGateway] = useState("COD");
 
-  // Load addresses from API on mount
-  useEffect(() => {
-    const loadAddresses = async () => {
-      try {
-        const res = await api.get("/me/addresses");
-        const list = Array.isArray(res.data) ? res.data : [];
-        // Transform API format to match AddressCard component
-        const mapped = list.map((a) => ({
-          id: a.id,
-          label: a.label || "Khác",
-          fullAddress: [a.addressLine, a.ward, a.district, a.city, a.country]
-            .filter(Boolean)
-            .join(", "),
-          phone: a.receiverPhone || "",
-          email: "",
-          isDefault: a.isDefault || false,
-        }));
-        setApiAddresses(mapped);
-        const def = mapped.find((a) => a.isDefault) || mapped[0];
-        if (def) setShippingAddressId(def.id);
-      } catch (err) {
-        console.warn("Lỗi tải địa chỉ:", err);
+  const loadAddresses = useCallback(async () => {
+    try {
+      setLoadingAddresses(true);
+      const res = await api.get("/me/addresses");
+      const list = Array.isArray(res.data) ? res.data : [];
+      const mapped = list.map((address) => ({
+        id: address.id,
+        label:
+          address.label === "home"
+            ? "Nhà"
+            : address.label === "office"
+              ? "Văn phòng"
+              : address.label || "Khác",
+        receiverName: address.receiverName || "",
+        receiverPhone: address.receiverPhone || "",
+        fullAddress: [
+          address.addressLine,
+          address.ward,
+          address.district,
+          address.city,
+          address.country,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        isDefault: address.isDefault || false,
+      }));
+      setApiAddresses(mapped);
+
+      if (mapped.length === 0) {
+        setShippingAddressId(null);
+        return;
       }
-    };
-    loadAddresses();
+
+      setShippingAddressId((current) => {
+        if (current && mapped.some((address) => address.id === current)) {
+          return current;
+        }
+        return mapped.find((address) => address.isDefault)?.id || mapped[0].id;
+      });
+    } catch (err) {
+      console.warn("Lỗi tải địa chỉ:", err);
+    } finally {
+      setLoadingAddresses(false);
+    }
   }, []);
 
-  const selectedAddress = apiAddresses.find((a) => a.id === shippingAddressId) ||
-    apiAddresses[0] || {
-      id: null,
-      label: "",
-      fullAddress: "Chưa có địa chỉ",
-      phone: "",
-      email: "",
-    };
-  const shippingOption = SHIPPING_OPTIONS.find((s) => s.key === selectedShipping);
-  const shippingCost = shippingOption?.price ?? 0;
-  const grandTotal = subtotal + shippingCost;
+  useFocusEffect(
+    useCallback(() => {
+      loadAddresses();
+    }, [loadAddresses]),
+  );
 
-  // ── handlePlaceOrder ──────────────────────────────────────────────────────
+  const selectedAddress = useMemo(
+    () => apiAddresses.find((address) => address.id === shippingAddressId) || null,
+    [apiAddresses, shippingAddressId],
+  );
+
+  const totalAmount = subtotal + shippingCost;
+
+  useEffect(() => {
+    let active = true;
+
+    const loadShippingQuote = async () => {
+      if (!shippingAddressId) {
+        setShippingCost(0);
+        return;
+      }
+
+      try {
+        setLoadingShippingQuote(true);
+        const quote = await getShippingQuote({ addressId: shippingAddressId });
+        if (active) {
+          setShippingCost(Number(quote.shippingFee ?? 0));
+        }
+      } catch (error) {
+        if (active) {
+          setShippingCost(0);
+        }
+        console.warn("Lỗi tải phí vận chuyển:", error);
+      } finally {
+        if (active) {
+          setLoadingShippingQuote(false);
+        }
+      }
+    };
+
+    loadShippingQuote();
+
+    return () => {
+      active = false;
+    };
+  }, [shippingAddressId]);
+
   const handlePlaceOrder = async () => {
     if (items.length === 0) {
       Alert.alert("Giỏ hàng trống", "Vui lòng thêm sản phẩm trước khi đặt hàng.");
       return;
     }
 
-    setIsPlacingOrder(true);
+    if (!shippingAddressId) {
+      Alert.alert("Thiếu địa chỉ", "Vui lòng chọn địa chỉ giao hàng trước khi đặt hàng.");
+      return;
+    }
 
+    setIsPlacingOrder(true);
     const payload = {
-      items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-      addressId: shippingAddressId || 1,
-      shippingFee: shippingCost > 0 ? shippingCost * 1000 : 15000,
+      items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      addressId: shippingAddressId,
+      paymentGateway,
     };
 
-    console.log("[CheckoutScreen] Gửi payload tạo đơn:", JSON.stringify(payload, null, 2));
-
     try {
-      const response = await api.post("/orders", payload);
-
-      console.log("[CheckoutScreen] Tạo đơn thành công:", response.data);
-
+      const order = await createOrder(payload);
       clearCart();
-      const newOrderId = response.data.id;
-      navigation.navigate("Success", { orderId: newOrderId });
+      navigation.navigate("Success", { order });
     } catch (error) {
-      console.log("[CheckoutScreen] Lỗi chi tiết khi đặt hàng:", error);
       const errorMessage =
-        error.response?.data?.message || error.message || "Đặt hàng thất bại. Vui lòng thử lại.";
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Đặt hàng thất bại. Vui lòng thử lại.";
       Alert.alert("Lỗi đặt hàng", errorMessage);
     } finally {
       setIsPlacingOrder(false);
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -321,712 +267,597 @@ export default function CheckoutScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Shipping Address & Contact ─────────────────────────────────── */}
-        <AddressCard
-          address={selectedAddress}
-          onEdit={() => console.log("Điều hướng sang Address Book sáng mai")}
-        />
+        <View style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>Checkout</Text>
+          <Text style={styles.heroTitle}>Xác nhận đơn hàng</Text>
+        </View>
 
-        {/* ── Items Summary ─────────────────────────────────────────────── */}
-        <View style={styles.itemsSection}>
-          <View style={styles.itemsHeaderRow}>
-            <View style={styles.itemsHeaderLeft}>
-              <Text style={styles.itemsTitle}>Items</Text>
-              <View style={styles.itemCountBadge}>
-                <Text style={styles.itemCountText}>{items.length}</Text>
-              </View>
-            </View>
-            {voucherCode ? (
-              <TouchableOpacity style={styles.voucherBadge} onPress={() => setVoucherCode(null)}>
-                <Text style={styles.voucherBadgeText}>
-                  {voucherCode === "FIRST" ? "5% Discount" : "15% Discount"}
-                </Text>
-                <Text style={styles.voucherBadgeClose}>✕</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.addVoucherBtn}
-                onPress={() => setVoucherModalVisible(true)}
-              >
-                <Text style={styles.addVoucherText}>Add Voucher</Text>
-              </TouchableOpacity>
-            )}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
+            <TouchableOpacity onPress={() => setAddressModalVisible(true)}>
+              <Text style={styles.sectionAction}>Đổi địa chỉ</Text>
+            </TouchableOpacity>
           </View>
-          {items.map((item) => (
-            <CartItemSummaryRow key={String(item.productId)} item={item} />
-          ))}
-          {items.length === 0 && (
-            <Text style={styles.emptyCartNote}>Giỏ hàng trống – quay lại thêm sản phẩm.</Text>
+
+          {loadingAddresses ? (
+            <ActivityIndicator color="#9B4B1F" style={{ marginVertical: 16 }} />
+          ) : selectedAddress ? (
+            <View style={styles.addressCard}>
+              <View style={styles.addressTopRow}>
+                <Text style={styles.addressLabel}>{selectedAddress.label}</Text>
+                {selectedAddress.isDefault ? (
+                  <View style={styles.defaultBadge}>
+                    <Text style={styles.defaultBadgeText}>Mặc định</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.addressReceiver}>{selectedAddress.receiverName}</Text>
+              <Text style={styles.addressPhone}>{selectedAddress.receiverPhone}</Text>
+              <Text style={styles.addressText}>{selectedAddress.fullAddress}</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.emptyAddressCard}
+              onPress={() => navigation.navigate("AddressForm", { mode: "add" })}
+            >
+              <Text style={styles.emptyAddressTitle}>Bạn chưa có địa chỉ giao hàng</Text>
+              <Text style={styles.emptyAddressText}>
+                Thêm địa chỉ trước khi đặt hàng để backend lưu đúng snapshot giao nhận.
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* ── Shipping Options ──────────────────────────────────────────── */}
-        <SectionHeader title="Shipping Options" />
-        {SHIPPING_OPTIONS.map((option) => (
-          <ShippingOptionRow
-            key={option.key}
-            option={option}
-            selected={selectedShipping === option.key}
-            onSelect={setSelectedShipping}
-          />
-        ))}
-        {selectedShipping === "express" && (
-          <Text style={styles.deliveryNote}>Delivered in 1–2 business days</Text>
-        )}
-        {selectedShipping === "standard" && (
-          <Text style={styles.deliveryNote}>Delivered on or before Thursday, 23 April</Text>
-        )}
-
-        {/* ── Payment Method ────────────────────────────────────────────── */}
-        <View style={styles.paymentHeaderRow}>
-          <SectionHeader title="Payment Method" />
-          <TouchableOpacity
-            style={styles.editCircleBtnSmall}
-            onPress={() => setPaymentModalVisible(true)}
-          >
-            <Text style={styles.editCircleIcon}>›</Text>
-          </TouchableOpacity>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Sản phẩm trong đơn</Text>
+          {items.length > 0 ? (
+            items.map((item) => <CheckoutItemRow key={String(item.productId)} item={item} />)
+          ) : (
+            <Text style={styles.emptyStateText}>Giỏ hàng đang trống.</Text>
+          )}
         </View>
-        <View style={{ flexDirection: "row", marginTop: 10 }}>
-          <View style={styles.paymentPill}>
-            <Text style={styles.paymentPillText}>
-              {PAYMENT_METHODS.find((m) => m.key === selectedPaymentMethod)?.label || "Card"}
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Phí vận chuyển</Text>
+          <View style={styles.shippingQuoteCard}>
+            <View style={styles.shippingQuoteInfo}>
+              <Text style={styles.shippingQuoteLabel}>Phí giao hàng tạm tính</Text>
+            </View>
+            {loadingShippingQuote ? (
+              <ActivityIndicator size="small" color="#9B4B1F" />
+            ) : (
+              <Text style={styles.shippingQuotePrice}>{formatPrice(shippingCost)}</Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Phương thức thanh toán</Text>
+          <View style={styles.paymentOptionList}>
+            {PAYMENT_OPTIONS.map((option) => {
+              const selected = paymentGateway === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.paymentOption, selected && styles.paymentOptionSelected]}
+                  onPress={() => setPaymentGateway(option.value)}
+                  activeOpacity={0.88}
+                >
+                  <View style={styles.paymentOptionCopy}>
+                    <Text style={styles.paymentOptionTitle}>{option.title}</Text>
+                    <Text style={styles.paymentOptionDescription}>{option.description}</Text>
+                  </View>
+                  <View style={[styles.paymentRadio, selected && styles.paymentRadioSelected]}>
+                    {selected ? <View style={styles.paymentRadioDot} /> : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Tóm tắt thanh toán</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tiền hàng</Text>
+            <Text style={styles.summaryValue}>{formatPrice(subtotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
+            <Text style={styles.summaryValue}>{formatPrice(shippingCost)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Thanh toán</Text>
+            <Text style={styles.summaryValue}>
+              {PAYMENT_OPTIONS.find((option) => option.value === paymentGateway)?.title}
             </Text>
           </View>
-        </View>
-
-        {/* ── Order Summary ─────────────────────────────────────────────── */}
-        <SectionHeader title="Order Summary" />
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryRowLabel}>Subtotal</Text>
-            <Text style={styles.summaryRowValue}>{formatPrice(subtotal)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryRowLabel}>Shipping</Text>
-            <Text style={[styles.summaryRowValue, shippingCost === 0 && styles.freeLabel]}>
-              {shippingCost === 0 ? "FREE" : formatPrice(shippingCost)}
-            </Text>
-          </View>
-          <View style={[styles.summaryRow, styles.summaryRowTotal]}>
-            <Text style={styles.summaryTotalLabel}>Total</Text>
-            <Text style={styles.summaryTotalValue}>{formatPrice(grandTotal)}</Text>
+          <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+            <Text style={styles.summaryTotalLabel}>Tổng cộng</Text>
+            <Text style={styles.summaryTotalValue}>{formatPrice(totalAmount)}</Text>
           </View>
         </View>
 
-        <View style={{ height: 110 }} />
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* ── Fixed Bottom: Total + Pay ────────────────────────────────────── */}
       <View style={styles.bottomBar}>
-        <View style={styles.totalWrap}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalAmount}>{formatPrice(grandTotal)}</Text>
+        <View>
+          <Text style={styles.bottomLabel}>Tổng thanh toán</Text>
+          <Text style={styles.bottomTotal}>{formatPrice(totalAmount)}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.payBtn, (isPlacingOrder || items.length === 0) && styles.payBtnDisabled]}
+          style={[
+            styles.placeOrderBtn,
+            (isPlacingOrder || items.length === 0 || loadingShippingQuote) && styles.disabledBtn,
+          ]}
           onPress={handlePlaceOrder}
-          disabled={isPlacingOrder || items.length === 0}
-          activeOpacity={0.85}
+          disabled={isPlacingOrder || items.length === 0 || loadingShippingQuote}
+          activeOpacity={0.88}
         >
           {isPlacingOrder ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color="#FFFDF9" size="small" />
           ) : (
-            <Text style={styles.payBtnText}>Pay</Text>
+            <Text style={styles.placeOrderText}>Đặt hàng</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* ── Address Picker Modal ─────────────────────────────────────────── */}
       <AddressPickerModal
         visible={addressModalVisible}
         addresses={apiAddresses}
         selectedId={shippingAddressId}
         onSelect={setShippingAddressId}
         onClose={() => setAddressModalVisible(false)}
+        onAddAddress={() => {
+          setAddressModalVisible(false);
+          navigation.navigate("AddressForm", { mode: "add" });
+        }}
       />
-
-      {/* ── Payment Method Modal ─────────────────────────────────────────── */}
-      <Modal visible={paymentModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Payment Methods</Text>
-            {PAYMENT_METHODS.map((method) => (
-              <PaymentMethodRow
-                key={method.key}
-                method={method}
-                selected={selectedPaymentMethod === method.key}
-                onSelect={(val) => {
-                  setSelectedPaymentMethod(val);
-                  setPaymentModalVisible(false);
-                }}
-              />
-            ))}
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setPaymentModalVisible(false)}
-            >
-              <Text style={styles.modalCloseBtnText}>Đóng</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Voucher Modal ─────────────────────────────────────────────────── */}
-      <Modal visible={voucherModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Active Vouchers</Text>
-
-            <TouchableOpacity
-              style={styles.voucherCard}
-              onPress={() => {
-                setVoucherCode("FIRST");
-                setVoucherModalVisible(false);
-              }}
-            >
-              <View style={styles.voucherHeader}>
-                <Text style={styles.voucherType}>Voucher</Text>
-                <Text style={styles.voucherValid}>Valid Until 5.16.20</Text>
-              </View>
-              <View style={styles.voucherBody}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.voucherTitle}>First Purchase</Text>
-                  <Text style={styles.voucherDesc}>5% off for your next order</Text>
-                </View>
-                <View style={styles.applyBtn}>
-                  <Text style={styles.applyBtnText}>Apply</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.voucherCard}
-              onPress={() => {
-                setVoucherCode("GIFT");
-                setVoucherModalVisible(false);
-              }}
-            >
-              <View style={styles.voucherHeader}>
-                <Text style={styles.voucherType}>Voucher</Text>
-                <Text style={styles.voucherValid}>Valid Until 6.20.20</Text>
-              </View>
-              <View style={styles.voucherBody}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.voucherTitle}>Gift From Customer Care</Text>
-                  <Text style={styles.voucherDesc}>15% off your next purchase</Text>
-                </View>
-                <View style={styles.applyBtn}>
-                  <Text style={styles.applyBtnText}>Apply</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setVoucherModalVisible(false)}
-            >
-              <Text style={styles.modalCloseBtnText}>Đóng</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.bgPrimary,
+    backgroundColor: "#FCF9F4",
   },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 12 },
-
-  // ── Address / Contact Card ──────────────────────────────────────────────────
-  infoCard: {
-    flexDirection: "row",
-    backgroundColor: COLORS.bgSecondary,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 6,
-  },
-  infoCardContent: { flex: 1, marginRight: 12 },
-  infoCardTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  infoCardText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
-  },
-  contactInfoCard: { marginTop: 12 },
-  editCircleBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.info,
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "center",
-  },
-  editCircleBtnSmall: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: COLORS.info,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 2,
-  },
-  editCircleIcon: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-
-  // ── Items Summary ────────────────────────────────────────────────────────────
-  itemsSection: {
-    marginTop: 16,
-  },
-  itemsHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  itemsHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  itemsTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-    marginRight: 10,
-  },
-  itemCountBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: COLORS.info,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  itemCountText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  summaryItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
-  },
-  summaryQtyBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: COLORS.primaryBg,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  summaryQtyText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  summaryItemName: {
+  scrollView: {
     flex: 1,
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
-    marginRight: 10,
   },
-  summaryItemPrice: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
+  scrollContent: {
+    padding: 20,
   },
-  emptyCartNote: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    textAlign: "center",
-    paddingVertical: 16,
-  },
-
-  // ── Section header ───────────────────────────────────────────────────────────
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  paymentHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-
-  // ── Shipping Options ─────────────────────────────────────────────────────────
-  shippingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.bgSecondary,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: "transparent",
-  },
-  shippingRowSelected: {
-    borderColor: COLORS.info,
-    backgroundColor: "#EFF6FF",
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  radioOuterSelected: {
-    borderColor: COLORS.info,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.info,
-  },
-  shippingInfo: { flex: 1 },
-  shippingLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  shippingLabelSelected: { color: COLORS.info },
-  shippingDuration: {
-    fontSize: 12,
-    color: COLORS.info,
-    marginTop: 2,
-  },
-  shippingPrice: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  shippingPriceFree: {
-    color: COLORS.success,
-  },
-  deliveryNote: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: -2,
-    marginBottom: 8,
-    paddingLeft: 4,
-  },
-
-  // ── Voucher UI ──────────────────────────────────────────────────────────────
-  addVoucherBtn: {
-    borderWidth: 1,
-    borderColor: COLORS.info,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addVoucherText: {
-    color: COLORS.info,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  voucherBadge: {
-    flexDirection: "row",
-    backgroundColor: COLORS.info,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  voucherBadgeText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
-    marginRight: 6,
-  },
-  voucherBadgeClose: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-
-  // ── Modals Additional Styles ────────────────────────────────────────────────
-  paymentPill: {
-    backgroundColor: "#E5E5EA",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  paymentPillText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.info,
-  },
-  voucherCard: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: COLORS.info,
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: "hidden",
-  },
-  voucherHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.info,
-    borderStyle: "dashed",
-  },
-  voucherType: { color: COLORS.info, fontWeight: "700" },
-  voucherValid: { color: COLORS.textMuted, fontSize: 12 },
-  voucherBody: {
-    flexDirection: "row",
-    padding: 12,
-    alignItems: "center",
-  },
-  voucherTitle: { fontSize: 15, fontWeight: "700", marginBottom: 4 },
-  voucherDesc: { fontSize: 12, color: COLORS.textSecondary },
-  applyBtn: {
-    backgroundColor: COLORS.info,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  applyBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-
-  // ── Payment Method ───────────────────────────────────────────────────────────
-  paymentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.bgSecondary,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: "transparent",
-  },
-  paymentRowSelected: {
-    borderColor: COLORS.info,
-    backgroundColor: "#EFF6FF",
-  },
-  paymentLogo: {
-    width: 30,
-    height: 24,
-    marginRight: 14,
-  },
-  paymentInfo: { flex: 1 },
-  paymentLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  paymentLabelSelected: { color: COLORS.info },
-  paymentSublabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-
-  // ── Order Summary Card ───────────────────────────────────────────────────────
-  summaryCard: {
-    backgroundColor: COLORS.bgSecondary,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 8,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  summaryRowTotal: {
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
-  },
-  summaryRowLabel: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-  summaryRowValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  freeLabel: {
-    color: COLORS.success,
-    fontWeight: "700",
-  },
-  summaryTotalLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-  summaryTotalValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.primary,
-  },
-
-  // ── Bottom Bar ───────────────────────────────────────────────────────────────
-  bottomBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.bgPrimary,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 32,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
-  },
-  totalWrap: {
-    flexDirection: "row",
-    alignItems: "baseline",
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginRight: 8,
-  },
-  totalAmount: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-  },
-  payBtn: {
-    backgroundColor: COLORS.textPrimary,
-    paddingVertical: 14,
-    paddingHorizontal: 44,
-    borderRadius: 28,
-    minWidth: 110,
-    alignItems: "center",
-  },
-  payBtnDisabled: {
-    backgroundColor: COLORS.textMuted,
-  },
-  payBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-
-  // ── Address Modal ────────────────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    backgroundColor: COLORS.bgPrimary,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.border,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
+  heroCard: {
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: "#1E1815",
     marginBottom: 16,
   },
-  addrOption: {
+  heroEyebrow: {
+    color: "#DCC4A8",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  heroTitle: {
+    color: "#FFF8EE",
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "900",
+  },
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+  },
+  sectionHeaderRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: COLORS.bgSecondary,
-    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#1E1815",
+  },
+  sectionAction: {
+    color: "#9B4B1F",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  addressCard: {
+    borderRadius: 18,
+    backgroundColor: "#F7EFE7",
     padding: 14,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: "transparent",
   },
-  addrOptionSelected: {
-    borderColor: COLORS.info,
-    backgroundColor: "#EFF6FF",
+  addressTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  addrOptionLeft: { flex: 1 },
-  addrOptionLabel: {
+  addressLabel: {
+    color: "#8A6548",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  defaultBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#1E1815",
+  },
+  defaultBadgeText: {
+    color: "#FFF8EE",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  addressReceiver: {
+    color: "#1E1815",
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 3,
+  },
+  addressPhone: {
+    color: "#7C6B5F",
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  addressText: {
+    color: "#54483E",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  emptyAddressCard: {
+    borderRadius: 18,
+    backgroundColor: "#F7EFE7",
+    padding: 16,
+  },
+  emptyAddressTitle: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  emptyAddressText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0E5D8",
+  },
+  itemImage: {
+    width: 62,
+    height: 74,
+    borderRadius: 14,
+    backgroundColor: "#EFE8E0",
+    marginRight: 12,
+  },
+  itemInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  itemName: {
+    color: "#241A13",
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.textPrimary,
+    lineHeight: 20,
     marginBottom: 4,
   },
-  addrOptionText: {
+  itemMeta: {
+    color: "#8A7B6F",
     fontSize: 12,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
   },
-  addrOptionPhone: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
+  itemPrice: {
+    color: "#9B4B1F",
+    fontSize: 15,
+    fontWeight: "800",
   },
-  addrOptionCheck: {
+  shippingQuoteCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
+  },
+  shippingQuoteInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  shippingQuoteLabel: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  shippingQuotePrice: {
+    color: "#9B4B1F",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  paymentOptionList: {
+    marginTop: 12,
+    gap: 10,
+  },
+  paymentOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
+  },
+  paymentOptionSelected: {
+    backgroundColor: "#F5ECE3",
+    borderColor: "#D69A65",
+  },
+  paymentOptionCopy: {
+    flex: 1,
+    marginRight: 12,
+  },
+  paymentOptionTitle: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  paymentOptionDescription: {
+    color: "#78695C",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  paymentRadio: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: COLORS.info,
-    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#CDBEAF",
     alignItems: "center",
-    alignSelf: "center",
-    marginLeft: 10,
+    justifyContent: "center",
   },
-  addrOptionCheckIcon: {
-    color: "#fff",
-    fontSize: 13,
+  paymentRadioSelected: {
+    borderColor: "#9B4B1F",
+  },
+  paymentRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#9B4B1F",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 9,
+  },
+  summaryLabel: {
+    color: "#6F6257",
+    fontSize: 14,
+  },
+  summaryValue: {
+    color: "#241A13",
+    fontSize: 14,
     fontWeight: "700",
   },
-  modalCloseBtn: {
-    marginTop: 8,
-    paddingVertical: 14,
+  summaryTotalRow: {
+    marginTop: 4,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#EFE3D6",
+  },
+  summaryTotalLabel: {
+    color: "#1E1815",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  summaryTotalValue: {
+    color: "#9B4B1F",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  emptyStateText: {
+    color: "#78695C",
+    fontSize: 14,
+  },
+  bottomSpacer: {
+    height: 110,
+  },
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 34,
+    backgroundColor: "#FCF9F4",
+    borderTopWidth: 1,
+    borderTopColor: "#EFE3D6",
+  },
+  bottomLabel: {
+    color: "#78695C",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  bottomTotal: {
+    color: "#1E1815",
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  placeOrderBtn: {
+    minWidth: 148,
+    paddingHorizontal: 22,
+    paddingVertical: 15,
+    borderRadius: 18,
+    alignItems: "center",
+    backgroundColor: "#1E1815",
+  },
+  disabledBtn: {
+    opacity: 0.6,
+  },
+  placeOrderText: {
+    color: "#FFFDF9",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(24, 18, 14, 0.32)",
+  },
+  modalSheet: {
+    backgroundColor: "#FCF9F4",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 30,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D3C4B6",
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: "#1E1815",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 16,
+  },
+  modalScroll: {
+    maxHeight: "65%",
+  },
+  modalScrollContent: {
+    paddingBottom: 8,
+  },
+  modalEmptyState: {
+    paddingVertical: 24,
+  },
+  modalEmptyTitle: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  modalEmptyText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  addrOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+  },
+  addrOptionSelected: {
+    backgroundColor: "#F5ECE3",
+    borderColor: "#D69A65",
+  },
+  addrOptionLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  addrOptionTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 6,
+  },
+  addrOptionLabel: {
+    color: "#8A6548",
+    fontSize: 12,
+    fontWeight: "700",
+    marginRight: 8,
+  },
+  addrDefaultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#1E1815",
+  },
+  addrDefaultBadgeText: {
+    color: "#FFF8EE",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  addrOptionReceiver: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+  addrOptionPhone: {
+    color: "#7C6B5F",
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  addrOptionText: {
+    color: "#564A40",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  addrOptionCheck: {
+    width: 28,
+    height: 28,
     borderRadius: 14,
-    backgroundColor: COLORS.bgSecondary,
+    backgroundColor: "#1E1815",
+    justifyContent: "center",
     alignItems: "center",
   },
-  modalCloseBtnText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
+  modalFooter: {
+    flexDirection: "row",
+    gap: 10,
+    paddingTop: 14,
+  },
+  modalSecondaryBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+    backgroundColor: "#F5ECE3",
+  },
+  modalSecondaryBtnText: {
+    color: "#9B4B1F",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  modalPrimaryBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+    backgroundColor: "#1E1815",
+  },
+  modalPrimaryBtnText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });

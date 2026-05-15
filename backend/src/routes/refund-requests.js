@@ -1,7 +1,78 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
+import {
+  createRefundEvidenceUploadUrl,
+  getR2Config,
+  isAllowedImageContentType,
+  isValidImageUrl,
+} from "../r2.js";
 
 const router = Router();
+
+router.post("/uploads/presign", async (req, res) => {
+  const config = getR2Config();
+  if (!config) {
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "R2 upload is not configured",
+      },
+    });
+  }
+
+  const validationError = validateRefundUploadPresignPayload(req.body);
+  if (validationError) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: validationError,
+      },
+    });
+  }
+
+  const orderId = Number(req.body.orderId);
+  const customerId = req.authCustomer.id;
+  const fileName = req.body.fileName.trim();
+  const contentType = req.body.contentType.trim().toLowerCase();
+
+  try {
+    const { rows } = await pool.query(
+      `
+        SELECT id
+        FROM orders
+        WHERE id = $1 AND customer_id = $2
+        LIMIT 1
+      `,
+      [orderId, customerId],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const upload = await createRefundEvidenceUploadUrl({
+      customerId,
+      orderId,
+      fileName,
+      contentType,
+    });
+
+    return res.status(201).json(upload);
+  } catch (error) {
+    console.error("POST /refund-requests/uploads/presign failed:", error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create upload URL",
+      },
+    });
+  }
+});
 
 router.post("/", async (req, res) => {
   const validationError = validateRefundRequestPayload(req.body);
@@ -15,7 +86,7 @@ router.post("/", async (req, res) => {
   }
 
   const orderId = Number(req.body.orderId);
-  const imageUrl = req.body.imageUrl.trim();
+  const imageUrl = req.body.imageUrl?.trim() || null;
   const reason = req.body.reason.trim();
   const customerId = req.authCustomer.id;
 
@@ -158,12 +229,36 @@ function validateRefundRequestPayload(body) {
     return "orderId must be a positive integer";
   }
 
-  if (!body.imageUrl?.trim()) {
-    return "imageUrl is required";
+  if (body.imageUrl != null && body.imageUrl.trim() && !isValidImageUrl(body.imageUrl)) {
+    return "imageUrl must be a valid http or https URL";
   }
 
   if (!body.reason?.trim()) {
     return "reason is required";
+  }
+
+  return null;
+}
+
+function validateRefundUploadPresignPayload(body) {
+  if (!body || typeof body !== "object") {
+    return "Request body is required";
+  }
+
+  if (!Number.isInteger(body.orderId) || body.orderId <= 0) {
+    return "orderId must be a positive integer";
+  }
+
+  if (!body.fileName?.trim()) {
+    return "fileName is required";
+  }
+
+  if (!body.contentType?.trim()) {
+    return "contentType is required";
+  }
+
+  if (!isAllowedImageContentType(body.contentType)) {
+    return "contentType must be one of image/jpeg, image/png, image/webp, image/gif";
   }
 
   return null;

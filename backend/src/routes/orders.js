@@ -9,6 +9,7 @@ import {
   calculateAddressChangeFeeBreakdown,
   calculateShippingFeeFromDaNang,
 } from "../lib/shipping-fee.js";
+import { createMomoPaymentRequest, getMomoConfig } from "../lib/momo.js";
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id, latest_rr.status ORDER BY o.created_at DESC`,
       params,
     );
 
@@ -75,7 +76,7 @@ router.get("/:id", requireAuth, async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1${accessClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1${accessClause} GROUP BY o.id, c.id, latest_rr.status ORDER BY o.created_at DESC`,
       params,
     );
 
@@ -189,7 +190,7 @@ router.patch("/:id/status", requireAuth, requireRole("admin", "staff"), async (r
     await client.query("COMMIT");
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id, latest_rr.status ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -201,6 +202,59 @@ router.patch("/:id/status", requireAuth, requireRole("admin", "staff"), async (r
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to update order status",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/shipping-quote", requireAuth, async (req, res) => {
+  const validationError = validateShippingQuotePayload(req.body);
+  if (validationError) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: validationError,
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    const customerRow = await resolveAuthenticatedCustomerForOrder(client, req.authCustomer.id);
+    const shippingSnapshot = await resolveShippingSnapshot(client, req.body, customerRow);
+    const shippingFee = calculateShippingFeeFromDaNang({
+      provinceCode: shippingSnapshot.provinceCode,
+      city: shippingSnapshot.city,
+    });
+
+    return res.json({
+      shippingFee,
+      destination: {
+        provinceCode: shippingSnapshot.provinceCode,
+        districtCode: shippingSnapshot.districtCode,
+        wardCode: shippingSnapshot.wardCode,
+        city: shippingSnapshot.city,
+        district: shippingSnapshot.district,
+        ward: shippingSnapshot.ward,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("POST /orders/shipping-quote failed:", error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to calculate shipping fee",
       },
     });
   } finally {
@@ -220,6 +274,17 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   const { items } = req.body;
+  const paymentGateway = normalizePaymentGateway(req.body.paymentGateway ?? req.body.paymentMethod);
+  if (paymentGateway === "MOMO" && !getMomoConfig()) {
+    return res.status(503).json({
+      error: {
+        code: "PAYMENT_GATEWAY_UNAVAILABLE",
+        message: "MoMo payment is not configured",
+      },
+    });
+  }
+
+  const paymentStatus = getInitialPaymentStatus(paymentGateway);
 
   const client = await pool.connect();
   try {
@@ -266,6 +331,7 @@ router.post("/", requireAuth, async (req, res) => {
     }
 
     const totalAmount = subtotal + shippingFee;
+    const paymentExpiresAt = getPaymentExpiresAt(paymentGateway);
     const orderResult = await client.query(
       `
         INSERT INTO orders (
@@ -286,10 +352,12 @@ router.post("/", requireAuth, async (req, res) => {
           city,
           shipping_country,
           shipping_postal_code,
+          payment_status,
+          payment_gateway,
           payment_expires_at
         )
         VALUES (
-          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW() + INTERVAL '24 hours'
+          $1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
         )
         RETURNING *
       `,
@@ -310,6 +378,9 @@ router.post("/", requireAuth, async (req, res) => {
         shippingSnapshot.city,
         shippingSnapshot.country,
         shippingSnapshot.postalCode,
+        paymentStatus,
+        paymentGateway,
+        paymentExpiresAt,
       ],
     );
     const orderRow = orderResult.rows[0];
@@ -351,11 +422,63 @@ router.post("/", requireAuth, async (req, res) => {
       }
     }
 
+    let momoPayment = null;
+    if (paymentGateway === "MOMO") {
+      momoPayment = await createMomoPaymentRequest({
+        order: {
+          id: Number(orderRow.id),
+          totalAmount: Number(orderRow.total_amount),
+          customerId: Number(customerRow.id),
+        },
+        customer: customerRow,
+        items: orderItems.map((item) => ({
+          productId: item.product_id,
+          quantity: item.quantity,
+          priceAtPurchase: item.price_at_purchase,
+        })),
+      });
+
+      await client.query(
+        `
+          UPDATE orders
+          SET transaction_ref = $2, updated_at = NOW()
+          WHERE id = $1
+        `,
+        [orderRow.id, momoPayment.requestId],
+      );
+
+      await client.query(
+        `
+          INSERT INTO payment_logs (
+            order_id,
+            external_event_id,
+            gateway_name,
+            transaction_ref,
+            source,
+            payment_status,
+            raw_response
+          )
+          VALUES ($1, $2, 'MOMO', $3, 'app_client', 'payment_pending', $4::jsonb)
+          ON CONFLICT (external_event_id) DO NOTHING
+        `,
+        [
+          orderRow.id,
+          `momo-create-${momoPayment.requestId}`,
+          momoPayment.requestId,
+          JSON.stringify(momoPayment.rawResponse),
+        ],
+      );
+    }
+
     await client.query("COMMIT");
 
     return res.status(201).json({
       id: Number(orderRow.id),
       status: orderRow.status,
+      paymentStatus: orderRow.payment_status,
+      paymentGateway: orderRow.payment_gateway,
+      payment: momoPayment,
+      deliveryStatus: orderRow.delivery_status,
       totalAmount: Number(orderRow.total_amount),
       shippingFee: Number(orderRow.shipping_fee),
       paymentExpiresAt: orderRow.payment_expires_at,
@@ -392,6 +515,138 @@ router.post("/", requireAuth, async (req, res) => {
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to create order",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/:id/momo-payment", requireAuth, async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      `
+        SELECT
+          o.id,
+          o.customer_id,
+          o.status,
+          o.payment_status,
+          o.payment_gateway,
+          o.total_amount,
+          c.full_name,
+          c.phone,
+          c.email
+        FROM orders o
+        JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = $1 AND o.customer_id = $2
+        LIMIT 1
+      `,
+      [orderId, req.authCustomer.id],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    const order = rows[0];
+    if (
+      order.payment_gateway !== "MOMO" ||
+      order.payment_status !== "payment_pending" ||
+      order.status !== "pending"
+    ) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Order is not waiting for MoMo payment",
+        },
+      });
+    }
+
+    const orderItemsResult = await client.query(
+      `
+        SELECT
+          oi.product_id AS "productId",
+          oi.quantity,
+          oi.price_at_purchase AS "priceAtPurchase",
+          p.name
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = $1
+      `,
+      [orderId],
+    );
+
+    const momoPayment = await createMomoPaymentRequest({
+      order: {
+        id: Number(order.id),
+        totalAmount: Number(order.total_amount),
+        customerId: Number(order.customer_id),
+      },
+      customer: order,
+      items: orderItemsResult.rows,
+    });
+
+    const paymentExpiresAt = getPaymentExpiresAt("MOMO");
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          transaction_ref = $2,
+          payment_expires_at = $3,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, momoPayment.requestId, paymentExpiresAt],
+    );
+
+    await client.query(
+      `
+        INSERT INTO payment_logs (
+          order_id,
+          external_event_id,
+          gateway_name,
+          transaction_ref,
+          source,
+          payment_status,
+          raw_response
+        )
+        VALUES ($1, $2, 'MOMO', $3, 'app_client', 'payment_pending', $4::jsonb)
+        ON CONFLICT (external_event_id) DO NOTHING
+      `,
+      [
+        orderId,
+        `momo-create-${momoPayment.requestId}`,
+        momoPayment.requestId,
+        JSON.stringify(momoPayment.rawResponse),
+      ],
+    );
+
+    return res.json({
+      ...momoPayment,
+      paymentExpiresAt,
+    });
+  } catch (error) {
+    console.error(`POST /orders/${orderId}/momo-payment failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to create MoMo payment",
       },
     });
   } finally {
@@ -618,6 +873,9 @@ const listOrdersBaseQuery = `
   SELECT
     o.id,
     o.status,
+    o.payment_status,
+    o.payment_gateway,
+    o.delivery_status,
     o.total_amount,
     o.shipping_fee,
     o.payment_expires_at,
@@ -641,6 +899,7 @@ const listOrdersBaseQuery = `
     c.full_name,
     c.phone,
     c.email,
+    latest_rr.status AS latest_refund_request_status,
     COALESCE(
       json_agg(
         json_build_object(
@@ -655,6 +914,13 @@ const listOrdersBaseQuery = `
     ) AS items
   FROM orders o
   JOIN customers c ON c.id = o.customer_id
+  LEFT JOIN LATERAL (
+    SELECT rr.status
+    FROM refund_requests rr
+    WHERE rr.order_id = o.id
+    ORDER BY rr.created_at DESC, rr.id DESC
+    LIMIT 1
+  ) latest_rr ON true
   LEFT JOIN order_items oi ON oi.order_id = o.id
 `;
 
@@ -708,6 +974,13 @@ function validateOrderPayload(body) {
     return "Shipping fee must be a non-negative number";
   }
 
+  if (
+    (body.paymentGateway != null || body.paymentMethod != null) &&
+    !normalizePaymentGateway(body.paymentGateway ?? body.paymentMethod)
+  ) {
+    return "paymentGateway must be COD, BANK_TRANSFER or MOMO";
+  }
+
   return null;
 }
 
@@ -741,15 +1014,46 @@ function validateAddressChangePayload(body) {
   return null;
 }
 
+function validateShippingQuotePayload(body) {
+  if (!body || typeof body !== "object") {
+    return "Request body is required";
+  }
+
+  const hasAddressId = body.addressId != null;
+  const hasNewAddress = body.newAddress != null;
+
+  if (hasAddressId && hasNewAddress) {
+    return "Use either addressId or newAddress, not both";
+  }
+
+  if (!hasAddressId && !hasNewAddress) {
+    return "addressId or newAddress is required";
+  }
+
+  if (hasAddressId && (!Number.isInteger(body.addressId) || body.addressId <= 0)) {
+    return "addressId must be a positive integer";
+  }
+
+  if (hasNewAddress) {
+    return validateShippingAddressPayload(body.newAddress);
+  }
+
+  return null;
+}
+
 function mapOrderRow(row) {
   return {
     id: Number(row.id),
     status: row.status,
+    paymentStatus: row.payment_status,
+    paymentGateway: row.payment_gateway,
+    deliveryStatus: row.delivery_status,
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
     customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
+    latestRefundRequestStatus: row.latest_refund_request_status ?? null,
     shippingAddress: row.shipping_address,
     city: row.city,
     shipping: mapShippingRow(row),
@@ -914,18 +1218,48 @@ function validateShippingAddressPayload(address) {
   return null;
 }
 
-const ORDER_STATUSES = [
+const ORDER_STATUSES = ["pending", "processing", "shipping", "completed", "cancelled", "failed"];
+const PAYMENT_GATEWAYS = ["COD", "BANK_TRANSFER", "MOMO"];
+
+const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = [
   "pending",
-  "awaiting_payment",
-  "paid",
-  "processing",
-  "shipping",
-  "completed",
-  "cancelled",
-  "failed",
+  "ready_to_ship",
+  "handover",
+  "in_transit",
+  "retry_pending",
 ];
 
-const ALLOWED_ADDRESS_CHANGE_DELIVERY_STATUSES = ["pending", "ready_to_ship", "retry_pending"];
+function normalizePaymentGateway(value) {
+  if (value == null || value === "") {
+    return "COD";
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toUpperCase();
+  return PAYMENT_GATEWAYS.includes(normalizedValue) ? normalizedValue : null;
+}
+
+function getInitialPaymentStatus(paymentGateway) {
+  return ["BANK_TRANSFER", "MOMO"].includes(paymentGateway) ? "payment_pending" : "unpaid";
+}
+
+function getPaymentExpiresAt(paymentGateway) {
+  if (!["BANK_TRANSFER", "MOMO"].includes(paymentGateway)) {
+    return null;
+  }
+
+  const configuredMinutes = Number(
+    paymentGateway === "MOMO"
+      ? process.env.MOMO_PAYMENT_EXPIRY_MINUTES || 15
+      : process.env.BANK_TRANSFER_PAYMENT_EXPIRY_MINUTES || 30,
+  );
+  const expiryMinutes =
+    Number.isFinite(configuredMinutes) && configuredMinutes > 0 ? configuredMinutes : 30;
+  return new Date(Date.now() + expiryMinutes * 60 * 1000);
+}
 
 function isPrivilegedRole(role) {
   return role === "admin" || role === "staff";

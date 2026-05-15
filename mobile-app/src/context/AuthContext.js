@@ -13,26 +13,29 @@ export function AuthProvider({ children }) {
   // Check auth state on mount
   useEffect(() => {
     const bootstrapAsync = async () => {
-      try {
-        const storedToken = await AsyncStorage.getItem("authToken");
-        if (storedToken) {
-          setToken(storedToken);
-          // Get /me if token exists
-          try {
-            const data = await getMeApi();
-            setUser(data.customer || data);
-          } catch (e) {
-            console.warn("Mã thông báo không hợp lệ hoặc hết hạn", e);
-            await AsyncStorage.removeItem("authToken");
-            setToken(null);
-            setUser(null);
+      const minWait = new Promise((resolve) => setTimeout(resolve, 2000));
+      const authProcess = (async () => {
+        try {
+          const storedToken = await AsyncStorage.getItem("authToken");
+          if (storedToken) {
+            setToken(storedToken);
+            try {
+              const data = await getMeApi();
+              setUser(data.customer || data);
+            } catch (e) {
+              console.warn("Mã thông báo không hợp lệ hoặc hết hạn", e);
+              await AsyncStorage.removeItem("authToken");
+              setToken(null);
+              setUser(null);
+            }
           }
+        } catch (e) {
+          console.warn("Restoring token failed", e);
         }
-      } catch (e) {
-        console.warn("Restoring token failed", e);
-      } finally {
-        setIsLoading(false);
-      }
+      })();
+
+      await Promise.all([authProcess, minWait]);
+      setIsLoading(false);
     };
     bootstrapAsync();
   }, []);

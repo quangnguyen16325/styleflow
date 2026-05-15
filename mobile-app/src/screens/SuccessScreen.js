@@ -1,108 +1,112 @@
 /* eslint-disable react/prop-types */
-/**
- * SuccessScreen.js
- * Màn hình thông báo đặt hàng thành công.
- * Hiển thị sau khi clearCart() + navigation.replace("Success")
- */
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  Animated,
-  Easing,
+  ScrollView,
+  Image,
+  Linking,
 } from "react-native";
-import { COLORS } from "../constants/colors";
-
-// ── Tạo mã đơn hàng giả (sẽ replace bằng orderId thật từ API response) ───────
-function genOrderCode() {
-  return "ECL-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
-const ORDER_CODE = genOrderCode();
+import { formatPrice } from "../services/api";
+import {
+  BANK_TRANSFER_CONFIG,
+  buildBankTransferQrUrl,
+  formatPaymentExpiresAt,
+} from "../components/BankTransferPaymentCard";
+import MomoPaymentCard from "../components/MomoPaymentCard";
+import AppIcon from "../components/AppIcon";
 
 export default function SuccessScreen({ route, navigation }) {
-  const { orderId } = route?.params || {};
-
-  // ── Animations ──────────────────────────────────────────────────────────────
-  const [scaleAnim] = useState(new Animated.Value(0));
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [slideAnim] = useState(new Animated.Value(40));
-
-  useEffect(() => {
-    Animated.sequence([
-      // 1. Circle pops in
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 5,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-      // 2. Text fades + slides up
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  }, [fadeAnim, scaleAnim, slideAnim]);
+  const order = route?.params?.order || null;
+  const orderId = route?.params?.orderId || order?.id;
+  const isBankTransfer = order?.paymentGateway === "BANK_TRANSFER";
+  const isMomo = order?.paymentGateway === "MOMO";
+  const paymentCode = orderId ? `ORD${orderId}` : "";
+  const qrUrl = useMemo(
+    () => (isBankTransfer ? buildBankTransferQrUrl(order) : null),
+    [isBankTransfer, order],
+  );
+  const expiresAtLabel = formatPaymentExpiresAt(order?.paymentExpiresAt);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* ── Animated success icon ───────────────────────────────────────── */}
-        <Animated.View style={[styles.iconCircle, { transform: [{ scale: scaleAnim }] }]}>
-          <Text style={styles.checkIcon}>✓</Text>
-        </Animated.View>
-
-        {/* ── Content ─────────────────────────────────────────────────────── */}
-        <Animated.View
-          style={[styles.textBlock, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
-        >
-          <Text style={styles.successTitle}>Order Placed!</Text>
-          <Text style={styles.successSubtitle}>
-            Cảm ơn bạn đã mua sắm tại <Text style={styles.brandName}>ecloria</Text>.{"\n"}
-            Đơn hàng của bạn đang được xử lý.
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <View style={styles.iconCircle}>
+            <AppIcon name="check" size={34} color="#1E1815" />
+          </View>
+          <Text style={styles.successTitle}>
+            {isBankTransfer || isMomo ? "Đơn hàng đang chờ thanh toán" : "Đặt hàng thành công"}
           </Text>
+          <Text style={styles.successSubtitle}>
+            {isBankTransfer
+              ? "Quét mã QR hoặc chuyển khoản đúng nội dung bên dưới để hệ thống xác nhận đơn."
+              : isMomo
+                ? "Mở MoMo để hoàn tất thanh toán. Đơn sẽ được xử lý sau khi MoMo xác nhận."
+                : "Cảm ơn bạn đã mua sắm tại Ecloria. Đơn hàng của bạn đang được xử lý."}
+          </Text>
+        </View>
 
-          {/* Order code */}
-          <View style={styles.codeCard}>
-            <Text style={styles.codeLabel}>Mã đơn hàng</Text>
-            <Text style={styles.codeValue}>{ORDER_CODE}</Text>
+        <View style={styles.codeCard}>
+          <Text style={styles.codeLabel}>Mã đơn hàng</Text>
+          <Text style={styles.codeValue}>{paymentCode || "Đang cập nhật"}</Text>
+        </View>
+
+        {isBankTransfer ? (
+          <View style={styles.paymentCard}>
+            <Text style={styles.sectionTitle}>Thanh toán chuyển khoản</Text>
+            {qrUrl ? (
+              <View style={styles.qrWrap}>
+                <Image source={{ uri: qrUrl }} style={styles.qrImage} resizeMode="contain" />
+              </View>
+            ) : null}
+
+            <View style={styles.paymentRows}>
+              <InfoRow label="Ngân hàng" value={BANK_TRANSFER_CONFIG.bank} />
+              <InfoRow label="Số tài khoản" value={BANK_TRANSFER_CONFIG.accountNumber} />
+              <InfoRow label="Chủ tài khoản" value={BANK_TRANSFER_CONFIG.accountName} />
+              <InfoRow
+                label="Số tiền"
+                value={formatPrice(Number(order?.totalAmount || 0))}
+                strong
+              />
+              <InfoRow label="Nội dung" value={`Thanh toan don hang ${paymentCode}`} strong />
+              {expiresAtLabel ? <InfoRow label="Hạn thanh toán" value={expiresAtLabel} /> : null}
+            </View>
+
+            <Text style={styles.paymentHint}>
+              Nếu quá hạn mà chưa nhận được thanh toán, đơn sẽ tự chuyển sang thất bại.
+            </Text>
+
+            {qrUrl ? (
+              <TouchableOpacity
+                style={styles.outlineBtn}
+                activeOpacity={0.85}
+                onPress={() => Linking.openURL(qrUrl)}
+              >
+                <Text style={styles.outlineBtnText}>Mở mã QR</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
-
-          {/* Info row */}
-          <View style={styles.infoRow}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>📦</Text>
-              <Text style={styles.infoText}>Đang xác nhận</Text>
-            </View>
-            <View style={styles.infoDivider} />
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>🚚</Text>
-              <Text style={styles.infoText}>5–7 ngày giao</Text>
-            </View>
-            <View style={styles.infoDivider} />
-            <View style={styles.infoItem}>
-              <Text style={styles.infoIcon}>🔔</Text>
-              <Text style={styles.infoText}>Nhận thông báo</Text>
-            </View>
+        ) : isMomo ? (
+          <MomoPaymentCard order={order} payment={order?.payment} />
+        ) : (
+          <View style={styles.statusCard}>
+            <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
+            <InfoRow label="Thanh toán" value="Thanh toán khi nhận hàng" />
+            <InfoRow
+              label="Tổng tiền"
+              value={formatPrice(Number(order?.totalAmount || 0))}
+              strong
+            />
+            <InfoRow label="Trạng thái" value="Đang xác nhận" />
           </View>
-        </Animated.View>
+        )}
 
-        {/* ── Actions ─────────────────────────────────────────────────────── */}
-        <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
+        <View style={styles.actions}>
           <TouchableOpacity
             style={styles.primaryBtn}
             activeOpacity={0.85}
@@ -122,161 +126,188 @@ export default function SuccessScreen({ route, navigation }) {
               }
             }}
           >
-            <Text style={styles.secondaryBtnText}>Theo dõi đơn hàng →</Text>
+            <Text style={styles.secondaryBtnText}>Theo dõi đơn hàng</Text>
           </TouchableOpacity>
-        </Animated.View>
-      </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+function InfoRow({ label, value, strong }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoValue, strong && styles.infoValueStrong]}>{value || "—"}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.bgPrimary,
+    backgroundColor: "#FCF9F4",
   },
   container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 28,
+    padding: 20,
+    paddingBottom: 34,
   },
-
-  // Success icon
+  heroCard: {
+    alignItems: "center",
+    padding: 22,
+    borderRadius: 28,
+    backgroundColor: "#1E1815",
+    marginBottom: 14,
+  },
   iconCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: COLORS.success,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: "#DDA66D",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 32,
-    shadowColor: COLORS.success,
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
-  },
-  checkIcon: {
-    color: "#fff",
-    fontSize: 52,
-    fontWeight: "800",
-    marginTop: -4,
-  },
-
-  // Text block
-  textBlock: {
-    alignItems: "center",
-    width: "100%",
+    marginBottom: 16,
   },
   successTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: COLORS.textPrimary,
-    marginBottom: 12,
-    letterSpacing: -0.5,
+    color: "#FFF8EE",
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 8,
   },
   successSubtitle: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    textAlign: "center",
+    color: "#DCC4A8",
+    fontSize: 14,
     lineHeight: 22,
-    marginBottom: 24,
+    textAlign: "center",
   },
-  brandName: {
-    color: COLORS.primary,
-    fontWeight: "700",
-  },
-
-  // Order code
   codeCard: {
-    backgroundColor: COLORS.primaryBg,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
+    borderRadius: 22,
+    padding: 18,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
-    marginBottom: 28,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    marginBottom: 14,
   },
   codeLabel: {
+    color: "#8A7B6F",
     fontSize: 12,
-    color: COLORS.textMuted,
-    fontWeight: "500",
-    marginBottom: 4,
+    fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 1,
+    marginBottom: 6,
   },
   codeValue: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.primary,
+    color: "#9B4B1F",
+    fontSize: 28,
+    fontWeight: "900",
     letterSpacing: 2,
   },
-
-  // Info row
+  paymentCard: {
+    borderRadius: 24,
+    padding: 18,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 16,
+  },
+  statusCard: {
+    borderRadius: 24,
+    padding: 18,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    color: "#1E1815",
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 14,
+  },
+  qrWrap: {
+    borderRadius: 22,
+    backgroundColor: "#F7EFE7",
+    padding: 14,
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  qrImage: {
+    width: 260,
+    height: 260,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+  },
+  paymentRows: {
+    borderRadius: 18,
+    backgroundColor: "#FCF9F4",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.bgSecondary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 10,
-    width: "100%",
-    marginBottom: 8,
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EFE3D6",
+    gap: 14,
   },
-  infoItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  infoDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: COLORS.divider,
-  },
-  infoIcon: {
-    fontSize: 22,
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-
-  // Buttons
-  actions: {
-    width: "100%",
-    marginTop: 36,
-  },
-  primaryBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 28,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 14,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  primaryBtnText: {
-    color: "#fff",
-    fontSize: 16,
+  infoLabel: {
+    color: "#78695C",
+    fontSize: 13,
     fontWeight: "700",
   },
+  infoValue: {
+    flex: 1,
+    color: "#241A13",
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  infoValueStrong: {
+    color: "#9B4B1F",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  paymentHint: {
+    color: "#78695C",
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  actions: {
+    gap: 10,
+  },
+  primaryBtn: {
+    backgroundColor: "#1E1815",
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  primaryBtnText: {
+    color: "#FFFDF9",
+    fontSize: 15,
+    fontWeight: "900",
+  },
   secondaryBtn: {
-    paddingVertical: 14,
+    backgroundColor: "#F5ECE3",
+    borderRadius: 18,
+    paddingVertical: 15,
     alignItems: "center",
   },
   secondaryBtnText: {
+    color: "#9B4B1F",
     fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.info,
+    fontWeight: "900",
+  },
+  outlineBtn: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D69A65",
+  },
+  outlineBtnText: {
+    color: "#9B4B1F",
+    fontSize: 14,
+    fontWeight: "900",
   },
 });

@@ -1,17 +1,17 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import ApiService from '../../api';
-import ErrorMessage from '../../components/ui/ErrorMessage';
-import { clearAdminSession, isPrivilegedRole, storeAdminSession } from '../../utils/auth';
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import ApiService from "../../api";
+import ErrorMessage from "../../components/ui/ErrorMessage";
+import { clearAdminSession, isPortalRole, storeAdminSession } from "../../utils/auth";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/';
+  const from = location.state?.from?.pathname || "/";
   const expired = location.state?.expired;
 
   const handleLogin = async (e) => {
@@ -21,16 +21,16 @@ export default function Login() {
 
     try {
       const response = await ApiService.login(email, password);
-      
+
       if (!response?.token || !response?.customer) {
-        throw new Error('Invalid response from server');
+        throw new Error("Invalid response from server");
       }
 
-      if (!isPrivilegedRole(response.customer.role)) {
+      if (!isPortalRole(response.customer.role)) {
         clearAdminSession();
         setError({
-          code: 'FORBIDDEN',
-          message: 'Only admin/staff accounts can access the admin portal.',
+          code: "FORBIDDEN",
+          message: "Only admin, staff, or shipper accounts can access this portal.",
         });
         return;
       }
@@ -45,83 +45,90 @@ export default function Login() {
   };
 
   return (
-    <div 
+    <div
       style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'var(--color-bg)',
-        padding: 'var(--spacing-xl)',
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background:
+          "radial-gradient(circle at 20% 20%, rgba(246, 130, 31, 0.16), transparent 30rem), linear-gradient(135deg, #fffaf4 0%, #f7f8fa 42%, #eef1f5 100%)",
+        padding: "var(--spacing-xl)",
       }}
     >
-      <div 
+      <div
         style={{
-          width: '100%',
-          maxWidth: '400px',
-          animation: 'fadeIn 0.3s ease-in-out',
+          width: "100%",
+          maxWidth: "420px",
+          animation: "fadeIn 0.3s ease-in-out",
         }}
       >
-        <div 
+        <div
           style={{
-            textAlign: 'center',
-            marginBottom: 'var(--spacing-xl)',
+            marginBottom: "var(--spacing-xl)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--spacing-md)",
           }}
         >
-          <div 
+          <div
             style={{
-              width: '48px',
-              height: '48px',
-              margin: '0 auto var(--spacing-md)',
-              background: 'var(--color-primary)',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 'var(--font-size-xl)',
-              fontWeight: 'var(--font-weight-bold)',
-              color: '#fff',
+              width: "46px",
+              height: "46px",
+              background: "linear-gradient(135deg, #f6821f 0%, #f45d01 100%)",
+              borderRadius: "var(--radius-md)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "13px",
+              fontWeight: "var(--font-weight-bold)",
+              color: "#fff",
+              boxShadow: "0 12px 26px rgba(246, 130, 31, 0.3)",
             }}
           >
-            SF
+            EC
           </div>
-          <h1 
-            style={{
-              margin: '0 0 var(--spacing-xs) 0',
-              fontSize: 'var(--font-size-2xl)',
-              fontWeight: 'var(--font-weight-semibold)',
-              color: 'var(--color-dark)',
-            }}
-          >
-            StyleFlow
-          </h1>
-          <p 
-            style={{
-              margin: 0,
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            Admin Portal
-          </p>
+          <div>
+            <h1
+              style={{
+                margin: "0 0 var(--spacing-xs) 0",
+                fontSize: "var(--font-size-2xl)",
+                fontWeight: "var(--font-weight-bold)",
+                color: "var(--color-dark)",
+                letterSpacing: "-0.04em",
+              }}
+            >
+              Ecloria Shop
+            </h1>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "var(--font-size-sm)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Admin, staff and shipper operations
+            </p>
+          </div>
         </div>
 
-        <div 
-          className="card" 
+        <div
+          className="card"
           style={{
-            padding: 'var(--spacing-xl)',
+            padding: "28px",
+            boxShadow: "var(--shadow-md)",
           }}
         >
           {expired && (
-            <div 
+            <div
               style={{
-                padding: 'var(--spacing-md)',
-                marginBottom: 'var(--spacing-md)',
-                background: 'var(--color-warning-light)',
-                border: '1px solid var(--color-warning)',
-                borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text)',
+                padding: "var(--spacing-md)",
+                marginBottom: "var(--spacing-md)",
+                background: "var(--color-warning-light)",
+                border: "1px solid var(--color-warning)",
+                borderRadius: "var(--radius-md)",
+                fontSize: "var(--font-size-sm)",
+                color: "var(--color-text)",
               }}
               role="alert"
             >
@@ -142,7 +149,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@styleflow.vn"
+                placeholder="admin@ecloria.co.uk"
                 autoComplete="email"
                 className="form-input"
                 disabled={loading}
@@ -166,26 +173,26 @@ export default function Login() {
               />
             </div>
 
-            <button 
-              type="submit" 
-              className="btn-primary" 
-              disabled={loading} 
-              style={{ width: '100%' }}
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={loading}
+              style={{ width: "100%" }}
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
         </div>
 
-        <div 
+        <div
           style={{
-            textAlign: 'center',
-            marginTop: 'var(--spacing-lg)',
-            fontSize: 'var(--font-size-xs)',
-            color: 'var(--color-text-muted)',
+            textAlign: "center",
+            marginTop: "var(--spacing-lg)",
+            fontSize: "var(--font-size-xs)",
+            color: "var(--color-text-muted)",
           }}
         >
-          StyleFlow Admin • Internal Use Only
+          Ecloria Shop • Internal Use Only
         </div>
       </div>
     </div>

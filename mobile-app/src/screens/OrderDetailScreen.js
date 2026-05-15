@@ -9,11 +9,11 @@ import {
   ActivityIndicator,
   SafeAreaView,
   RefreshControl,
-  Image,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import api from "../services/api";
-import { COLORS } from "../constants/colors";
+import AppImage from "../components/AppImage";
+import api, { formatPrice, PAYMENT_GATEWAY_LABEL } from "../services/api";
+import AppIcon from "../components/AppIcon";
 
 export default function OrderDetailScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
@@ -23,7 +23,6 @@ export default function OrderDetailScreen({ navigation }) {
   const fetchOrders = async () => {
     try {
       const res = await api.get("/orders");
-      // Sắp xếp đơn mới nhất lên đầu
       const sorted = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setOrders(sorted);
     } catch (err) {
@@ -50,89 +49,95 @@ export default function OrderDetailScreen({ navigation }) {
   };
 
   const getStatusDisplay = (status) => {
+    const map = {
+      pending: { label: "Chờ xử lý", color: "#AA9C8F" },
+      processing: { label: "Đang xử lý", color: "#D99152" },
+      shipping: { label: "Đang giao", color: "#3B82F6" },
+      completed: { label: "Hoàn tất", color: "#2D9F6F" },
+      failed: { label: "Thất bại", color: "#C43A2F" },
+      cancelled: { label: "Đã hủy", color: "#AA9C8F" },
+    };
     const s = (status || "").toLowerCase();
-    if (s === "pending" || s === "paid" || s === "awaiting_payment") return "Pending";
-    if (s === "processing") return "Packed";
-    if (s === "shipping" || s === "ready_to_ship") return "Shipped";
-    if (s === "completed" || s === "delivered") return "Delivered";
-    if (s === "failed" || s === "delivery_failed") return "Failed";
-    return "Pending";
+    return map[s] || { label: "Chờ xử lý", color: "#AA9C8F" };
+  };
+
+  const getPaymentLabel = (gateway) => {
+    return PAYMENT_GATEWAY_LABEL[gateway] || "Chưa chọn";
   };
 
   const renderOrderCard = (order) => {
-    const statusText = getStatusDisplay(order.status);
-    const isDelivered = statusText === "Delivered";
-
+    const statusInfo = getStatusDisplay(order.status);
     const totalQuantity = Array.isArray(order.items)
       ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
       : 0;
-
-    // Fallback colors cho tối đa 4 blocks
-    const FALLBACK_COLORS = ["#FFD1D1", "#D1E8FF", "#E2D1FF", "#D1FFDF"];
     const itemsList = Array.isArray(order.items) ? order.items : [];
+    const FALLBACK_TONES = ["#F5ECE3", "#E8DDD4", "#F0E5D8", "#EBE1D7"];
 
     return (
       <TouchableOpacity
         style={styles.card}
         key={order.id}
-        activeOpacity={0.8}
+        activeOpacity={0.88}
         onPress={() => handlePressItem(order.id)}
       >
-        {/* Collage layout 4 góc */}
+        {/* Collage ảnh sản phẩm */}
         <View style={styles.collageWrap}>
           {[0, 1, 2, 3].map((idx) => {
             const item = itemsList[idx];
             if (item && item.imageUrl) {
               return (
-                <Image
+                <AppImage
                   key={idx}
                   source={{ uri: item.imageUrl }}
                   style={styles.collageChunk}
                   resizeMode="cover"
                 />
               );
-            } else {
-              return (
-                <View
-                  key={idx}
-                  style={[styles.collageChunk, { backgroundColor: FALLBACK_COLORS[idx] }]}
-                />
-              );
             }
+            return (
+              <View
+                key={idx}
+                style={[styles.collageChunk, { backgroundColor: FALLBACK_TONES[idx] }]}
+              />
+            );
           })}
         </View>
 
-        {/* Thông tin */}
+        {/* Thông tin đơn */}
         <View style={styles.cardInfo}>
-          <View style={styles.cardRow}>
-            <Text style={styles.orderIdText}>Order #{order.id}</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {totalQuantity} {totalQuantity > 1 ? "items" : "item"}
+          <View style={styles.cardTopRow}>
+            <Text style={styles.orderIdText}>Đơn #{order.id}</Text>
+            <View style={styles.qtyBadge}>
+              <Text style={styles.qtyBadgeText}>
+                {totalQuantity} sản phẩm
               </Text>
             </View>
           </View>
 
-          <Text style={styles.deliveryType}>Standard Delivery</Text>
+          {/* Hình thức thanh toán */}
+          <Text style={styles.paymentMethodText}>
+            {getPaymentLabel(order.paymentGateway)}
+          </Text>
+
+          {/* Tổng tiền */}
+          {order.totalAmount ? (
+            <Text style={styles.totalText}>{formatPrice(order.totalAmount)}</Text>
+          ) : null}
 
           <View style={styles.cardBottomRow}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={styles.statusText}>{statusText}</Text>
-              {isDelivered && <Text style={styles.successCheck}> ✔</Text>}
+            <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + "18" }]}>
+              <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
+              <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                {statusInfo.label}
+              </Text>
             </View>
 
             <TouchableOpacity
-              style={[styles.actionBtn, isDelivered ? styles.reviewBtn : styles.trackBtn]}
+              style={styles.trackBtn}
               onPress={() => handlePressItem(order.id)}
             >
-              <Text
-                style={[
-                  styles.actionBtnText,
-                  isDelivered ? styles.reviewBtnText : styles.trackBtnText,
-                ]}
-              >
-                {isDelivered ? "Review" : "Track"}
-              </Text>
+              <Text style={styles.trackBtnText}>Chi tiết</Text>
+              <Text style={styles.trackBtnArrow}>→</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -142,42 +147,36 @@ export default function OrderDetailScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* ── Header theo chuẩn Figma 57 ── */}
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.avatarWrap}>
-          <Text style={styles.avatarText}>ME</Text>
-        </View>
-        <View style={styles.headerMid}>
-          <Text style={styles.headerTitle}>To Receive</Text>
-          <Text style={styles.headerSub}>My Orders</Text>
-        </View>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Text>📝</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Text>⚙️</Text>
-          </TouchableOpacity>
+        <View>
+          <Text style={styles.headerEyebrow}>My Orders</Text>
+          <Text style={styles.headerTitle}>Đơn hàng của bạn</Text>
         </View>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollList}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={COLORS.primary}
+            tintColor="#9B4B1F"
           />
         }
       >
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
+            <ActivityIndicator size="large" color="#9B4B1F" />
           </View>
         ) : orders.length === 0 ? (
-          <View style={styles.center}>
-            <Text style={styles.emptyText}>You don&apos;t have any orders to receive.</Text>
+          <View style={styles.emptyCard}>
+            <AppIcon name="note" size={28} color="#AA9C8F" />
+            <Text style={styles.emptyTitle}>Chưa có đơn hàng nào</Text>
+            <Text style={styles.emptyText}>
+              Các đơn hàng bạn đặt sẽ xuất hiện tại đây để bạn dễ dàng theo dõi.
+            </Text>
           </View>
         ) : (
           orders.map(renderOrderCard)
@@ -188,98 +187,170 @@ export default function OrderDetailScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.bgPrimary },
-  center: { marginTop: 40, alignItems: "center" },
-  emptyText: { color: COLORS.textSecondary, fontSize: 16 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FCF9F4",
+  },
+  center: {
+    marginTop: 60,
+    alignItems: "center",
+  },
 
   // Header
   header: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    backgroundColor: COLORS.bgPrimary,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: "#FCF9F4",
   },
-  avatarWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFE5E5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
+  headerEyebrow: {
+    color: "#AA9C8F",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 4,
   },
-  avatarText: { fontWeight: "bold", color: COLORS.primary },
-  headerMid: { flex: 1 },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: COLORS.textPrimary },
-  headerSub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  headerIcons: { flexDirection: "row" },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.bgSecondary,
-    justifyContent: "center",
+  headerTitle: {
+    color: "#1E1815",
+    fontSize: 26,
+    fontWeight: "900",
+  },
+
+  // Empty
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 28,
     alignItems: "center",
-    marginLeft: 10,
+    marginTop: 20,
+  },
+  emptyTitle: {
+    color: "#1E1815",
+    fontSize: 17,
+    fontWeight: "800",
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
   },
 
   // List
-  scrollList: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 },
+  scrollList: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 100,
+  },
   card: {
     flexDirection: "row",
-    backgroundColor: COLORS.bgPrimary, // Trắng
-    marginBottom: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#F3F0FF",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
-    padding: 12,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 14,
+    borderRadius: 22,
+    padding: 14,
     alignItems: "center",
+    shadowColor: "#1E1815",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 3,
   },
 
-  // Collage image holder
+  // Collage
   collageWrap: {
     width: 80,
     height: 80,
-    borderRadius: 8,
+    borderRadius: 16,
     overflow: "hidden",
     flexDirection: "row",
     flexWrap: "wrap",
-    marginRight: 16,
+    marginRight: 14,
   },
-  collageChunk: { width: "50%", height: "50%" },
+  collageChunk: {
+    width: "50%",
+    height: "50%",
+  },
 
   // Info
-  cardInfo: { flex: 1 },
-  cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  orderIdText: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary },
-  badge: { backgroundColor: "#F5F5F5", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "600" },
-  deliveryType: { fontSize: 13, color: COLORS.textSecondary, marginVertical: 6 },
+  cardInfo: {
+    flex: 1,
+  },
+  cardTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  orderIdText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E1815",
+  },
+  qtyBadge: {
+    backgroundColor: "#F5ECE3",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  qtyBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#76675B",
+  },
+  paymentMethodText: {
+    fontSize: 13,
+    color: "#76675B",
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  totalText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#9B4B1F",
+    marginBottom: 8,
+  },
   cardBottomRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 4,
   },
-  statusText: { fontSize: 18, fontWeight: "800", color: COLORS.textPrimary },
-  successCheck: { fontSize: 16, color: COLORS.info },
-
-  // Buttons
-  actionBtn: {
-    borderRadius: 20,
-    paddingHorizontal: 20,
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  trackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E1815",
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    justifyContent: "center",
+    borderRadius: 12,
   },
-  trackBtn: { backgroundColor: COLORS.info },
-  trackBtnText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
-  reviewBtn: { backgroundColor: "transparent", borderWidth: 1, borderColor: COLORS.info },
-  reviewBtnText: { color: COLORS.info, fontWeight: "700", fontSize: 14 },
+  trackBtnText: {
+    color: "#FFFDF9",
+    fontSize: 13,
+    fontWeight: "800",
+    marginRight: 4,
+  },
+  trackBtnArrow: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
+  },
 });

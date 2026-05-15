@@ -1,3 +1,6 @@
+import { lookup } from "node:dns";
+import { request as httpsRequest } from "node:https";
+
 import { Router } from "express";
 
 const router = Router();
@@ -102,17 +105,63 @@ async function getCachedJson(cacheKey, loader) {
 }
 
 async function fetchLocationJson(pathname) {
-  const response = await fetch(`${LOCATION_API_BASE_URL}${pathname}`);
+  const response = await requestLocationJson(pathname);
 
-  if (response.status === 404) {
+  if (response.statusCode === 404) {
     throw new LocationApiNotFoundError();
   }
 
-  if (!response.ok) {
-    throw new Error(`Location API request failed with status ${response.status}`);
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`Location API request failed with status ${response.statusCode}`);
   }
 
-  return response.json();
+  try {
+    return JSON.parse(response.body);
+  } catch (error) {
+    throw new Error("Location API returned invalid JSON", { cause: error });
+  }
+}
+
+function requestLocationJson(pathname) {
+  const url = new URL(pathname, LOCATION_API_BASE_URL);
+
+  return new Promise((resolve, reject) => {
+    const req = httpsRequest(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || undefined,
+        path: `${url.pathname}${url.search}`,
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        lookup(hostname, options, callback) {
+          return lookup(hostname, { ...options, family: 4 }, callback);
+        },
+      },
+      (res) => {
+        let body = "";
+
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          resolve({
+            statusCode: res.statusCode ?? 500,
+            body,
+          });
+        });
+      },
+    );
+
+    req.setTimeout(10_000, () => {
+      req.destroy(new Error("Location API request timed out"));
+    });
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 function parsePositiveInteger(value) {

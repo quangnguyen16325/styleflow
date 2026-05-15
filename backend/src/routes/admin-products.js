@@ -1,6 +1,6 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { pool } from "../db/pool.js";
-import { isValidImageUrl } from "../r2.js";
+import { isAllowedImageContentType, isValidImageUrl, uploadProductImageObject } from "../r2.js";
 
 const router = Router();
 
@@ -258,6 +258,74 @@ router.patch("/:id/image", async (req, res) => {
     return res.status(500).json(internalError("Failed to update product image"));
   }
 });
+
+router.put(
+  "/:id/image-upload",
+  express.raw({
+    type: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    limit: "5mb",
+  }),
+  async (req, res) => {
+    const productId = parsePositiveInteger(req.params.id);
+    if (!productId) {
+      return res.status(400).json(validationError("Product id must be a positive integer"));
+    }
+
+    const contentType = String(req.get("content-type") || "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    if (!isAllowedImageContentType(contentType)) {
+      return res
+        .status(400)
+        .json(
+          validationError(
+            "contentType must be one of image/jpeg, image/png, image/webp, image/gif",
+          ),
+        );
+    }
+
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json(validationError("Image body is required"));
+    }
+
+    const fileName = String(req.get("x-file-name") || `product-${productId}`).trim();
+
+    try {
+      const existingProduct = await pool.query("SELECT id FROM products WHERE id = $1 LIMIT 1", [
+        productId,
+      ]);
+      if (existingProduct.rows.length === 0) {
+        return res.status(404).json(notFound("Product not found"));
+      }
+
+      const upload = await uploadProductImageObject({
+        productId,
+        fileName,
+        contentType,
+        body: req.body,
+      });
+
+      await pool.query(
+        `
+          UPDATE products
+          SET image_url = $2
+          WHERE id = $1
+        `,
+        [productId, upload.publicUrl],
+      );
+
+      const updatedProduct = await pool.query(`${listProductsQuery} WHERE p.id = $1`, [productId]);
+      return res.json({
+        ...mapAdminProductRow(updatedProduct.rows[0]),
+        objectKey: upload.objectKey,
+      });
+    } catch (error) {
+      console.error(`PUT /admin/products/${productId}/image-upload failed:`, error);
+      return res.status(500).json(internalError("Failed to upload product image"));
+    }
+  },
+);
 
 router.delete("/:id", async (req, res) => {
   const productId = parsePositiveInteger(req.params.id);

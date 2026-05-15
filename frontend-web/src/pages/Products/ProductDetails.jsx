@@ -131,46 +131,16 @@ export default function ProductDetails() {
       return;
     }
 
-    let presignPayload;
     try {
-      presignPayload = await ApiService.createProductUploadPresign(product.id, selectedFile.name, contentType);
-      if (!presignPayload?.uploadUrl || !presignPayload?.publicUrl) {
-        throw new Error('Missing upload URL or public URL in presign response.');
-      }
-    } catch (err) {
-      setUploadError(`Presign failed: ${err.message || 'Unable to create upload URL.'}`);
-      setUploading(false);
-      return;
-    }
-
-    try {
-      const uploadResponse = await fetch(presignPayload.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': contentType,
-        },
-        body: selectedFile,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error(`Storage returned status ${uploadResponse.status}`);
-      }
-    } catch (err) {
-      setUploadError(`Upload failed: ${err.message || 'Unable to upload file to storage.'}`);
-      setUploading(false);
-      return;
-    }
-
-    try {
-      await ApiService.updateProductImage(product.id, presignPayload.publicUrl);
-      setProduct((prev) => (prev ? { ...prev, imageUrl: presignPayload.publicUrl } : prev));
+      const result = await ApiService.uploadProductImage(product.id, selectedFile, contentType);
+      setProduct(result);
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       setUploadSuccess('Product image updated successfully.');
     } catch (err) {
-      setUploadError(`Save image failed: ${err.message || 'Unable to update product image.'}`);
+      setUploadError(err.message || 'Unable to upload and save product image.');
     } finally {
       setUploading(false);
     }

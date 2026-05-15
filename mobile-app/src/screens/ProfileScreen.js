@@ -8,16 +8,48 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../services/api";
 import { useWishlist } from "../context/WishlistContext";
+import { useAuth } from "../context/AuthContext";
+import AppIcon from "../components/AppIcon";
 
-export default function ProfileScreen({ navigation, onSettingsPress }) {
+function MenuItem({ label, sub, onPress, isLast = false }) {
+  return (
+    <TouchableOpacity
+      style={[styles.menuRow, isLast && styles.menuRowLast]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      disabled={!onPress}
+    >
+      <View style={styles.menuTextCol}>
+        <Text style={styles.menuText}>{label}</Text>
+        {sub ? <Text style={styles.menuSub}>{sub}</Text> : null}
+      </View>
+      <Text style={styles.menuChevron}>›</Text>
+    </TouchableOpacity>
+  );
+}
+
+export default function ProfileScreen({ navigation, onSettingsPress, onTabSwitch }) {
   const [profile, setProfile] = useState(null);
   const [orderCount, setOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { items: wishlistItems } = useWishlist();
+  const { logout } = useAuth();
+
+  const handleLogout = useCallback(() => {
+    Alert.alert("Đăng xuất", "Bạn có chắc chắn muốn đăng xuất?", [
+      { text: "Huỷ", style: "cancel" },
+      {
+        text: "Đăng xuất",
+        style: "destructive",
+        onPress: () => logout(),
+      },
+    ]);
+  }, [logout]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -26,12 +58,11 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
         api.get("/me"),
         api.get("/orders").catch(() => ({ data: [] })),
       ]);
-      setProfile(meRes.data);
-      if (Array.isArray(ordersRes.data)) {
-        setOrderCount(ordersRes.data.length);
-      }
-    } catch (err) {
-      console.warn("Lỗi tải data Profile:", err);
+      const meData = meRes.data;
+      setProfile(meData.customer || meData);
+      setOrderCount(Array.isArray(ordersRes.data) ? ordersRes.data.length : 0);
+    } catch (error) {
+      console.warn("Lỗi tải data Profile:", error);
     } finally {
       setLoading(false);
     }
@@ -46,28 +77,39 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
   if (loading && !profile) {
     return (
       <SafeAreaView style={[styles.safeArea, styles.center]}>
-        <ActivityIndicator size="large" color="#0055ff" />
+        <ActivityIndicator size="large" color="#9B4B1F" />
       </SafeAreaView>
     );
   }
 
-  const initial = profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : "U";
+  const initial = profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : "E";
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Header & Settings Icon */}
-        <View style={styles.topBar}>
-          <Text style={styles.screenTitle}>Tài khoản</Text>
-          <TouchableOpacity
-            style={styles.settingsBtn}
-            onPress={onSettingsPress || (() => navigation.navigate("Settings"))}
-          >
-            <Text style={styles.settingsIcon}>⚙</Text>
-          </TouchableOpacity>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
+      >
+        <View style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroTextWrap}>
+              <Text style={styles.heroEyebrow}>Account</Text>
+              <Text style={styles.heroTitle}>Tài khoản của bạn</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              onPress={onSettingsPress || (() => navigation.navigate("Settings"))}
+              activeOpacity={0.88}
+            >
+              <AppIcon name="settings" size={22} color="#9B4B1F" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.heroSubtext}>
+            Quản lý đơn hàng, địa chỉ giao hàng và danh sách những món bạn muốn quay lại sau.
+          </Text>
         </View>
 
-        {/* User Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarWrap}>
             <Text style={styles.avatarText}>{initial}</Text>
@@ -79,192 +121,253 @@ export default function ProfileScreen({ navigation, onSettingsPress }) {
           </View>
         </View>
 
-        {/* Stats Section */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
             <Text style={styles.statValue}>{orderCount}</Text>
             <Text style={styles.statLabel}>Đơn hàng</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statBox}>
+          <View style={styles.statCard}>
             <Text style={styles.statValue}>{wishlistItems.length}</Text>
             <Text style={styles.statLabel}>Yêu thích</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Voucher</Text>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{profile?.phone ? "OK" : "—"}</Text>
+            <Text style={styles.statLabel}>Liên hệ</Text>
           </View>
         </View>
 
-        {/* Quick Menu — Mua sắm */}
-        <Text style={styles.sectionLabel}>MUA SẮM</Text>
-        <View style={styles.menuGroup}>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Mua sắm</Text>
           <MenuItem
-            icon="◷"
             label="Theo dõi đơn hàng"
-            onPress={() => navigation.navigate("MainTabs", { screen: "Track" })}
+            sub={`${orderCount} đơn đang lưu trong lịch sử`}
+            onPress={() => onTabSwitch?.("Track")}
           />
           <MenuItem
-            icon="♡"
             label="Sản phẩm yêu thích"
             sub={`${wishlistItems.length} sản phẩm`}
-            onPress={() => navigation.navigate("MainTabs", { screen: "Wishlist" })}
+            onPress={() => onTabSwitch?.("Wishlist")}
           />
           <MenuItem
-            icon="▽"
             label="Sổ địa chỉ giao hàng"
+            sub="Cập nhật nơi nhận hàng mặc định"
             onPress={() => navigation.navigate("AddressList")}
             isLast
           />
         </View>
 
-        {/* Quick Menu — Tài khoản */}
-        <Text style={styles.sectionLabel}>TÀI KHOẢN</Text>
-        <View style={styles.menuGroup}>
-          <MenuItem icon="○" label="Thông tin cá nhân" sub={profile?.email || ""} />
-          <MenuItem icon="□" label="Bảo mật & Mật khẩu" />
-          <MenuItem icon="◑" label="Thông báo" isLast />
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Tài khoản</Text>
+          <MenuItem
+            label="Thông tin cá nhân"
+            sub={profile?.email || ""}
+            onPress={() =>
+              Alert.alert("Thông tin cá nhân", "Tính năng chỉnh sửa thông tin đang được phát triển.")
+            }
+          />
+          <MenuItem
+            label="Cài đặt"
+            sub="Thông báo, giao diện và tuỳ chọn khác"
+            onPress={onSettingsPress || (() => navigation.navigate("Settings"))}
+          />
+          <MenuItem
+            label="Bảo mật"
+            sub="Kiểm tra thông tin đăng nhập"
+            onPress={() =>
+              Alert.alert("Bảo mật", "Tính năng bảo mật tài khoản đang được phát triển.")
+            }
+            isLast
+          />
         </View>
+
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.88}
+        >
+          <Text style={styles.logoutBtnText}>Đăng xuất</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ── Helper Component ──
-function MenuItem({ icon, label, sub, onPress, isLast }) {
-  return (
-    <TouchableOpacity
-      style={[styles.menuRow, isLast && styles.menuRowLast]}
-      onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-      disabled={!onPress}
-    >
-      <View style={styles.menuIconWrap}>
-        <Text style={styles.menuIconText}>{icon}</Text>
-      </View>
-      <View style={styles.menuTextCol}>
-        <Text style={styles.menuText}>{label}</Text>
-        {sub ? <Text style={styles.menuSub}>{sub}</Text> : null}
-      </View>
-      <Text style={styles.menuChevron}>›</Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F8F9FA" },
-  center: { justifyContent: "center", alignItems: "center" },
-  scroll: { padding: 20, paddingBottom: 60 },
-
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-    marginTop: 10,
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FCF9F4",
   },
-  screenTitle: { fontSize: 28, fontWeight: "900", color: "#111" },
-  settingsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#fff",
+  center: {
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
   },
-  settingsIcon: { fontSize: 22, color: "#111" },
-
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  heroCard: {
+    backgroundColor: "#1E1815",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  heroTextWrap: {
+    flex: 1,
+    marginRight: 16,
+  },
+  heroEyebrow: {
+    color: "#DCC4A8",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  heroTitle: {
+    color: "#FFF8EE",
+    fontSize: 28,
+    fontWeight: "900",
+    lineHeight: 34,
+  },
+  heroSubtext: {
+    color: "rgba(255,248,238,0.76)",
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 10,
+  },
+  settingsBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#F2E2D2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   profileCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
   },
   avatarWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#0055ff",
-    justifyContent: "center",
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#F5ECE3",
     alignItems: "center",
+    justifyContent: "center",
     marginRight: 16,
   },
-  avatarText: { fontSize: 28, fontWeight: "800", color: "#fff" },
-  profileInfo: { flex: 1 },
-  fullName: { fontSize: 20, fontWeight: "800", color: "#111", marginBottom: 4 },
-  email: { fontSize: 14, color: "#666" },
-  phone: { fontSize: 13, color: "#888", marginTop: 2 },
-
-  statsContainer: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingVertical: 20,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+  avatarText: {
+    color: "#9B4B1F",
+    fontSize: 28,
+    fontWeight: "900",
   },
-  statBox: { flex: 1, alignItems: "center" },
-  statValue: { fontSize: 22, fontWeight: "800", color: "#0055ff", marginBottom: 6 },
-  statLabel: { fontSize: 13, fontWeight: "600", color: "#666" },
-  statDivider: { width: 1, height: "100%", backgroundColor: "#EEE" },
-
-  sectionLabel: {
+  profileInfo: {
+    flex: 1,
+  },
+  fullName: {
+    color: "#1E1815",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  email: {
+    color: "#65574C",
+    fontSize: 14,
+  },
+  phone: {
+    color: "#8A7B6F",
+    fontSize: 13,
+    marginTop: 4,
+  },
+  statsRow: {
+    flexDirection: "row",
+    marginBottom: 14,
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: "#F7EFE7",
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  statValue: {
+    color: "#9B4B1F",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  statLabel: {
+    color: "#65574C",
     fontSize: 12,
     fontWeight: "700",
-    color: "#999",
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginLeft: 4,
   },
-
-  menuGroup: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    color: "#1E1815",
+    fontSize: 17,
+    fontWeight: "800",
+    marginBottom: 8,
   },
   menuRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 18,
+    justifyContent: "space-between",
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#F0E5D8",
   },
-  menuRowLast: { borderBottomWidth: 0 },
-  menuIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#EFF2FE",
-    justifyContent: "center",
+  menuRowLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 4,
+  },
+  menuTextCol: {
+    flex: 1,
+    marginRight: 12,
+  },
+  menuText: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  menuSub: {
+    color: "#7A685B",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  menuChevron: {
+    color: "#9B4B1F",
+    fontSize: 22,
+  },
+  logoutBtn: {
     alignItems: "center",
-    marginRight: 14,
+    paddingVertical: 16,
+    borderRadius: 18,
+    backgroundColor: "#F5ECE3",
+    marginBottom: 30,
   },
-  menuIconText: { fontSize: 16, color: "#0055ff" },
-  menuTextCol: { flex: 1 },
-  menuText: { fontSize: 15, fontWeight: "700", color: "#111" },
-  menuSub: { fontSize: 12, color: "#888", marginTop: 2 },
-  menuChevron: { fontSize: 22, color: "#ccc" },
+  logoutBtnText: {
+    color: "#C43A2F",
+    fontSize: 15,
+    fontWeight: "800",
+  },
 });

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS customers (
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash TEXT,
   role VARCHAR(30) NOT NULL DEFAULT 'customer' CHECK (
-    role IN ('customer', 'admin', 'staff')
+    role IN ('customer', 'admin', 'staff', 'shipper')
   ),
   abuse_score INTEGER NOT NULL DEFAULT 0 CHECK (abuse_score >= 0),
   is_blacklisted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_id BIGINT NOT NULL REFERENCES customers(id),
   customer_address_id BIGINT REFERENCES customer_addresses(id) ON DELETE SET NULL,
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
-    status IN ('pending', 'awaiting_payment', 'paid', 'processing', 'shipping', 'completed', 'cancelled', 'failed')
+    status IN ('pending', 'processing', 'shipping', 'completed', 'cancelled', 'failed')
   ),
   payment_status VARCHAR(50) NOT NULL DEFAULT 'unpaid' CHECK (
     payment_status IN (
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS refund_requests (
   id BIGSERIAL PRIMARY KEY,
   order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-  image_url TEXT NOT NULL,
+  image_url TEXT,
   reason TEXT NOT NULL DEFAULT '',
   status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (
     status IN (
@@ -253,7 +253,7 @@ DROP CONSTRAINT IF EXISTS customers_role_check;
 
 ALTER TABLE customers
 ADD CONSTRAINT customers_role_check CHECK (
-  role IN ('customer', 'admin', 'staff')
+  role IN ('customer', 'admin', 'staff', 'shipper')
 );
 
 ALTER TABLE customers
@@ -261,6 +261,9 @@ ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS customer_address_id BIGINT REFERENCES customer_addresses(id) ON DELETE SET NULL;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS assigned_shipper_id BIGINT REFERENCES customers(id) ON DELETE SET NULL;
 
 ALTER TABLE customer_addresses
 ADD COLUMN IF NOT EXISTS province_code VARCHAR(20);
@@ -311,8 +314,37 @@ ADD CONSTRAINT orders_payment_status_check CHECK (
   )
 );
 
+UPDATE orders
+SET
+  payment_status = CASE
+    WHEN status = 'awaiting_payment' AND payment_status = 'unpaid' THEN 'payment_pending'
+    WHEN status = 'paid' AND payment_status = 'unpaid' THEN 'paid'
+    ELSE payment_status
+  END,
+  status = CASE
+    WHEN status = 'awaiting_payment' THEN 'pending'
+    WHEN status = 'paid' THEN 'processing'
+    ELSE status
+  END
+WHERE status IN ('awaiting_payment', 'paid');
+
+ALTER TABLE orders
+DROP CONSTRAINT IF EXISTS orders_status_check;
+
+ALTER TABLE orders
+ADD CONSTRAINT orders_status_check CHECK (
+  status IN ('pending', 'processing', 'shipping', 'completed', 'cancelled', 'failed')
+);
+
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS payment_gateway VARCHAR(50);
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS payment_expires_at TIMESTAMPTZ;
+
+UPDATE orders
+SET payment_expires_at = NULL
+WHERE payment_gateway = 'COD';
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS transaction_ref VARCHAR(120);
@@ -473,6 +505,9 @@ ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS review_note TEXT;
 
 ALTER TABLE refund_requests
+ALTER COLUMN image_url DROP NOT NULL;
+
+ALTER TABLE refund_requests
 ADD COLUMN IF NOT EXISTS reason TEXT;
 
 UPDATE refund_requests
@@ -564,6 +599,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_customer_address_id ON orders(customer_add
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_status ON orders(delivery_status);
+CREATE INDEX IF NOT EXISTS idx_orders_assigned_shipper_id ON orders(assigned_shipper_id);
 CREATE INDEX IF NOT EXISTS idx_orders_shipping_province_code ON orders(shipping_province_code);
 CREATE INDEX IF NOT EXISTS idx_orders_shipping_district_code ON orders(shipping_district_code);
 CREATE INDEX IF NOT EXISTS idx_orders_shipping_ward_code ON orders(shipping_ward_code);

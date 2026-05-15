@@ -1,563 +1,505 @@
 /* eslint-disable react/prop-types */
-import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  SafeAreaView,
-  Image,
-  ScrollView,
-  Dimensions,
-  Modal,
-} from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from "react-native";
+import AppImage from "../components/AppImage";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
-import api, { formatPrice } from "../services/api";
+import { formatPrice } from "../services/api";
 
-const { width } = Dimensions.get("window");
+function CartItemCard({ item, onDecrease, onIncrease, onRemove }) {
+  const imageUri = item.image || item.imageUrl || null;
+  const price = item.basePrice || item.price || 0;
+
+  return (
+    <View style={styles.itemCard}>
+      <AppImage source={{ uri: imageUri }} style={styles.itemImage} />
+      <View style={styles.itemBody}>
+        <View style={styles.itemTopRow}>
+          <Text style={styles.itemName} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <TouchableOpacity style={styles.removeBtn} onPress={onRemove} activeOpacity={0.85}>
+            <Text style={styles.removeBtnText}>×</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.itemMeta}>
+          {item.availableQty > 0 ? `Có thể đặt ${item.availableQty}` : "Tạm hết hàng"}
+        </Text>
+        <View style={styles.itemBottomRow}>
+          <Text style={styles.itemPrice} numberOfLines={1} adjustsFontSizeToFit>
+            {formatPrice(price)}
+          </Text>
+          <View style={styles.qtyControl}>
+            <TouchableOpacity style={styles.qtyBtn} onPress={onDecrease} activeOpacity={0.85}>
+              <Text style={styles.qtyBtnText}>−</Text>
+            </TouchableOpacity>
+            <View style={styles.qtyValueWrap}>
+              <Text style={styles.qtyValueText}>{item.quantity}</Text>
+            </View>
+            <TouchableOpacity style={styles.qtyBtn} onPress={onIncrease} activeOpacity={0.85}>
+              <Text style={styles.qtyBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function WishlistRow({ product, onMoveToCart }) {
+  const price = product.basePrice || product.price || 0;
+  const imageUri = product.imageUrl || product.image || null;
+
+  return (
+    <View style={styles.wishlistRow}>
+      <AppImage source={{ uri: imageUri }} style={styles.wishlistImage} />
+      <View style={styles.wishlistInfo}>
+        <Text style={styles.wishlistName} numberOfLines={2}>
+          {product.name}
+        </Text>
+        <Text style={styles.wishlistPrice}>{formatPrice(price)}</Text>
+      </View>
+      <TouchableOpacity style={styles.wishlistAction} onPress={onMoveToCart} activeOpacity={0.88}>
+        <Text style={styles.wishlistActionText}>Thêm</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function CartScreen({ navigation }) {
   const { items, updateQuantity, removeFromCart, addToCart } = useCart();
-
-  const [defaultAddress, setDefaultAddress] = useState(null);
-  const [addressModalVisible, setAddressModalVisible] = useState(false);
-  const [apiAddresses, setApiAddresses] = useState([]);
   const { items: wishlistItems, removeFromWishlist } = useWishlist();
 
-  // Tổng thanh toán cục bộ
   const subtotal = items.reduce(
     (sum, item) => sum + (item.basePrice || item.price || 0) * item.quantity,
     0,
   );
   const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
-
-  useFocusEffect(
-    useCallback(() => {
-      // Gọi API thực tế từ database
-      const loadData = async () => {
-        try {
-          // Lấy địa chỉ
-          const addrRes = await api.get("/me/addresses").catch(() => null);
-          if (addrRes && addrRes.data) {
-            const list = Array.isArray(addrRes.data) ? addrRes.data : [];
-            const mapped = list.map((a) => ({
-              id: a.id,
-              label: a.label || "Khác",
-              fullAddress: [a.addressLine, a.ward, a.district, a.city, a.country]
-                .filter(Boolean)
-                .join(", "),
-              phone: a.receiverPhone || "",
-              isDefault: a.isDefault || false,
-            }));
-            setApiAddresses(mapped);
-            const def = mapped.find((a) => a.isDefault) || mapped[0];
-            setDefaultAddress(def || null);
-          }
-        } catch (err) {
-          console.warn("Lỗi tải data CartScreen:", err);
-        }
-      };
-
-      loadData();
-    }, []),
-  );
+  const wishlistPreview = wishlistItems.slice(0, 3);
 
   const handleCheckout = () => {
-    if (items.length === 0) return;
-    navigation.navigate("Checkout", { cartItems: items, subtotal });
-  };
-
-  const handleAddToCart = (product) => {
-    if (addToCart) {
-      addToCart({
-        id: product.id || product._id,
-        name: product.name,
-        basePrice: product.basePrice || product.price || 0,
-        availableQty: product.availableQty || product.stockCount || 10,
-        image: product.imageUrl || product.image || product.thumbnail,
-      });
-      // Xóa khỏi wishlist khi vào giỏ
-      if (removeFromWishlist) removeFromWishlist(product.id || product._id);
+    if (items.length === 0) {
+      return;
     }
+
+    navigation.navigate("Checkout");
   };
 
-  // Wishlist items thật từ WishlistContext
-  const displayWishlistItems = wishlistItems.slice(0, 4);
-
-  // Address Display String
-  const addressString = defaultAddress ? defaultAddress.fullAddress : "No address selected";
-
-  // --- RENDERS ---
-
-  const renderCartItem = ({ item }) => {
-    const qty = item.quantity || 1;
-    const priceRaw = item.basePrice || item.price || 0;
-    const imageUri = item.image || item.imageUrl || "https://via.placeholder.com/150";
-
-    return (
-      <View style={styles.cartItem}>
-        <View style={styles.imageWrap}>
-          <Image source={{ uri: imageUri }} style={styles.itemImage} />
-          <TouchableOpacity
-            style={styles.trashCircle}
-            onPress={() => removeFromCart(item.productId || item.id)}
-          >
-            {/* Outline red circle inner */}
-            <View style={styles.trashOutline}>
-              <Text style={styles.trashIcon}>🗑</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.itemInfo}>
-          <Text style={styles.itemName} numberOfLines={2}>
-            {item.name || "Lorem ipsum dolor sit amet consectetur."}
-          </Text>
-          <Text style={styles.itemVariant}>Pink, Size M</Text>
-
-          <View style={styles.itemBotRow}>
-            <Text style={styles.itemPrice}>{formatPrice(priceRaw)}</Text>
-
-            <View style={styles.qtyBox}>
-              <TouchableOpacity
-                style={styles.qtyBtnBorder}
-                onPress={() => {
-                  if (qty > 1) updateQuantity(item.productId || item.id, qty - 1);
-                  else removeFromCart(item.productId || item.id);
-                }}
-              >
-                <Text style={styles.qtyBtnIconText}>-</Text>
-              </TouchableOpacity>
-
-              <View style={styles.qtyValueWrap}>
-                <Text style={styles.qtyValueText}>{qty}</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.qtyBtnBorder}
-                onPress={() => updateQuantity(item.productId || item.id, qty + 1)}
-              >
-                <Text style={styles.qtyBtnIconText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    );
+  const handleMoveWishlistToCart = (product) => {
+    addToCart({
+      id: product.id || product._id,
+      name: product.name,
+      basePrice: product.basePrice || product.price || 0,
+      availableQty: product.availableQty || product.stockCount || 1,
+      image: product.imageUrl || product.image || null,
+    });
+    removeFromWishlist(product.id || product._id);
   };
-
-  const renderWishlistItem = (product) => {
-    const priceRaw = product.price || product.basePrice || 17;
-    const imageUri = product.imageUrl || product.image || "https://via.placeholder.com/150";
-
-    return (
-      <View key={product.id || product._id} style={styles.cartItem}>
-        <View style={styles.imageWrap}>
-          <Image source={{ uri: imageUri }} style={styles.itemImage} resizeMode="cover" />
-          <TouchableOpacity style={styles.trashCircle}>
-            <View style={styles.trashOutline}>
-              <Text style={styles.trashIcon}>🗑</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.itemInfo}>
-          <Text style={styles.itemName} numberOfLines={2}>
-            {product.name || "Lorem ipsum dolor sit amet."}
-          </Text>
-          <Text style={styles.itemPrice}>{formatPrice(priceRaw)}</Text>
-
-          <View style={styles.wishlistBotRow}>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={styles.variantChip}>
-                <Text style={styles.variantText}>Pink</Text>
-              </View>
-              <View style={styles.variantChip}>
-                <Text style={styles.variantText}>M</Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={() => handleAddToCart(product)}>
-              {/* Add to cart icon blue outline style */}
-              <Text style={styles.addCartIcon}>🛍+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  // Khối rỗng - Cart 0
-  const renderEmptyContent = () => (
-    <>
-      <View style={styles.emptyCircleBag}>
-        <View style={styles.emptyCircleBlue}>
-          <Text style={styles.emptyBagWhiteIco}>🛍</Text>
-          <Text style={styles.emptyBagS}>S</Text>
-        </View>
-      </View>
-
-      {displayWishlistItems.length > 0 && (
-        <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>From Your Wishlist</Text>
-          {displayWishlistItems.map(renderWishlistItem)}
-        </View>
-      )}
-    </>
-  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Scrollable Body */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.mainScroll}>
-        {/* Header: Cart 2 */}
-        <View style={styles.headerRow}>
-          <Text style={styles.mainHeading}>Cart</Text>
-          <View style={styles.cartCountBadge}>
-            <Text style={styles.cartCountText}>{totalCount}</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
+      >
+        <View style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>Shopping Bag</Text>
+          <View style={styles.heroTopRow}>
+            <Text style={styles.heroTitle}>Giỏ hàng của bạn</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{totalCount}</Text>
+            </View>
           </View>
+          <Text style={styles.heroSubtext}>
+            {items.length > 0
+              ? `${totalCount} sản phẩm đang chờ được hoàn tất.`
+              : "Chọn thêm sản phẩm để bắt đầu đơn hàng tiếp theo."}
+          </Text>
         </View>
 
-        {/* Address Card */}
-        <View style={styles.addressCard}>
-          <View style={styles.addrLeftDiv}>
-            <Text style={styles.addrTitle}>Shipping Address</Text>
-            <Text style={styles.addrText} numberOfLines={2}>
-              {addressString}
-            </Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Sản phẩm đã chọn</Text>
+            {items.length > 0 ? <Text style={styles.sectionMeta}>{totalCount} món</Text> : null}
           </View>
-          <TouchableOpacity
-            style={styles.addrEditCircle}
-            onPress={() => setAddressModalVisible(true)}
-          >
-            <Text style={styles.addrEditPencil}>✎</Text>
-          </TouchableOpacity>
+          {items.length > 0 ? (
+            items.map((item) => (
+              <CartItemCard
+                key={String(item.productId || item.id)}
+                item={item}
+                onDecrease={() => {
+                  if (item.quantity > 1) {
+                    updateQuantity(item.productId || item.id, item.quantity - 1);
+                    return;
+                  }
+                  removeFromCart(item.productId || item.id);
+                }}
+                onIncrease={() => updateQuantity(item.productId || item.id, item.quantity + 1)}
+                onRemove={() => removeFromCart(item.productId || item.id)}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyBagCard}>
+              <Text style={styles.emptyBagTitle}>Giỏ hàng đang trống</Text>
+              <Text style={styles.emptyBagText}>
+                Khám phá thêm các thiết kế mới và lưu lại những món bạn muốn sở hữu.
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyBagBtn}
+                onPress={() => navigation.navigate("ProductList")}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.emptyBagBtnText}>Xem sản phẩm</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Cart Listing */}
-        {items.length > 0 ? (
-          <>
-            <FlatList
-              data={items}
-              keyExtractor={(item, index) => String(item.productId || item.id || index)}
-              renderItem={renderCartItem}
-              scrollEnabled={false}
-            />
+        {wishlistPreview.length > 0 ? (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Từ danh sách yêu thích</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("MainTabs", { screen: "Wishlist" })}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.sectionAction}>Xem tất cả</Text>
+              </TouchableOpacity>
+            </View>
+            {wishlistPreview.map((product) => (
+              <WishlistRow
+                key={String(product.id || product._id)}
+                product={product}
+                onMoveToCart={() => handleMoveWishlistToCart(product)}
+              />
+            ))}
+          </View>
+        ) : null}
 
-            {displayWishlistItems.length > 0 && (
-              <View style={styles.sectionWrap}>
-                <Text style={styles.sectionTitle}>From Your Wishlist</Text>
-                {displayWishlistItems.map(renderWishlistItem)}
-              </View>
-            )}
-          </>
-        ) : (
-          renderEmptyContent()
-        )}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Sticky Total Footer */}
-      <View style={styles.footerWrap}>
-        <View style={styles.footerPriceCol}>
-          <Text style={styles.totalLbl}>Total</Text>
-          <Text style={styles.totalVal}>{formatPrice(subtotal)}</Text>
+      <View style={styles.bottomBar}>
+        <View>
+          <Text style={styles.bottomLabel}>Tổng tạm tính</Text>
+          <Text style={styles.bottomTotal}>{formatPrice(subtotal)}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.checkoutBtn, items.length === 0 && styles.checkoutDisabled]}
+          style={[styles.checkoutBtn, items.length === 0 && styles.checkoutBtnDisabled]}
           onPress={handleCheckout}
-          activeOpacity={items.length === 0 ? 1 : 0.8}
+          activeOpacity={items.length === 0 ? 1 : 0.88}
+          disabled={items.length === 0}
         >
-          <Text style={[styles.checkoutBtnTxt, items.length === 0 && styles.checkoutTxtDis]}>
-            Checkout
+          <Text
+            style={[styles.checkoutBtnText, items.length === 0 && styles.checkoutBtnTextDisabled]}
+          >
+            Thanh toán
           </Text>
         </TouchableOpacity>
       </View>
-
-      {/* ── Address Picker Modal ─────────────────────────────────────────── */}
-      <Modal
-        visible={addressModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setAddressModalVisible(false)}
-      >
-        <View style={styles.modalBg}>
-          <View style={styles.modalContent}>
-            <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 15 }}>Chọn địa chỉ</Text>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={{ maxHeight: Dimensions.get("window").height * 0.5 }}
-            >
-              {apiAddresses.map((addr) => (
-                <TouchableOpacity
-                  key={addr.id}
-                  style={[
-                    styles.addressCard,
-                    {
-                      borderWidth: 2,
-                      borderColor: defaultAddress?.id === addr.id ? "#0055ff" : "transparent",
-                    },
-                  ]}
-                  onPress={() => {
-                    setDefaultAddress(addr);
-                    setAddressModalVisible(false);
-                  }}
-                >
-                  <View style={styles.addrLeftDiv}>
-                    <Text style={[styles.addrTitle, { textTransform: "capitalize" }]}>
-                      {addr.label}
-                    </Text>
-                    <Text style={styles.addrText} numberOfLines={2}>
-                      {addr.fullAddress}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{addr.phone}</Text>
-                  </View>
-                  {defaultAddress?.id === addr.id && (
-                    <Text style={{ color: "#0055ff", fontWeight: "bold", fontSize: 20 }}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setAddressModalVisible(false)}
-            >
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>Đóng</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#fff" },
-  mainScroll: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 },
-
-  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
-  mainHeading: { fontSize: 28, fontWeight: "900", color: "#111" },
-  cartCountBadge: {
-    marginLeft: 12,
-    backgroundColor: "#EFF2FE",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FCF9F4",
   },
-  cartCountText: { fontSize: 16, fontWeight: "800", color: "#111" },
-
-  addressCard: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  heroCard: {
+    backgroundColor: "#1E1815",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+  },
+  heroEyebrow: {
+    color: "#DCC4A8",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  heroTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8F9FA",
+    justifyContent: "space-between",
+  },
+  heroTitle: {
+    color: "#FFF8EE",
+    fontSize: 28,
+    fontWeight: "900",
+    flex: 1,
+    marginRight: 12,
+  },
+  countBadge: {
+    minWidth: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F2E2D2",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  countBadgeText: {
+    color: "#9B4B1F",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  heroSubtext: {
+    color: "rgba(255,248,238,0.76)",
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 10,
+  },
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
     padding: 18,
-    borderRadius: 12,
-    marginBottom: 25,
+    marginBottom: 14,
   },
-  addrLeftDiv: { flex: 1, marginRight: 15 },
-  addrTitle: { fontSize: 16, fontWeight: "700", color: "#111", marginBottom: 6 },
-  addrText: { fontSize: 13, color: "#666", lineHeight: 18 },
-  addrEditCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#0055ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addrEditPencil: { color: "#fff", fontSize: 18 },
-
-  // ITEM CART LIST
-  cartItem: {
+  sectionHeaderRow: {
     flexDirection: "row",
-    marginBottom: 24,
-    alignItems: "stretch",
-  },
-  imageWrap: { position: "relative", width: 110, height: 110 },
-  itemImage: { width: 110, height: 110, borderRadius: 12, backgroundColor: "#eee" },
-  trashCircle: {
-    position: "absolute",
-    bottom: -5,
-    left: -5,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#fff",
-    justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 4,
+    justifyContent: "space-between",
+    marginBottom: 14,
   },
-  trashOutline: {
+  sectionTitle: {
+    color: "#1E1815",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  sectionAction: {
+    color: "#9B4B1F",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  sectionMeta: {
+    color: "#7A685B",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  itemCard: {
+    flexDirection: "row",
+    paddingBottom: 14,
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0E5D8",
+  },
+  itemImage: {
+    width: 84,
+    height: 104,
+    borderRadius: 16,
+    backgroundColor: "#EFE8E0",
+    marginRight: 14,
+  },
+  itemBody: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  itemTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  itemName: {
+    flex: 1,
+    color: "#241A13",
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 22,
+    marginRight: 12,
+  },
+  removeBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#ff4d4f",
-    justifyContent: "center",
+    backgroundColor: "#F5ECE3",
     alignItems: "center",
+    justifyContent: "center",
   },
-  trashIcon: { color: "#ff4d4f", fontSize: 14 },
-
-  itemInfo: { flex: 1, marginLeft: 20, justifyContent: "space-between" },
-  itemName: { fontSize: 15, fontWeight: "500", color: "#222" },
-  itemVariant: { fontSize: 13, color: "#444", marginTop: 4 },
-  itemBotRow: {
+  removeBtnText: {
+    color: "#9B4B1F",
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
+  itemMeta: {
+    color: "#8A7B6F",
+    fontSize: 12,
+    marginTop: 6,
+  },
+  itemBottomRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 10,
+    marginTop: 14,
   },
-  itemPrice: { fontSize: 18, fontWeight: "900", color: "#111" },
-
-  qtyBox: { flexDirection: "row", alignItems: "center" },
-  qtyBtnBorder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#0055ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  qtyBtnIconText: { fontSize: 20, color: "#0055ff", fontWeight: "600", marginTop: -2 },
-  qtyValueWrap: {
-    width: 36,
-    height: 32,
-    backgroundColor: "#EFF2FE",
-    marginHorizontal: 8,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  qtyValueText: { fontSize: 16, fontWeight: "700", color: "#111" },
-
-  // WISHLIST
-  sectionWrap: { marginTop: 10, paddingBottom: 20 },
-  sectionTitle: { fontSize: 24, fontWeight: "800", color: "#111", marginBottom: 20 },
-  wishlistBotRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 10,
-  },
-  variantChip: {
-    backgroundColor: "#EFF2FE",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  variantText: { color: "#333", fontWeight: "500", fontSize: 14 },
-  addCartIcon: { fontSize: 28, color: "#0055ff" },
-
-  // EMPTY STATE //
-  emptyCircleBag: { alignItems: "center", marginVertical: 30 },
-  emptyCircleBlue: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  emptyBagWhiteIco: { fontSize: 60, color: "#0055ff" },
-  emptyBagS: {
-    position: "absolute",
-    top: 70,
-    fontSize: 32,
+  itemPrice: {
+    color: "#9B4B1F",
+    fontSize: 16,
     fontWeight: "900",
-    color: "#fff",
+    marginRight: 6,
+    flex: 1,
   },
-
-  // POPULAR ITEMS
-  popularHeaderRow: {
+  qtyControl: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
   },
-  seeAllBtn: { flexDirection: "row", alignItems: "center" },
-  seeAllText: { fontSize: 16, fontWeight: "800", color: "#111", marginRight: 8 },
-  seeAllCircle: {
+  qtyBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#0055ff",
+    borderWidth: 1,
+    borderColor: "#D9C7B7",
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#FCF9F4",
   },
-  seeAllArrow: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  popScrollList: { paddingRight: 20, gap: 15 },
-  popularCard: { width: width * 0.4, paddingRight: 10 },
-  popCardImg: { width: "100%", height: 160, borderRadius: 12, backgroundColor: "#eee" },
-  popCardBot: {
+  qtyBtnText: {
+    color: "#9B4B1F",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  qtyValueWrap: {
+    minWidth: 32,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#F5ECE3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 6,
+    paddingHorizontal: 6,
+  },
+  qtyValueText: {
+    color: "#241A13",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  emptyBagCard: {
+    borderRadius: 18,
+    backgroundColor: "#F7EFE7",
+    padding: 20,
+    alignItems: "flex-start",
+  },
+  emptyBagTitle: {
+    color: "#1E1815",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  emptyBagText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  emptyBagBtn: {
+    backgroundColor: "#1E1815",
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  emptyBagBtnText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  wishlistRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 10,
+    paddingBottom: 12,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0E5D8",
   },
-  popHeartText: { fontSize: 16, fontWeight: "900", color: "#111" },
-  popBadge: { fontSize: 14, color: "#666" },
-
-  // FOOTER
-  footerWrap: {
+  wishlistImage: {
+    width: 70,
+    height: 84,
+    borderRadius: 14,
+    backgroundColor: "#EFE8E0",
+    marginRight: 12,
+  },
+  wishlistInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  wishlistName: {
+    color: "#241A13",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  wishlistPrice: {
+    color: "#9B4B1F",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  wishlistAction: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#1E1815",
+  },
+  wishlistActionText: {
+    color: "#FFFDF9",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  bottomSpacer: {
+    height: 120,
+  },
+  bottomBar: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 35,
+    bottom: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 34,
+    backgroundColor: "#FCF9F4",
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: "#EFE3D6",
   },
-  footerPriceCol: { flexDirection: "row", alignItems: "center" },
-  totalLbl: { fontSize: 20, fontWeight: "900", color: "#111", marginRight: 10 },
-  totalVal: { fontSize: 20, fontWeight: "900", color: "#111" },
+  bottomLabel: {
+    color: "#78695C",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  bottomTotal: {
+    color: "#1E1815",
+    fontSize: 22,
+    fontWeight: "900",
+  },
   checkoutBtn: {
-    backgroundColor: "#0055ff",
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 12,
-  },
-  checkoutBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  checkoutDisabled: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    paddingHorizontal: 39,
+    minWidth: 148,
+    paddingHorizontal: 22,
     paddingVertical: 15,
-  },
-  checkoutTxtDis: { color: "#666" },
-
-  // Modal styles
-  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
-  },
-  modalCloseBtn: {
-    backgroundColor: "#0055ff",
-    padding: 15,
-    borderRadius: 12,
+    borderRadius: 18,
     alignItems: "center",
-    marginTop: 15,
+    backgroundColor: "#1E1815",
+  },
+  checkoutBtnDisabled: {
+    backgroundColor: "#E7DBCF",
+  },
+  checkoutBtnText: {
+    color: "#FFFDF9",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  checkoutBtnTextDisabled: {
+    color: "#8A7B6F",
   },
 });

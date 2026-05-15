@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from "react";
 import { View, StyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useAuth } from "../context/AuthContext";
 
 // Components
 import BottomTabBar from "../components/BottomTabBar";
@@ -31,12 +32,32 @@ import ReturnRequestScreen from "../screens/ReturnRequestScreen";
 
 const Stack = createNativeStackNavigator();
 
+function createStackScreenOptions() {
+  return {
+    contentStyle: {
+      backgroundColor: "#FCF9F4",
+    },
+    headerStyle: {
+      backgroundColor: "#FCF9F4",
+    },
+    headerShadowVisible: false,
+    headerTitleStyle: {
+      color: "#241A13",
+      fontSize: 18,
+      fontWeight: "800",
+    },
+    headerBackTitle: "",
+    headerBackTitleVisible: false,
+    headerBackButtonDisplayMode: "minimal",
+    headerTintColor: "#9B4B1F",
+  };
+}
+
 // ── Auth Stack ───────────────────────────────────────────────────────────────
 
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
@@ -78,7 +99,7 @@ function MainTabsWithNavigation({ navigation }) {
     <View style={styles.mainContainer}>
       {/* Render tab content */}
       <View style={styles.screenContainer}>
-        <ActiveScreen navigation={navigation} onSettingsPress={handleSettingsPress} />
+        <ActiveScreen navigation={navigation} onSettingsPress={handleSettingsPress} onTabSwitch={setActiveTab} />
       </View>
 
       {/* Custom Bottom Tab Bar */}
@@ -92,46 +113,42 @@ function MainTabsWithNavigation({ navigation }) {
 function MainAppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainTabs" component={MainTabsWithNavigation} />
+      <Stack.Screen
+        name="MainTabs"
+        component={MainTabsWithNavigation}
+        options={{ title: "", headerBackTitle: "" }}
+      />
       <Stack.Screen
         name="ProductList"
         component={ProductListScreen}
-        options={{
-          headerShown: true,
-          title: "Sản phẩm",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ProductDetail"
         component={ProductDetailScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Chi tiết",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="CartStack"
         component={CartScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Giỏ hàng",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="Checkout"
         component={CheckoutScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Thanh toán",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen name="Success" component={SuccessScreen} options={{ headerShown: false }} />
       <Stack.Screen
@@ -144,42 +161,38 @@ function MainAppStack() {
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Cài đặt",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="AddressList"
         component={AddressListScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Sổ địa chỉ",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="AddressForm"
         component={AddressFormScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Thêm địa chỉ",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
       <Stack.Screen
         name="ReturnRequest"
         component={ReturnRequestScreen}
-        options={{
+        options={() => ({
           headerShown: true,
           title: "Yêu cầu trả hàng",
-          headerTintColor: "#0055ff",
-          headerBackTitle: "Quay lại",
-        }}
+          ...createStackScreenOptions(),
+        })}
       />
     </Stack.Navigator>
   );
@@ -190,15 +203,25 @@ function MainAppStack() {
 const Root = createNativeStackNavigator();
 
 export default function AppNavigator() {
+  const { user, token, isLoading } = useAuth();
+  const isAuthenticated = Boolean(token && user);
+
+  if (isLoading) {
+    return <SplashScreen />;
+  }
+
   return (
     <Root.Navigator screenOptions={{ headerShown: false }}>
-      <Root.Screen name="Auth" component={AuthStack} />
-      <Root.Screen name="MainApp" component={MainAppStack} />
+      {isAuthenticated ? (
+        <Root.Screen name="MainApp" component={MainAppStack} />
+      ) : (
+        <Root.Screen name="Auth" component={AuthStack} />
+      )}
     </Root.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1 },
-  screenContainer: { flex: 1 },
+  mainContainer: { flex: 1, backgroundColor: "#FCF9F4" },
+  screenContainer: { flex: 1, backgroundColor: "#FCF9F4" },
 });

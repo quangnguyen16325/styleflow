@@ -1,32 +1,25 @@
 /* eslint-disable react/prop-types */
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
-import { COLORS } from "../constants/colors";
+import AppIcon from "./AppIcon";
 
-// Tab definitions — phải khớp với tên route trong navigator
 const TABS = [
-  { key: "Home", label: "Trang chủ", icon: "🏠", iconActive: "🏠" },
-  { key: "Wishlist", label: "Yêu thích", icon: "🤍", iconActive: "❤️" },
-  { key: "Track", label: "Đơn hàng", icon: "📦", iconActive: "📦", centerTab: true },
-  { key: "Cart", label: "Giỏ hàng", icon: "🛍️", iconActive: "🛍️" },
-  { key: "Profile", label: "Tôi", icon: "👤", iconActive: "👤" },
+  { key: "Home", label: "Trang chủ", icon: "home" },
+  { key: "Wishlist", label: "Yêu thích", icon: "heart" },
+  { key: "Track", label: "Đơn hàng", icon: "orders", centerTab: true },
+  { key: "Cart", label: "Giỏ hàng", icon: "cart" },
+  { key: "Profile", label: "Tài khoản", icon: "profile" },
 ];
 
-/**
- * BottomTabBar — custom, ghép vào bottom của MainApp
- * - Center tab (Track) nổi lên, màu accent
- * - Cart tab có badge đỏ hiển thị số lượng
- */
 export default function BottomTabBar({ activeTab, onTabPress }) {
   const { totalCount } = useCart();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
-      {/* Line trên cùng */}
-      <View style={styles.topLine} />
-
-      <View style={styles.tabRow}>
+    <View style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View style={styles.shell}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
 
@@ -36,12 +29,17 @@ export default function BottomTabBar({ activeTab, onTabPress }) {
                 key={tab.key}
                 style={styles.centerTabBtn}
                 onPress={() => onTabPress(tab.key)}
-                activeOpacity={0.85}
+                activeOpacity={0.88}
               >
                 <View style={[styles.centerCircle, isActive && styles.centerCircleActive]}>
-                  <Text style={styles.centerIcon}>{isActive ? tab.iconActive : tab.icon}</Text>
+                  <AppIcon
+                    name={tab.icon}
+                    size={22}
+                    color={isActive ? "#FFFDF9" : "#FFF7EA"}
+                    style={styles.centerIcon}
+                  />
                 </View>
-                <Text style={[styles.centerLabel, isActive && styles.centerLabelActive]}>
+                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                   {tab.label}
                 </Text>
               </TouchableOpacity>
@@ -53,16 +51,17 @@ export default function BottomTabBar({ activeTab, onTabPress }) {
               key={tab.key}
               style={styles.tabBtn}
               onPress={() => onTabPress(tab.key)}
-              activeOpacity={0.7}
+              activeOpacity={0.82}
             >
-              <View style={styles.iconWrapper}>
-                <Text style={styles.tabIcon}>{isActive ? tab.iconActive : tab.icon}</Text>
-                {/* Badge đỏ chỉ hiển thị trên tab Cart */}
-                {tab.key === "Cart" && totalCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{totalCount > 99 ? "99+" : totalCount}</Text>
+              <View style={[styles.iconBadge, isActive && styles.iconBadgeActive]}>
+                <AppIcon name={tab.icon} size={18} color={isActive ? "#9B4B1F" : "#876E5B"} />
+                {tab.key === "Cart" && totalCount > 0 ? (
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>
+                      {totalCount > 99 ? "99+" : totalCount}
+                    </Text>
                   </View>
-                )}
+                ) : null}
               </View>
               <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{tab.label}</Text>
             </TouchableOpacity>
@@ -74,106 +73,93 @@ export default function BottomTabBar({ activeTab, onTabPress }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.bgPrimary,
-    paddingBottom: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 12,
+  outer: {
+    backgroundColor: "#FCF9F4",
+    paddingHorizontal: 14,
+    paddingTop: 0,
   },
-  topLine: {
-    height: 1,
-    backgroundColor: COLORS.divider,
-  },
-  tabRow: {
+  shell: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: 4,
-    paddingTop: 4,
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
+    shadowColor: "#201812",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 8,
   },
-
-  // Normal tab
   tabBtn: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
-  iconWrapper: {
-    position: "relative",
-    marginBottom: 3,
-  },
-  tabIcon: {
-    fontSize: 22,
-  },
-  tabLabel: {
-    fontSize: 10,
-    color: COLORS.textMuted,
-    fontWeight: "500",
-  },
-  tabLabelActive: {
-    color: COLORS.primary,
-    fontWeight: "700",
-  },
-
-  // Badge on cart
-  badge: {
-    position: "absolute",
-    top: -4,
-    right: -8,
-    backgroundColor: COLORS.danger,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: COLORS.bgPrimary,
-  },
-  badgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-
-  // Center (floating) tab
   centerTabBtn: {
     flex: 1,
     alignItems: "center",
-    marginTop: -20, // Float lên trên
+    marginTop: -20,
   },
-  centerCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
+  iconBadge: {
+    position: "relative",
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#F7F0E8",
+    marginBottom: 6,
+  },
+  iconBadgeActive: {
+    backgroundColor: "#F1E0D0",
+  },
+  centerCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: "#1E1815",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
     borderWidth: 3,
-    borderColor: COLORS.bgPrimary,
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-    marginBottom: 3,
+    borderColor: "#FCF9F4",
   },
   centerCircleActive: {
-    backgroundColor: COLORS.accent,
-    shadowColor: COLORS.accent,
+    backgroundColor: "#9B4B1F",
   },
   centerIcon: {
-    fontSize: 22,
+    marginTop: 1,
   },
-  centerLabel: {
+  tabLabel: {
+    color: "#857669",
     fontSize: 10,
-    color: COLORS.textMuted,
-    fontWeight: "500",
-  },
-  centerLabelActive: {
-    color: COLORS.accent,
     fontWeight: "700",
+  },
+  tabLabelActive: {
+    color: "#9B4B1F",
+  },
+  countBadge: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#D53F56",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  countBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "900",
   },
 });

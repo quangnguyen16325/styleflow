@@ -74,6 +74,20 @@ class ApiService {
   static async updateProductImage(id, imageUrl) {
     return client.patch(`/admin/products/${id}/image`, { imageUrl });
   }
+  static async uploadProductImage(productId, file, contentType) {
+    const uploadBody =
+      file.type === contentType ? file : file.slice(0, file.size, contentType);
+    const encodedFileName = encodeURIComponent(file.name || `product-${productId}`);
+
+    return client.put(`/admin/products/${productId}/image-upload`, uploadBody, {
+      cache: 'no-store',
+      headers: {
+        'Content-Type': contentType,
+        'X-File-Name': encodedFileName,
+      },
+      timeout: 60000,
+    });
+  }
   static async createProduct(productData) {
     return client.post('/admin/products', productData);
   }
@@ -115,8 +129,17 @@ class ApiService {
   static async getOrder(id) {
     return client.get(`/admin/orders/${id}`);
   }
+  static async getShippers() {
+    return client.get('/admin/shippers');
+  }
+  static async assignOrderShipper(id, shipperId) {
+    return client.post(`/admin/orders/${id}/assign-shipper`, { shipperId });
+  }
   static async updateOrderStatus(id, status) {
     return client.patch(`/admin/orders/${id}/status`, { status });
+  }
+  static async updateOrderDeliveryStatus(id, payload) {
+    return client.post(`/admin/orders/${id}/delivery-status`, payload);
   }
   static async getOrderDeliveryEvents(id) {
     return client.get(`/admin/orders/${id}/delivery-events`);
@@ -128,6 +151,31 @@ class ApiService {
     }
 
     return client.post(`/admin/orders/${id}/address-change-decision`, payload);
+  }
+
+  // USERS
+  static async getUsers() {
+    return client.get('/admin/users');
+  }
+  static async createUser(payload) {
+    return client.post('/admin/users', payload);
+  }
+  static async updateUser(id, payload) {
+    return client.patch(`/admin/users/${id}`, payload);
+  }
+  static async deleteUser(id) {
+    return client.delete(`/admin/users/${id}`);
+  }
+
+  // SHIPPER
+  static async getShipperOrders() {
+    return client.get('/shipper/orders');
+  }
+  static async getShipperOrder(id) {
+    return client.get(`/shipper/orders/${id}`);
+  }
+  static async updateShipperOrderDeliveryStatus(id, payload) {
+    return client.post(`/shipper/orders/${id}/delivery-status`, payload);
   }
 
   // ISSUES

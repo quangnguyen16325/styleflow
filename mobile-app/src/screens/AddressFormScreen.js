@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,31 +10,37 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Modal,
 } from "react-native";
-import api from "../services/api";
-import { COLORS } from "../constants/colors";
-
-// ── Label Selector ───────────────────────────────────────────────────────────
+import api, { getVietnamDistricts, getVietnamProvinces, getVietnamWards } from "../services/api";
+import AppIcon from "../components/AppIcon";
 
 const LABELS = [
-  { key: "home", icon: "⌂", name: "Nhà" },
-  { key: "office", icon: "▣", name: "Văn phòng" },
-  { key: "other", icon: "◎", name: "Khác" },
+  { key: "home", icon: "location", name: "Nhà" },
+  { key: "office", icon: "office", name: "Văn phòng" },
+  { key: "other", icon: "other", name: "Khác" },
 ];
 
 function LabelSelector({ selected, onSelect }) {
   return (
     <View style={styles.labelRow}>
-      {LABELS.map((l) => (
+      {LABELS.map((label) => (
         <TouchableOpacity
-          key={l.key}
-          style={[styles.labelChip, selected === l.key && styles.labelChipActive]}
-          onPress={() => onSelect(l.key)}
-          activeOpacity={0.7}
+          key={label.key}
+          style={[styles.labelChip, selected === label.key && styles.labelChipActive]}
+          onPress={() => onSelect(label.key)}
+          activeOpacity={0.82}
         >
-          <Text style={styles.labelChipIcon}>{l.icon}</Text>
-          <Text style={[styles.labelChipText, selected === l.key && styles.labelChipTextActive]}>
-            {l.name}
+          <AppIcon
+            name={label.icon}
+            size={15}
+            color={selected === label.key ? "#FFF8EE" : "#9B4B1F"}
+            style={styles.labelChipIcon}
+          />
+          <Text
+            style={[styles.labelChipText, selected === label.key && styles.labelChipTextActive]}
+          >
+            {label.name}
           </Text>
         </TouchableOpacity>
       ))}
@@ -42,7 +48,87 @@ function LabelSelector({ selected, onSelect }) {
   );
 }
 
-// ── Main Screen ──────────────────────────────────────────────────────────────
+function LocationPickerModal({ visible, title, items, selectedCode, onSelect, onClose }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>{title}</Text>
+          <ScrollView
+            style={styles.modalScroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modalScrollContent}
+          >
+            {items.length === 0 ? (
+              <Text style={styles.modalEmptyText}>Chưa có dữ liệu để chọn.</Text>
+            ) : (
+              items.map((item) => (
+                <TouchableOpacity
+                  key={item.code}
+                  style={[
+                    styles.modalOption,
+                    selectedCode === item.code && styles.modalOptionSelected,
+                  ]}
+                  onPress={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      selectedCode === item.code && styles.modalOptionTextSelected,
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+                  {selectedCode === item.code ? (
+                    <Text style={styles.modalOptionCheck}>Đã chọn</Text>
+                  ) : null}
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+          <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
+            <Text style={styles.modalCloseBtnText}>Đóng</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function LocationSelectField({
+  label,
+  value,
+  placeholder,
+  onPress,
+  disabled = false,
+  loading = false,
+}) {
+  return (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TouchableOpacity
+        style={[styles.selectField, disabled && styles.selectFieldDisabled]}
+        onPress={onPress}
+        activeOpacity={disabled ? 1 : 0.82}
+        disabled={disabled}
+      >
+        <Text style={[styles.selectFieldText, !value && styles.selectFieldPlaceholder]}>
+          {value || placeholder}
+        </Text>
+        {loading ? (
+          <ActivityIndicator size="small" color="#9B4B1F" />
+        ) : (
+          <Text style={styles.selectFieldArrow}>›</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function AddressFormScreen({ route, navigation }) {
   const { mode, address } = route.params || {};
@@ -52,13 +138,72 @@ export default function AddressFormScreen({ route, navigation }) {
   const [receiverName, setReceiverName] = useState(isEdit ? address.receiverName || "" : "");
   const [receiverPhone, setReceiverPhone] = useState(isEdit ? address.receiverPhone || "" : "");
   const [addressLine, setAddressLine] = useState(isEdit ? address.addressLine || "" : "");
-  const [ward, setWard] = useState(isEdit ? address.ward || "" : "");
-  const [district, setDistrict] = useState(isEdit ? address.district || "" : "");
-  const [city, setCity] = useState(isEdit ? address.city || "" : "Ho Chi Minh City");
-  const country = isEdit ? address.country || "Vietnam" : "Vietnam";
   const [postalCode, setPostalCode] = useState(isEdit ? address.postalCode || "" : "");
   const [isDefault, setIsDefault] = useState(isEdit ? address.isDefault || false : false);
   const [saving, setSaving] = useState(false);
+
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [loadingProvinces, setLoadingProvinces] = useState(true);
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingWards, setLoadingWards] = useState(false);
+
+  const [selectedProvince, setSelectedProvince] = useState(null);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [selectedWard, setSelectedWard] = useState(null);
+
+  const [provinceModalVisible, setProvinceModalVisible] = useState(false);
+  const [districtModalVisible, setDistrictModalVisible] = useState(false);
+  const [wardModalVisible, setWardModalVisible] = useState(false);
+
+  useEffect(() => {
+    const loadInitialLocationData = async () => {
+      try {
+        setLoadingProvinces(true);
+        const provinceList = await getVietnamProvinces();
+        const safeProvinces = Array.isArray(provinceList) ? provinceList : [];
+        setProvinces(safeProvinces);
+
+        const matchedProvince =
+          safeProvinces.find((province) => province.name === address?.city) || null;
+        setSelectedProvince(matchedProvince);
+
+        if (!matchedProvince) {
+          return;
+        }
+
+        setLoadingDistricts(true);
+        const districtList = await getVietnamDistricts(matchedProvince.code);
+        const safeDistricts = Array.isArray(districtList) ? districtList : [];
+        setDistricts(safeDistricts);
+
+        const matchedDistrict =
+          safeDistricts.find((district) => district.name === address?.district) || null;
+        setSelectedDistrict(matchedDistrict);
+
+        if (!matchedDistrict) {
+          return;
+        }
+
+        setLoadingWards(true);
+        const wardList = await getVietnamWards(matchedDistrict.code);
+        const safeWards = Array.isArray(wardList) ? wardList : [];
+        setWards(safeWards);
+
+        const matchedWard = safeWards.find((ward) => ward.name === address?.ward) || null;
+        setSelectedWard(matchedWard);
+      } catch (err) {
+        console.warn("Lỗi tải địa giới hành chính:", err);
+      } finally {
+        setLoadingProvinces(false);
+        setLoadingDistricts(false);
+        setLoadingWards(false);
+      }
+    };
+
+    loadInitialLocationData();
+  }, [address?.city, address?.district, address?.ward]);
 
   const validate = () => {
     if (!receiverName.trim()) {
@@ -70,40 +215,84 @@ export default function AddressFormScreen({ route, navigation }) {
       return false;
     }
     if (!addressLine.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập địa chỉ");
+      Alert.alert("Lỗi", "Vui lòng nhập số nhà, tên đường");
       return false;
     }
-    if (!city.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập tỉnh/thành phố");
+    if (!selectedProvince) {
+      Alert.alert("Lỗi", "Vui lòng chọn tỉnh/thành phố");
+      return false;
+    }
+    if (!selectedDistrict) {
+      Alert.alert("Lỗi", "Vui lòng chọn quận/huyện");
       return false;
     }
     return true;
+  };
+
+  const handleProvinceSelect = async (province) => {
+    setSelectedProvince(province);
+    setSelectedDistrict(null);
+    setSelectedWard(null);
+    setDistricts([]);
+    setWards([]);
+
+    try {
+      setLoadingDistricts(true);
+      const districtList = await getVietnamDistricts(province.code);
+      setDistricts(Array.isArray(districtList) ? districtList : []);
+    } catch (err) {
+      console.warn("Lỗi tải quận/huyện:", err);
+      Alert.alert("Lỗi", "Không tải được danh sách quận/huyện.");
+    } finally {
+      setLoadingDistricts(false);
+    }
+  };
+
+  const handleDistrictSelect = async (district) => {
+    setSelectedDistrict(district);
+    setSelectedWard(null);
+    setWards([]);
+
+    try {
+      setLoadingWards(true);
+      const wardList = await getVietnamWards(district.code);
+      setWards(Array.isArray(wardList) ? wardList : []);
+    } catch (err) {
+      console.warn("Lỗi tải phường/xã:", err);
+      Alert.alert("Lỗi", "Không tải được danh sách phường/xã.");
+    } finally {
+      setLoadingWards(false);
+    }
   };
 
   const handleSave = async () => {
     if (!validate()) return;
 
     setSaving(true);
+    const trimmedPostalCode = postalCode.trim();
     const payload = {
       label,
       receiverName: receiverName.trim(),
       receiverPhone: receiverPhone.trim(),
+      provinceCode: selectedProvince?.code ? String(selectedProvince.code) : undefined,
+      districtCode: selectedDistrict?.code ? String(selectedDistrict.code) : undefined,
+      wardCode: selectedWard?.code ? String(selectedWard.code) : undefined,
       addressLine: addressLine.trim(),
-      ward: ward.trim(),
-      district: district.trim(),
-      city: city.trim(),
-      country: country.trim(),
-      postalCode: postalCode.trim(),
+      ward: selectedWard?.name || "",
+      district: selectedDistrict?.name || "",
+      city: selectedProvince?.name || "",
+      country: "Vietnam",
+      postalCode: trimmedPostalCode || undefined,
       isDefault,
     };
 
     try {
       if (isEdit) {
         await api.patch(`/me/addresses/${address.id}`, payload);
-        Alert.alert("Thành công", "Đã cập nhật địa chỉ!");
+        Alert.alert("Thành công", "Đã cập nhật địa chỉ.");
       } else {
         await api.post("/me/addresses", payload);
-        Alert.alert("Thành công", "Đã thêm địa chỉ mới!");
+        Alert.alert("Thành công", "Đã thêm địa chỉ mới.");
       }
       navigation.goBack();
     } catch (err) {
@@ -122,257 +311,427 @@ export default function AddressFormScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Label */}
-        <Text style={styles.sectionTitle}>Loại địa chỉ</Text>
-        <LabelSelector selected={label} onSelect={setLabel} />
-
-        {/* Receiver Info */}
-        <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
-
-        <Text style={styles.inputLabel}>Tên người nhận *</Text>
-        <TextInput
-          style={styles.input}
-          value={receiverName}
-          onChangeText={setReceiverName}
-          placeholder="Nguyễn Văn A"
-          placeholderTextColor={COLORS.textMuted}
-        />
-
-        <Text style={styles.inputLabel}>Số điện thoại *</Text>
-        <TextInput
-          style={styles.input}
-          value={receiverPhone}
-          onChangeText={setReceiverPhone}
-          placeholder="0901234567"
-          placeholderTextColor={COLORS.textMuted}
-          keyboardType="phone-pad"
-        />
-
-        {/* Address */}
-        <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
-
-        <Text style={styles.inputLabel}>Địa chỉ (số nhà, đường) *</Text>
-        <TextInput
-          style={styles.input}
-          value={addressLine}
-          onChangeText={setAddressLine}
-          placeholder="123 Nguyễn Trãi"
-          placeholderTextColor={COLORS.textMuted}
-        />
-
-        <View style={styles.rowTwo}>
-          <View style={styles.halfField}>
-            <Text style={styles.inputLabel}>Phường/Xã</Text>
-            <TextInput
-              style={styles.input}
-              value={ward}
-              onChangeText={setWard}
-              placeholder="Phường 2"
-              placeholderTextColor={COLORS.textMuted}
-            />
-          </View>
-          <View style={styles.halfField}>
-            <Text style={styles.inputLabel}>Quận/Huyện</Text>
-            <TextInput
-              style={styles.input}
-              value={district}
-              onChangeText={setDistrict}
-              placeholder="Quận 5"
-              placeholderTextColor={COLORS.textMuted}
-            />
-          </View>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>{isEdit ? "Chỉnh sửa địa chỉ" : "Địa chỉ mới"}</Text>
+          <Text style={styles.heroTitle}>
+            {isEdit ? "Cập nhật nơi nhận hàng" : "Thêm nơi nhận hàng"}
+          </Text>
+          <Text style={styles.heroText}>
+            Thêm các địa chỉ của bạn để dễ dàng đặt hàng nhanh chóng hơn.
+          </Text>
         </View>
 
-        <View style={styles.rowTwo}>
-          <View style={styles.halfField}>
-            <Text style={styles.inputLabel}>Tỉnh/Thành phố *</Text>
-            <TextInput
-              style={styles.input}
-              value={city}
-              onChangeText={setCity}
-              placeholder="TP. HCM"
-              placeholderTextColor={COLORS.textMuted}
-            />
-          </View>
-          <View style={styles.halfField}>
-            <Text style={styles.inputLabel}>Mã bưu chính</Text>
-            <TextInput
-              style={styles.input}
-              value={postalCode}
-              onChangeText={setPostalCode}
-              placeholder="700000"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="number-pad"
-            />
-          </View>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Loại địa chỉ</Text>
+          <LabelSelector selected={label} onSelect={setLabel} />
         </View>
 
-        <Text style={styles.inputLabel}>Quốc gia</Text>
-        <TextInput style={[styles.input, styles.inputDisabled]} value={country} editable={false} />
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Thông tin người nhận</Text>
 
-        {/* Default toggle */}
+          <Text style={styles.inputLabel}>Tên người nhận *</Text>
+          <TextInput
+            style={styles.input}
+            value={receiverName}
+            onChangeText={setReceiverName}
+            placeholder="Nguyễn Văn A"
+            placeholderTextColor="#A09082"
+          />
+
+          <Text style={styles.inputLabel}>Số điện thoại *</Text>
+          <TextInput
+            style={styles.input}
+            value={receiverPhone}
+            onChangeText={setReceiverPhone}
+            placeholder="0901234567"
+            placeholderTextColor="#A09082"
+            keyboardType="phone-pad"
+          />
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Địa chỉ giao hàng</Text>
+
+          <Text style={styles.inputLabel}>Số nhà, đường *</Text>
+          <TextInput
+            style={styles.input}
+            value={addressLine}
+            onChangeText={setAddressLine}
+            placeholder="123 Nguyễn Trãi"
+            placeholderTextColor="#A09082"
+          />
+
+          <LocationSelectField
+            label="Tỉnh/Thành phố *"
+            value={selectedProvince?.name}
+            placeholder={loadingProvinces ? "Đang tải..." : "Chọn tỉnh/thành phố"}
+            onPress={() => setProvinceModalVisible(true)}
+            loading={loadingProvinces}
+          />
+
+          <LocationSelectField
+            label="Quận/Huyện *"
+            value={selectedDistrict?.name}
+            placeholder={selectedProvince ? "Chọn quận/huyện" : "Chọn tỉnh/thành trước"}
+            onPress={() => setDistrictModalVisible(true)}
+            disabled={!selectedProvince || loadingDistricts}
+            loading={loadingDistricts}
+          />
+
+          <LocationSelectField
+            label="Phường/Xã"
+            value={selectedWard?.name}
+            placeholder={selectedDistrict ? "Chọn phường/xã" : "Chọn quận/huyện trước"}
+            onPress={() => setWardModalVisible(true)}
+            disabled={!selectedDistrict || loadingWards}
+            loading={loadingWards}
+          />
+
+          <Text style={styles.inputLabel}>Mã bưu chính</Text>
+          <TextInput
+            style={styles.input}
+            value={postalCode}
+            onChangeText={setPostalCode}
+            placeholder="700000"
+            placeholderTextColor="#A09082"
+            keyboardType="number-pad"
+          />
+
+          <Text style={styles.inputLabel}>Quốc gia</Text>
+          <TextInput
+            style={[styles.input, styles.inputDisabled]}
+            value="Vietnam"
+            editable={false}
+          />
+        </View>
+
         <View style={styles.defaultRow}>
           <View style={styles.defaultInfo}>
             <Text style={styles.defaultLabel}>Đặt làm địa chỉ mặc định</Text>
-            <Text style={styles.defaultDesc}>Địa chỉ này sẽ được chọn tự động khi đặt hàng</Text>
+            <Text style={styles.defaultDesc}>
+              Địa chỉ này sẽ được chọn tự động khi bạn đặt hàng.
+            </Text>
           </View>
           <Switch
             value={isDefault}
             onValueChange={setIsDefault}
-            trackColor={{ true: COLORS.primary, false: "#E5E5EA" }}
-            thumbColor="#fff"
-            ios_backgroundColor="#E5E5EA"
+            trackColor={{ true: "#C98A57", false: "#E5D8CA" }}
+            thumbColor="#FFFFFF"
+            ios_backgroundColor="#E5D8CA"
           />
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Save Button */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
           onPress={handleSave}
           disabled={saving}
-          activeOpacity={0.85}
+          activeOpacity={0.88}
         >
           {saving ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color="#FFFDF9" size="small" />
           ) : (
             <Text style={styles.saveBtnText}>{isEdit ? "Lưu thay đổi" : "Thêm địa chỉ"}</Text>
           )}
         </TouchableOpacity>
       </View>
+
+      <LocationPickerModal
+        visible={provinceModalVisible}
+        title="Chọn tỉnh/thành phố"
+        items={provinces}
+        selectedCode={selectedProvince?.code}
+        onSelect={handleProvinceSelect}
+        onClose={() => setProvinceModalVisible(false)}
+      />
+
+      <LocationPickerModal
+        visible={districtModalVisible}
+        title="Chọn quận/huyện"
+        items={districts}
+        selectedCode={selectedDistrict?.code}
+        onSelect={handleDistrictSelect}
+        onClose={() => setDistrictModalVisible(false)}
+      />
+
+      <LocationPickerModal
+        visible={wardModalVisible}
+        title="Chọn phường/xã"
+        items={wards}
+        selectedCode={selectedWard?.code}
+        onSelect={setSelectedWard}
+        onClose={() => setWardModalVisible(false)}
+      />
     </View>
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bgSecondary },
-  scrollView: { flex: 1 },
-  scrollContent: { padding: 20 },
-
-  // Section
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-    marginTop: 20,
-    marginBottom: 12,
+  container: {
+    flex: 1,
+    backgroundColor: "#FCF9F4",
   },
-
-  // Label selector
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  heroCard: {
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: "#1E1815",
+    marginBottom: 16,
+  },
+  heroEyebrow: {
+    color: "#DCC4A8",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  heroTitle: {
+    color: "#FFF8EE",
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+  heroText: {
+    color: "rgba(255,248,238,0.76)",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#1E1815",
+    marginBottom: 14,
+  },
   labelRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 8,
   },
   labelChip: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: COLORS.bgPrimary,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: "#F7F0E8",
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
   },
   labelChipActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryBg,
+    borderColor: "#D69A65",
+    backgroundColor: "#F2E2D2",
   },
-  labelChipIcon: { fontSize: 18, marginRight: 6 },
-  labelChipText: { fontSize: 13, fontWeight: "600", color: COLORS.textSecondary },
-  labelChipTextActive: { color: COLORS.primary },
-
-  // Input
+  labelChipIcon: {
+    marginRight: 6,
+  },
+  labelChipText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#6C5647",
+  },
+  labelChipTextActive: {
+    color: "#9B4B1F",
+  },
+  fieldBlock: {
+    marginTop: 10,
+  },
   inputLabel: {
     fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
+    fontWeight: "700",
+    color: "#7A685B",
     marginBottom: 6,
     marginTop: 10,
   },
   input: {
-    backgroundColor: COLORS.bgPrimary,
-    borderRadius: 12,
+    backgroundColor: "#FCF9F4",
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: COLORS.textPrimary,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    color: "#241A13",
+    borderWidth: 1,
+    borderColor: "#E7DBCF",
   },
   inputDisabled: {
-    backgroundColor: COLORS.bgInput,
-    color: COLORS.textMuted,
+    color: "#9D9084",
   },
-
-  // Row two columns
-  rowTwo: {
+  selectField: {
+    minHeight: 52,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "#E7DBCF",
+    backgroundColor: "#FCF9F4",
     flexDirection: "row",
-    gap: 12,
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  halfField: {
+  selectFieldDisabled: {
+    opacity: 0.6,
+  },
+  selectFieldText: {
     flex: 1,
+    fontSize: 15,
+    color: "#241A13",
+    marginRight: 12,
   },
-
-  // Default toggle
+  selectFieldPlaceholder: {
+    color: "#9D9084",
+  },
+  selectFieldArrow: {
+    fontSize: 22,
+    color: "#9B4B1F",
+  },
   defaultRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.bgPrimary,
-    borderRadius: 14,
+    backgroundColor: "#F5ECE3",
+    borderRadius: 18,
     padding: 16,
-    marginTop: 20,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: "#E8D5C2",
   },
-  defaultInfo: { flex: 1, marginRight: 12 },
+  defaultInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
   defaultLabel: {
     fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    marginBottom: 2,
+    fontWeight: "700",
+    color: "#241A13",
+    marginBottom: 3,
   },
   defaultDesc: {
     fontSize: 12,
-    color: COLORS.textMuted,
-    lineHeight: 17,
+    color: "#7A685B",
+    lineHeight: 18,
   },
-
-  // Bottom bar
+  bottomSpacer: {
+    height: 110,
+  },
   bottomBar: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.bgPrimary,
+    backgroundColor: "#FCF9F4",
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 12,
     paddingBottom: 34,
     borderTopWidth: 1,
-    borderTopColor: COLORS.divider,
+    borderTopColor: "#EFE3D6",
   },
   saveBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#1E1815",
     paddingVertical: 16,
+    borderRadius: 18,
+    alignItems: "center",
+  },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
+  saveBtnText: {
+    color: "#FFFDF9",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(24, 18, 14, 0.32)",
+  },
+  modalSheet: {
+    backgroundColor: "#FCF9F4",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 30,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D3C4B6",
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: "#1E1815",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 16,
+  },
+  modalScroll: {
+    maxHeight: "65%",
+  },
+  modalScrollContent: {
+    paddingBottom: 8,
+  },
+  modalEmptyText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
+    paddingVertical: 12,
+  },
+  modalOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalOptionSelected: {
+    backgroundColor: "#F5ECE3",
+    borderColor: "#D69A65",
+  },
+  modalOptionText: {
+    color: "#241A13",
+    fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
+    marginRight: 12,
+  },
+  modalOptionTextSelected: {
+    color: "#9B4B1F",
+  },
+  modalOptionCheck: {
+    color: "#9B4B1F",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  modalCloseBtn: {
+    marginTop: 8,
+    paddingVertical: 14,
     borderRadius: 16,
     alignItems: "center",
-    shadowColor: COLORS.primary,
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    backgroundColor: "#1E1815",
   },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
+  modalCloseBtnText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });

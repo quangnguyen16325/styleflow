@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { applyOrderLifecycleTransition } from "./order-lifecycle.js";
 import { ADDRESS_CHANGE_PROCESSING_FEE } from "../lib/shipping-fee.js";
+import { applyDeliveryStatusUpdate, DeliveryNotFoundError } from "./delivery.js";
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.get("/", async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery}${whereClause} GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery}${whereClause} ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       params,
     );
 
@@ -54,7 +55,7 @@ router.get("/:id", async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -239,7 +240,7 @@ router.patch("/:id/status", async (req, res) => {
     await client.query("COMMIT");
 
     const { rows } = await pool.query(
-      `${listOrdersBaseQuery} WHERE o.id = $1 GROUP BY o.id, c.id ORDER BY o.created_at DESC`,
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
       [orderId],
     );
 
@@ -251,6 +252,200 @@ router.patch("/:id/status", async (req, res) => {
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to update admin order status",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/:id/delivery-status", async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const status = normalizeDeliveryCallbackStatus(req.body?.status);
+  if (!status) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "A valid delivery status is required",
+      },
+    });
+  }
+
+  const reason = String(req.body?.reason ?? "").trim() || null;
+  if (status === "FAILED" && !reason) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "reason is required when status is FAILED",
+      },
+    });
+  }
+
+  const partner = String(req.body?.partner ?? "").trim() || "admin";
+  const externalEventId =
+    String(req.body?.externalEventId ?? "").trim() ||
+    `admin-${orderId}-${status.toLowerCase()}-${Date.now()}`;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await applyDeliveryStatusUpdate(client, {
+      orderId,
+      status,
+      reason,
+      partner,
+      externalEventId,
+      payload: {
+        orderId,
+        status,
+        reason,
+        partner,
+        externalEventId,
+        source: "admin",
+      },
+    });
+    await client.query("COMMIT");
+
+    const { rows } = await pool.query(
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
+      [orderId],
+    );
+
+    return res.json({
+      success: true,
+      action: result.action,
+      failCount: result.failCount,
+      order: mapOrderRow(rows[0]),
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    if (error instanceof DeliveryNotFoundError) {
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    console.error(`POST /admin/orders/${orderId}/delivery-status failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to update delivery status",
+      },
+    });
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/:id/assign-shipper", async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Order id must be a positive integer",
+      },
+    });
+  }
+
+  const shipperId =
+    req.body?.shipperId == null || req.body.shipperId === ""
+      ? null
+      : Number(req.body.shipperId);
+  if (shipperId != null && (!Number.isInteger(shipperId) || shipperId <= 0)) {
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "shipperId must be a positive integer or null",
+      },
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const orderResult = await client.query("SELECT id FROM orders WHERE id = $1 LIMIT 1", [
+      orderId,
+    ]);
+    if (orderResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Order not found",
+        },
+      });
+    }
+
+    if (shipperId != null) {
+      const shipperResult = await client.query(
+        `
+          SELECT id
+          FROM customers
+          WHERE id = $1 AND role = 'shipper' AND is_blacklisted = FALSE
+          LIMIT 1
+        `,
+        [shipperId],
+      );
+
+      if (shipperResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "shipperId must reference an active shipper",
+          },
+        });
+      }
+    }
+
+    await client.query(
+      `
+        UPDATE orders
+        SET
+          assigned_shipper_id = $2,
+          delivery_status = CASE
+            WHEN $2::bigint IS NOT NULL AND delivery_status = 'pending' THEN 'handover'
+            ELSE delivery_status
+          END,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [orderId, shipperId],
+    );
+
+    await client.query("COMMIT");
+
+    const { rows } = await pool.query(
+      `${listOrdersBaseQuery} WHERE o.id = $1 ${listOrdersGroupByClause} ORDER BY o.created_at DESC`,
+      [orderId],
+    );
+
+    return res.json({
+      success: true,
+      order: mapOrderRow(rows[0]),
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`POST /admin/orders/${orderId}/assign-shipper failed:`, error);
+    return res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to assign shipper",
       },
     });
   } finally {
@@ -442,11 +637,21 @@ const listOrdersBaseQuery = `
   SELECT
     o.id,
     o.status,
+    o.payment_status,
+    o.payment_gateway,
+    o.delivery_status,
+    o.transaction_ref,
+    o.incident_id,
+    o.victim_notified,
+    o.delivery_partner,
+    o.delivery_fail_count,
+    o.last_delivery_failed_reason,
     o.total_amount,
     o.shipping_fee,
     o.payment_expires_at,
     o.fail_count,
     o.customer_address_id,
+    o.assigned_shipper_id,
     o.shipping_receiver_name,
     o.shipping_receiver_phone,
     o.shipping_address_line,
@@ -460,6 +665,9 @@ const listOrdersBaseQuery = `
     o.shipping_country,
     o.shipping_postal_code,
     o.address_change_status,
+    o.address_change_requested_at,
+    o.address_change_fee_delta,
+    o.shipping_fee_approved,
     o.address_change_payload,
     o.created_at,
     o.updated_at,
@@ -467,6 +675,17 @@ const listOrdersBaseQuery = `
     c.full_name,
     c.phone,
     c.email,
+    s.full_name AS shipper_full_name,
+    s.phone AS shipper_phone,
+    s.email AS shipper_email,
+    latest_rr.id AS latest_refund_request_id,
+    latest_rr.status AS latest_refund_request_status,
+    latest_rr.image_url AS latest_refund_request_image_url,
+    latest_rr.reason AS latest_refund_request_reason,
+    latest_rr.abuse_score_snapshot AS latest_refund_request_abuse_score_snapshot,
+    latest_rr.review_note AS latest_refund_request_review_note,
+    latest_rr.created_at AS latest_refund_request_created_at,
+    latest_rr.updated_at AS latest_refund_request_updated_at,
     COALESCE(
       json_agg(
         json_build_object(
@@ -481,7 +700,38 @@ const listOrdersBaseQuery = `
     ) AS items
   FROM orders o
   JOIN customers c ON c.id = o.customer_id
+  LEFT JOIN customers s ON s.id = o.assigned_shipper_id
+  LEFT JOIN LATERAL (
+    SELECT
+      rr.id,
+      rr.status,
+      rr.image_url,
+      rr.reason,
+      rr.abuse_score_snapshot,
+      rr.review_note,
+      rr.created_at,
+      rr.updated_at
+    FROM refund_requests rr
+    WHERE rr.order_id = o.id
+    ORDER BY rr.created_at DESC, rr.id DESC
+    LIMIT 1
+  ) latest_rr ON TRUE
   LEFT JOIN order_items oi ON oi.order_id = o.id
+`;
+
+const listOrdersGroupByClause = `
+  GROUP BY
+    o.id,
+    c.id,
+    s.id,
+    latest_rr.id,
+    latest_rr.status,
+    latest_rr.image_url,
+    latest_rr.reason,
+    latest_rr.abuse_score_snapshot,
+    latest_rr.review_note,
+    latest_rr.created_at,
+    latest_rr.updated_at
 `;
 
 function normalizeStatusFilter(value) {
@@ -502,19 +752,54 @@ function normalizeAddressChangeDecision(value) {
   return ADDRESS_CHANGE_DECISIONS.includes(normalizedValue) ? normalizedValue : null;
 }
 
+function normalizeDeliveryCallbackStatus(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toUpperCase();
+  return DELIVERY_CALLBACK_STATUSES.includes(normalizedValue) ? normalizedValue : null;
+}
+
 function mapOrderRow(row) {
   return {
     id: Number(row.id),
     status: row.status,
+    paymentStatus: row.payment_status,
+    paymentGateway: row.payment_gateway,
+    deliveryStatus: row.delivery_status,
+    transactionRef: row.transaction_ref,
+    incidentId: row.incident_id,
+    victimNotified: row.victim_notified,
+    deliveryPartner: row.delivery_partner,
+    deliveryFailCount: row.delivery_fail_count,
+    lastDeliveryFailedReason: row.last_delivery_failed_reason,
     totalAmount: Number(row.total_amount),
     shippingFee: Number(row.shipping_fee),
     paymentExpiresAt: row.payment_expires_at,
     failCount: row.fail_count,
     customerAddressId: row.customer_address_id == null ? null : Number(row.customer_address_id),
+    assignedShipperId:
+      row.assigned_shipper_id == null ? null : Number(row.assigned_shipper_id),
+    assignedShipper:
+      row.assigned_shipper_id == null
+        ? null
+        : {
+            id: Number(row.assigned_shipper_id),
+            fullName: row.shipper_full_name,
+            phone: row.shipper_phone,
+            email: row.shipper_email,
+          },
     shippingAddress: row.shipping_address,
     city: row.city,
     addressChangeStatus: row.address_change_status,
+    addressChangeRequestedAt: row.address_change_requested_at,
+    addressChangeFeeDelta:
+      row.address_change_fee_delta == null ? null : Number(row.address_change_fee_delta),
+    shippingFeeApproved: row.shipping_fee_approved,
     addressChangePayload: mapAddressChangePayload(row.address_change_payload),
+    latestRefundRequestStatus: row.latest_refund_request_status ?? null,
+    latestRefundRequest: mapLatestRefundRequestRow(row),
     shipping: mapShippingRow(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -549,6 +834,26 @@ function mapAddressChangePayload(payload) {
   };
 }
 
+function mapLatestRefundRequestRow(row) {
+  if (row.latest_refund_request_id == null) {
+    return null;
+  }
+
+  return {
+    id: Number(row.latest_refund_request_id),
+    status: row.latest_refund_request_status,
+    imageUrl: row.latest_refund_request_image_url,
+    reason: row.latest_refund_request_reason,
+    abuseScoreSnapshot:
+      row.latest_refund_request_abuse_score_snapshot == null
+        ? null
+        : Number(row.latest_refund_request_abuse_score_snapshot),
+    reviewNote: row.latest_refund_request_review_note,
+    createdAt: row.latest_refund_request_created_at,
+    updatedAt: row.latest_refund_request_updated_at,
+  };
+}
+
 function mapOrderItemRow(item) {
   return {
     id: Number(item.id),
@@ -575,15 +880,8 @@ function mapShippingRow(row) {
   };
 }
 
-const ORDER_STATUSES = [
-  "pending",
-  "awaiting_payment",
-  "paid",
-  "processing",
-  "shipping",
-  "completed",
-  "cancelled",
-  "failed",
-];
+const ORDER_STATUSES = ["pending", "processing", "shipping", "completed", "cancelled", "failed"];
 
 const ADDRESS_CHANGE_DECISIONS = ["approved", "rejected", "rejected_timeout"];
+
+const DELIVERY_CALLBACK_STATUSES = ["FAILED", "DELIVERED", "IN_TRANSIT", "HANDOVER", "RETURNED"];

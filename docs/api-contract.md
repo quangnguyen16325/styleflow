@@ -1,14 +1,17 @@
 # API Contract v0.5
 
 Base URL:
+
 - Production: `https://api.ecloria.co.uk`
 - Local: `http://localhost:5000`
 
 Content-Type:
+
 - Request: `application/json`
 - Response: `application/json`
 
 Authorization:
+
 - Authenticated endpoints require `Authorization: Bearer <token>`
 
 ## Client Compatibility Policy
@@ -50,6 +53,7 @@ Shared format:
 ```
 
 Common error codes:
+
 - `VALIDATION_ERROR`
 - `NOT_FOUND`
 - `INTERNAL_ERROR`
@@ -209,6 +213,7 @@ Common error codes:
 ```
 
 Notes:
+
 - `orderAmount` and `customerEmail` are returned by `GET /admin/refund-requests/:id`
 - list and status-update responses do not currently include `orderAmount` or `customerEmail`
 
@@ -291,6 +296,7 @@ Notes:
 ```
 
 Notes:
+
 - `addressChangeStatus` and `addressChangePayload` are currently returned by admin order endpoints
 - `addressChangePayload` is `null` unless an address change request is pending or preserved on the order
 
@@ -327,6 +333,7 @@ Request body:
 ```
 
 Rules:
+
 - `fullName`: required
 - `phone`: required
 - `email`: required
@@ -464,6 +471,7 @@ Response `200`:
 Get all addresses of the authenticated customer.
 
 Response `200`:
+
 - array of `Customer Address Model`
 
 ### `POST /me/addresses`
@@ -491,11 +499,13 @@ Request body example:
 ```
 
 Rules:
+
 - `receiverName`, `receiverPhone`, `addressLine`, and `city` are required
 - `provinceCode`, `districtCode`, and `wardCode` are optional additive fields for precise Vietnam administrative mapping
 - existing clients can continue sending only text fields (`ward`, `district`, `city`)
 
 Response `201`:
+
 - `Customer Address Model`
 
 ### `PATCH /me/addresses/:addressId`
@@ -503,6 +513,7 @@ Response `201`:
 Update one address of the authenticated customer.
 
 Response `200`:
+
 - `Customer Address Model`
 
 ### `DELETE /me/addresses/:addressId`
@@ -510,6 +521,7 @@ Response `200`:
 Delete one address of the authenticated customer.
 
 Response `204`:
+
 - empty body
 
 ### `GET /locations/provinces`
@@ -569,6 +581,7 @@ Response `200`:
 ### Admin
 
 Preferred admin order routes:
+
 - `GET /admin/inventory`
 - `GET /admin/analytics/sales-by-product`
 - `GET /admin/products`
@@ -589,6 +602,7 @@ Preferred admin order routes:
 - `PATCH /admin/products/:id/image`
 
 Compatibility note:
+
 - existing admin clients may continue using `PATCH /orders/:id/status`
 - new admin work should prefer the `/admin/orders/*` routes
 
@@ -597,10 +611,18 @@ Compatibility note:
 Get admin order list.
 
 Query params:
+
 - `status` optional
-- allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+- allowed values: `pending`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
+Status model:
+
+- `status` is the order lifecycle only
+- `paymentStatus` carries payment state such as `payment_pending`, `paid`, `payment_failed`
+- `deliveryStatus` carries delivery state such as `ready_to_ship`, `in_transit`, `delivered`
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -610,6 +632,8 @@ Response `200`:
   {
     "id": 1,
     "status": "pending",
+    "paymentStatus": "unpaid",
+    "deliveryStatus": "pending",
     "totalAmount": 418000,
     "shippingFee": 20000,
     "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
@@ -653,6 +677,7 @@ Response `200`:
 Get one order by id for admin/staff.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -661,6 +686,8 @@ Response `200`:
 {
   "id": 1,
   "status": "pending",
+  "paymentStatus": "unpaid",
+  "deliveryStatus": "pending",
   "totalAmount": 418000,
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
@@ -703,6 +730,7 @@ Response `200`:
 Update order status through the admin-specific path.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -714,16 +742,22 @@ Request body:
 ```
 
 Allowed status values:
+
 - `pending`
-- `awaiting_payment`
-- `paid`
 - `processing`
 - `shipping`
 - `completed`
 - `cancelled`
 - `failed`
 
+Notes:
+
+- use `POST /payment-events` to update payment state
+- `paid` is represented as `paymentStatus = paid`, not `status = paid`
+- payment success may move `status` from `pending` to `processing`
+
 Side effects:
+
 - when status changes to `failed`, backend automatically creates an `issue` record with:
   - `type = ORDER_FAILED`
   - `severity = high`
@@ -735,6 +769,8 @@ Response `200`:
 {
   "id": 1,
   "status": "processing",
+  "paymentStatus": "paid",
+  "deliveryStatus": "pending",
   "totalAmount": 418000,
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
@@ -766,6 +802,7 @@ Response `200`:
 Get delivery callback history for one order.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -795,6 +832,7 @@ Response `200`:
 Approve or reject a pending address change request.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -807,11 +845,13 @@ Request body:
 ```
 
 Allowed `decision` values:
+
 - `approved`
 - `rejected`
 - `rejected_timeout`
 
 Rules:
+
 - order must currently have `address_change_status = requested`
 - `approvedShippingFee` is optional and only used when `decision = approved`
 
@@ -840,13 +880,16 @@ Response `409`:
 Get refund request list.
 
 Query params:
+
 - `status` optional
 - allowed values: `pending`, `manual_review_required`, `approved`, `rejected`, `refunded`
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
+
 - array of refund request summary objects with:
   - `id`
   - `orderId`
@@ -864,9 +907,11 @@ Response `200`:
 Get one refund request by id.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
+
 - `Refund Request Model`
 
 ### `PATCH /admin/refund-requests/:id/status`
@@ -874,6 +919,7 @@ Response `200`:
 Update refund request status.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -886,6 +932,7 @@ Request body:
 ```
 
 Allowed `status` values:
+
 - `pending`
 - `manual_review_required`
 - `approved`
@@ -893,6 +940,7 @@ Allowed `status` values:
 - `refunded`
 
 Response `200`:
+
 - refund request status object with:
   - `id`
   - `orderId`
@@ -910,9 +958,11 @@ Response `200`:
 Get the current admin-editable system configuration.
 
 Access rules:
+
 - admin/staff only
 
 Current keys:
+
 - `payment.active_gateway`
 - `payment.maintenance_mode`
 
@@ -948,6 +998,7 @@ Response `200`:
 Update allowed system configuration keys.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -972,6 +1023,7 @@ Request body:
 ```
 
 Rules:
+
 - only whitelisted keys are accepted
 - `items` must be a non-empty array
 - supported `configType` values:
@@ -980,6 +1032,7 @@ Rules:
   - `number`
 
 Response `200`:
+
 - array of updated system config records in the same shape as `GET /admin/system-config`
 
 ### `GET /admin/payment-incidents/active`
@@ -987,6 +1040,7 @@ Response `200`:
 Get the current active payment incident summary.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -1028,9 +1082,11 @@ Response `200`:
 Get raw payment log history for investigation.
 
 Access rules:
+
 - admin/staff only
 
 Query params:
+
 - `gateway` optional
 - `orderId` optional
 - `transactionRef` optional
@@ -1070,11 +1126,13 @@ Response `200`:
 Get issue list for admin or staff.
 
 Query params:
+
 - `status` optional
 - `severity` optional
 - `type` optional
 
 Response `200`:
+
 - array of `Issue Model`
 
 ### `GET /admin/issues/:id`
@@ -1082,6 +1140,7 @@ Response `200`:
 Get one issue by id for admin or staff.
 
 Response `200`:
+
 - `Issue Model`
 
 ### `PATCH /admin/issues/:id/status`
@@ -1097,12 +1156,14 @@ Request body:
 ```
 
 Allowed `status`:
+
 - `open`
 - `investigating`
 - `resolved`
 - `ignored`
 
 Response `200`:
+
 - `Issue Model`
 
 ### Internal / Integration
@@ -1112,6 +1173,7 @@ Response `200`:
 Process delivery partner callback.
 
 Headers:
+
 - `X-Internal-Webhook-Secret: <secret>` required
 
 Request body:
@@ -1127,6 +1189,7 @@ Request body:
 ```
 
 Allowed `status`:
+
 - `FAILED`
 - `DELIVERED`
 - `IN_TRANSIT`
@@ -1134,6 +1197,7 @@ Allowed `status`:
 - `RETURNED`
 
 Rules:
+
 - `orderId`: required, positive integer
 - `reason`: required when `status = FAILED`
 - `externalEventId` is optional
@@ -1150,6 +1214,7 @@ Response `200`:
 ```
 
 Other possible `action` values:
+
 - `delivered`
 - `returning`
 - `returned`
@@ -1157,8 +1222,12 @@ Other possible `action` values:
 - `duplicate_ignored`
 
 Side effects:
+
+- `IN_TRANSIT` / `HANDOVER` can move `orders.status` to `shipping`
+- `DELIVERED` moves `orders.status` to `completed` and `orders.deliveryStatus` to `delivered`
 - when delivery reaches `DELIVERED`, backend records `SALE` inventory transactions once
 - when delivery reaches `RETURNED`, backend records `RETURN` inventory transactions once
+- after 3 failed delivery callbacks, backend moves `orders.status` to `failed`
 - when delivery fails 3 times, backend creates an issue with:
   - `type = DELIVERY_FAILED`
   - `severity = high`
@@ -1183,11 +1252,13 @@ Request body:
 ```
 
 Allowed `source`:
+
 - `payment_service`
 - `app_client`
 - `schedule`
 
 Rules:
+
 - `externalEventId` is optional
 - when `externalEventId` is provided, repeated events with the same value are ignored idempotently
 
@@ -1202,7 +1273,45 @@ Response `200`:
 ```
 
 Other possible `action` values:
+
 - `duplicate_ignored`
+
+Side effects:
+
+- when payment status resolves to `paid`, backend sets `orders.paymentStatus = paid`
+- if the order is still `pending`, payment success moves `orders.status` to `processing`
+- when payment status resolves to `payment_failed`, backend sets `orders.status = failed`
+- payment failure rolls back reserved inventory through the normal order lifecycle
+
+### `POST /payment-events/expire-pending`
+
+Expire overdue bank transfer orders.
+
+Headers:
+
+```http
+X-Internal-Webhook-Secret: <INTERNAL_WEBHOOK_SECRET>
+```
+
+Rules:
+
+- internal workflow endpoint for cron/n8n only
+- finds orders where `paymentGateway = BANK_TRANSFER`
+- requires `paymentStatus = payment_pending`
+- requires `status = pending`
+- requires `paymentExpiresAt <= now`
+- marks matched orders as `status = failed` and `paymentStatus = payment_failed`
+- rolls back reserved inventory through the normal order lifecycle
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "expiredCount": 1,
+  "orderIds": [93]
+}
+```
 
 ### `GET /products`
 
@@ -1297,6 +1406,7 @@ Response `400`:
 Create a presigned R2 upload URL for a product image.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -1310,6 +1420,7 @@ Request body:
 ```
 
 Allowed `contentType` values:
+
 - `image/jpeg`
 - `image/png`
 - `image/webp`
@@ -1331,6 +1442,7 @@ Response `201`:
 Save the uploaded product image URL.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -1365,6 +1477,7 @@ Response `200`:
 Get the admin product list with inventory fields.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -1392,6 +1505,7 @@ Response `200`:
 Get one product for admin/staff.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -1418,6 +1532,7 @@ Response `200`:
 Create a new product and its inventory row.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -1435,6 +1550,7 @@ Request body:
 ```
 
 Notes:
+
 - `imageUrl` is optional
 - `stockQty` defaults to `0`
 - `minStockLevel` defaults to `5`
@@ -1465,6 +1581,7 @@ Response `201`:
 Update product fields and inventory settings.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -1481,6 +1598,7 @@ Request body:
 ```
 
 Rules:
+
 - all fields are optional
 - `stockQty` cannot be lower than current `reservedQty`
 - `categoryId` must reference an existing category if provided
@@ -1509,12 +1627,15 @@ Response `200`:
 Delete a product.
 
 Access rules:
+
 - admin/staff only
 
 Rules:
+
 - returns `409 CONFLICT` if the product is referenced by existing records such as `order_items`
 
 Response `204`:
+
 - no content
 
 ### `GET /admin/inventory`
@@ -1522,9 +1643,11 @@ Response `204`:
 Get the current inventory snapshot with warehouse analytics fields.
 
 Access rules:
+
 - admin/staff only
 
 Query params:
+
 - `categoryId` optional, positive integer
 - `lowStockOnly` optional, `true` or `false`
 
@@ -1562,13 +1685,16 @@ Response `200`:
 Get aggregated product sales metrics for a date window.
 
 Access rules:
+
 - admin/staff only
 
 Query params:
+
 - `from` optional, `YYYY-MM-DD`
 - `to` optional, `YYYY-MM-DD`
 
 Behavior:
+
 - if both params are omitted, backend returns the last 7 days ending on today (UTC)
 - analytics currently count orders with `status = completed`
 - the sales window uses `orders.updated_at` as the completed timestamp reference
@@ -1609,6 +1735,7 @@ Response `200`:
 Get the admin category list.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -1630,6 +1757,7 @@ Response `200`:
 Get one category for admin/staff.
 
 Access rules:
+
 - admin/staff only
 
 Response `200`:
@@ -1649,6 +1777,7 @@ Response `200`:
 Create a category.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -1677,6 +1806,7 @@ Response `201`:
 Update a category.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -1689,6 +1819,7 @@ Request body:
 ```
 
 Behavior:
+
 - when a category slug changes, backend also syncs `products.category` for products referencing that `categoryId`
 
 ### `DELETE /admin/categories/:id`
@@ -1696,12 +1827,15 @@ Behavior:
 Delete a category.
 
 Access rules:
+
 - admin/staff only
 
 Rules:
+
 - returns `409 CONFLICT` if any products still reference the category
 
 Response `204`:
+
 - no content
 
 ### `POST /orders`
@@ -1713,6 +1847,7 @@ Request body using a saved address:
 ```json
 {
   "addressId": 1,
+  "paymentGateway": "COD",
   "items": [
     {
       "productId": 1,
@@ -1739,6 +1874,7 @@ Request body using a new address:
     "country": "Vietnam",
     "postalCode": "700000"
   },
+  "paymentGateway": "BANK_TRANSFER",
   "items": [
     {
       "productId": 1,
@@ -1749,6 +1885,7 @@ Request body using a new address:
 ```
 
 Rules:
+
 - authenticated endpoint only
 - customer identity is taken from the JWT token
 - use either `addressId` or `newAddress`
@@ -1765,6 +1902,10 @@ Rules:
 - backend computes final `shippingFee` from the shipping city using the Da Nang origin zone rules
 - client-provided `shippingFee` is accepted for backward compatibility, but backend-calculated fee is the source of truth
 - when `addressId` is used, it must belong to the authenticated customer
+- `paymentGateway`: optional, one of `COD`, `BANK_TRANSFER`; defaults to `COD`
+- `COD` creates the order with `paymentStatus = unpaid`
+- `BANK_TRANSFER` creates the order with `paymentStatus = payment_pending`
+- `BANK_TRANSFER` uses `paymentExpiresAt` as the transfer deadline; default is 30 minutes unless `BANK_TRANSFER_PAYMENT_EXPIRY_MINUTES` is configured
 
 Response `201`:
 
@@ -1772,6 +1913,8 @@ Response `201`:
 {
   "id": 1,
   "status": "pending",
+  "paymentStatus": "unpaid",
+  "paymentGateway": "COD",
   "totalAmount": 438000,
   "shippingFee": 40000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
@@ -1813,6 +1956,7 @@ Response `201`:
 ```
 
 Side effects:
+
 - backend copies a shipping snapshot into the order from `addressId` or `newAddress`
 - backend increases `inventory.reserved_qty`
 - backend creates an `inventory_transactions` record with type `RESERVE`
@@ -1845,6 +1989,7 @@ Response `401`:
 Create an address change request for an existing order.
 
 Access rules:
+
 - authenticated customer only
 - customer can request change only for own order
 
@@ -1874,6 +2019,7 @@ Request body using a new address:
 ```
 
 Rules:
+
 - use either `addressId` or `newAddress`, not both
 - if the order status is `pending`, the address change is applied immediately and `shippingFee` is recalculated from the new address without any extra handling fee
 - for orders that have moved past `pending`, the request is stored as pending approval for admin/n8n flow
@@ -1921,6 +2067,7 @@ Response `409`:
 Create a refund request for an existing order.
 
 Access rules:
+
 - authenticated customer only
 - customer can create a refund request only for own order
 
@@ -1935,6 +2082,7 @@ Request body:
 ```
 
 Rules:
+
 - `orderId` must be a positive integer
 - `imageUrl` is required
 - `reason` is required
@@ -1975,10 +2123,18 @@ Response `409`:
 Get order list.
 
 Query params:
+
 - `status` optional
-- allowed values: `pending`, `awaiting_payment`, `paid`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+- allowed values: `pending`, `processing`, `shipping`, `completed`, `cancelled`, `failed`
+
+Status model:
+
+- `status` is the order lifecycle only
+- `paymentStatus` carries payment state such as `payment_pending`, `paid`, `payment_failed`
+- `deliveryStatus` carries delivery state such as `ready_to_ship`, `in_transit`, `delivered`
 
 Access rules:
+
 - customer: only sees own orders
 - admin/staff: sees all orders
 
@@ -2000,6 +2156,9 @@ Response `200`:
   {
     "id": 1,
     "status": "pending",
+    "paymentStatus": "unpaid",
+    "deliveryStatus": "pending",
+    "latestRefundRequestStatus": null,
     "totalAmount": 418000,
     "shippingFee": 20000,
     "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
@@ -2031,6 +2190,7 @@ Response `200`:
 Get one order by id.
 
 Access rules:
+
 - customer: only own order
 - admin/staff: any order
 
@@ -2040,6 +2200,9 @@ Response `200`:
 {
   "id": 1,
   "status": "pending",
+  "paymentStatus": "unpaid",
+  "deliveryStatus": "pending",
+  "latestRefundRequestStatus": null,
   "totalAmount": 418000,
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
@@ -2092,6 +2255,7 @@ Response `400`:
 Update order status.
 
 Access rules:
+
 - admin/staff only
 
 Request body:
@@ -2103,16 +2267,22 @@ Request body:
 ```
 
 Allowed status values:
+
 - `pending`
-- `awaiting_payment`
-- `paid`
 - `processing`
 - `shipping`
 - `completed`
 - `cancelled`
 - `failed`
 
+Notes:
+
+- use `POST /payment-events` to update payment state
+- `paid` is represented as `paymentStatus = paid`, not `status = paid`
+- payment success may move `status` from `pending` to `processing`
+
 Side effects:
+
 - when status changes to `failed`, backend automatically creates an `issue` record with:
   - `type = ORDER_FAILED`
   - `severity = high`
@@ -2126,6 +2296,8 @@ Response `200`:
 {
   "id": 1,
   "status": "processing",
+  "paymentStatus": "paid",
+  "deliveryStatus": "pending",
   "totalAmount": 418000,
   "shippingFee": 20000,
   "paymentExpiresAt": "2026-04-03T10:15:00.000Z",
@@ -2186,6 +2358,7 @@ Response `404`:
 ## Planned Next Scope
 
 The following backend capabilities are planned for the next phase and are not implemented yet:
+
 - address change request workflow
 - refund request workflow
 - system-config admin APIs

@@ -3,11 +3,13 @@
 This document describes how `n8n` should integrate with the current backend.
 
 Core rule:
+
 - backend database is the source of truth
 - `n8n` orchestrates approval, notification, and monitoring
 - `n8n` should not replace backend business-state updates with Google Sheets or ad-hoc storage
 
 Base URLs:
+
 - Production backend: `https://api.ecloria.co.uk`
 - Local backend: `http://localhost:5000`
 
@@ -44,9 +46,14 @@ Base URLs:
 - `POST /delivery-callback`
 
 Backend behavior:
+
 - validates `X-Internal-Webhook-Secret`
 - dedupes repeated callbacks by `externalEventId`
 - updates `orders.delivery_status`
+- may update `orders.status`
+  - `IN_TRANSIT` / `HANDOVER` can move the order to `shipping`
+  - `DELIVERED` moves the order to `completed`
+  - repeated `FAILED` callbacks can move the order to `failed`
 - updates `orders.delivery_fail_count`
 - creates `DELIVERY_FAILED` issue when fail threshold is reached
 
@@ -134,6 +141,7 @@ Response example:
 ```
 
 Backend already calculates:
+
 - `calculatedShippingFee`
 - `processingFee`
 - `feeDelta`
@@ -167,6 +175,7 @@ So app/web and `n8n` do not need to propose shipping fee values anymore.
 ### Current business rules
 
 Backend create request:
+
 - validates order belongs to authenticated customer
 - stores `imageUrl`
 - stores `reason`
@@ -176,6 +185,7 @@ Backend create request:
   - issue `ABUSE_RISK` is created
 
 Refund request model currently includes:
+
 - `orderAmount`
 - `customerEmail`
 - `reason`
@@ -220,6 +230,7 @@ Refund request model currently includes:
 ### Backend source of truth
 
 Current backend state already writes inventory lifecycle records:
+
 - `RESERVE`
 - `SALE`
 - `RETURN`
@@ -250,6 +261,7 @@ Current backend state already writes inventory lifecycle records:
 4. send Discord / email alerts
 
 Notes:
+
 - backend now exposes `ads`, `doi`, `lastCalculatedAt`, low-stock flags, and current stock snapshot through `/admin/inventory`
 - backend now exposes per-product `soldQty`, `revenue`, and `orderCount` through `/admin/analytics/sales-by-product`
 - sales analytics currently use orders with `status = completed`
@@ -315,10 +327,12 @@ These are internal orchestrator payloads, not customer-facing backend APIs.
 ## Environment / Secrets
 
 Backend:
+
 - `INTERNAL_WEBHOOK_SECRET`
 - `JWT_SECRET`
 
 `n8n` should store:
+
 - backend admin token or service credential for `/admin/*` calls
 - `X-Internal-Webhook-Secret` value for internal delivery callbacks
 

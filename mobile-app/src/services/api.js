@@ -1,11 +1,11 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Contract: Base URL — dùng IP máy Mac khi test thật trên iPhone
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-
-//TEST
-console.log("🛠 THIẾT BỊ ĐANG GỌI ĐẾN URL:", BASE_URL);
+// Prefer the shared repo env name, keep the older key as fallback for compatibility.
+const BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  process.env.EXPO_PUBLIC_API_URL ||
+  "https://api.ecloria.co.uk";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -97,12 +97,37 @@ export async function getProductById(id) {
   return res.data;
 }
 
+export async function getCategories() {
+  const res = await api.get("/categories");
+  return res.data;
+}
+
+export async function getVietnamProvinces() {
+  const res = await api.get("/locations/provinces");
+  return res.data;
+}
+
+export async function getVietnamDistricts(provinceCode) {
+  const res = await api.get(`/locations/provinces/${provinceCode}/districts`);
+  return res.data;
+}
+
+export async function getVietnamWards(districtCode) {
+  const res = await api.get(`/locations/districts/${districtCode}/wards`);
+  return res.data;
+}
+
 // ── Orders ───────────────────────────────────────────────────────────────────
 
 export async function createOrder(orderPayload) {
   const { items, ...rest } = orderPayload;
   const cleanItems = items.map(({ productId, quantity }) => ({ productId, quantity }));
   const res = await api.post("/orders", { ...rest, items: cleanItems });
+  return res.data;
+}
+
+export async function getShippingQuote(payload) {
+  const res = await api.post("/orders/shipping-quote", payload);
   return res.data;
 }
 
@@ -116,6 +141,32 @@ export async function getOrderById(id) {
   return res.data;
 }
 
+export async function createRefundEvidenceUpload(orderId, fileName, contentType) {
+  const res = await api.post("/refund-requests/uploads/presign", {
+    orderId,
+    fileName,
+    contentType,
+  });
+  return res.data;
+}
+
+export async function uploadFileToSignedUrl(uploadUrl, fileUri, contentType) {
+  const fileResponse = await fetch(fileUri);
+  const fileBlob = await fileResponse.blob();
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType,
+    },
+    body: fileBlob,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error("Failed to upload image");
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 export function formatPrice(amount) {
@@ -124,14 +175,41 @@ export function formatPrice(amount) {
 }
 
 export const ORDER_STATUS_LABEL = {
-  pending: "Chờ xác nhận",
-  confirmed: "Đã xác nhận",
+  pending: "Chờ xử lý",
   processing: "Đang xử lý",
   shipping: "Đang giao",
-  delivered: "Đã giao",
   completed: "Hoàn tất",
   cancelled: "Đã hủy",
   failed: "Thất bại",
+};
+
+export const PAYMENT_STATUS_LABEL = {
+  unpaid: "Chưa thanh toán",
+  payment_pending: "Chờ thanh toán",
+  payment_unknown: "Chưa xác nhận thanh toán",
+  paid: "Đã thanh toán",
+  paid_held: "Thanh toán tạm giữ",
+  payment_failed: "Thanh toán thất bại",
+  refunded: "Đã hoàn tiền",
+  refund_pending: "Chờ hoàn tiền",
+};
+
+export const PAYMENT_GATEWAY_LABEL = {
+  COD: "Thanh toán khi nhận hàng",
+  BANK_TRANSFER: "Chuyển khoản ngân hàng",
+  MOMO: "Ví MoMo",
+};
+
+export const DELIVERY_STATUS_LABEL = {
+  pending: "Chờ bàn giao",
+  ready_to_ship: "Sẵn sàng giao",
+  handover: "Đã bàn giao",
+  in_transit: "Đang vận chuyển",
+  delivery_failed: "Giao thất bại",
+  retry_pending: "Chờ giao lại",
+  returning: "Đang hoàn về",
+  returned: "Đã hoàn về",
+  delivered: "Đã giao",
 };
 
 export default api;

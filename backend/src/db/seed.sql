@@ -48,6 +48,16 @@ VALUES
     'staff',
     0,
     FALSE
+  ),
+  (
+    5,
+    'Shipper Demo',
+    '0903000003',
+    'shipper@example.com',
+    '$2b$10$2nXovS6fkWMqsQzXWNzB1.0/R2y/SNO2V1/OqdwBnCKV6hzJpqLOS',
+    'shipper',
+    0,
+    FALSE
 )
 ON CONFLICT (id) DO NOTHING;
 
