@@ -147,7 +147,14 @@ export default function Header({ onToggleSidebar, isMobile }) {
         zIndex: "var(--z-popover)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-md)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--spacing-md)",
+          minWidth: 0,
+        }}
+      >
         {isMobile && (
           <button
             onClick={onToggleSidebar}
@@ -166,7 +173,7 @@ export default function Header({ onToggleSidebar, isMobile }) {
             <Menu size={18} />
           </button>
         )}
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h1
             style={{
               fontSize: isMobile ? "var(--font-size-sm)" : "var(--font-size-md)",
@@ -174,6 +181,10 @@ export default function Header({ onToggleSidebar, isMobile }) {
               color: "var(--color-dark)",
               margin: 0,
               letterSpacing: "-0.03em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: isMobile ? "42vw" : "none",
             }}
           >
             {roleConfig.headerTitle}

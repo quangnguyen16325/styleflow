@@ -140,52 +140,54 @@ export default function IssueList() {
         <EmptyState title="No Issues Found" description="No issues match your current filter criteria." />
       ) : (
         <div className="card" style={{ overflow: 'hidden' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Order ID</th>
-                <th>Product ID</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {issues.map((issue) => (
-                <tr key={issue.id}>
-                  <td style={{ fontWeight: 'var(--font-weight-bold)' }}>#{issue.id}</td>
-                  <td><StatusBadge value={issue.type} /></td>
-                  <td><StatusBadge value={issue.severity} /></td>
-                  <td><StatusBadge value={issue.status} /></td>
-                  <td>
-                    {issue.orderId ? (
-                      <Link to={`/orders/${issue.orderId}`} className="link">
-                        Order #{issue.orderId}
-                      </Link>
-                    ) : '—'}
-                  </td>
-                  <td>
-                    {issue.productId ? (
-                      <Link to={`/products/${issue.productId}`} className="link">
-                        Product #{issue.productId}
-                      </Link>
-                    ) : '—'}
-                  </td>
-                  <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
-                    {new Date(issue.createdAt).toLocaleString()}
-                  </td>
-                  <td>
-                    <Link to={`/issues/${issue.id}`} className="link">
-                      View
-                    </Link>
-                  </td>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ minWidth: '860px' }}>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Order ID</th>
+                  <th>Product ID</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {issues.map((issue) => (
+                  <tr key={issue.id}>
+                    <td style={{ fontWeight: 'var(--font-weight-bold)' }}>#{issue.id}</td>
+                    <td><StatusBadge value={issue.type} /></td>
+                    <td><StatusBadge value={issue.severity} /></td>
+                    <td><StatusBadge value={issue.status} /></td>
+                    <td>
+                      {issue.orderId ? (
+                        <Link to={`/orders/${issue.orderId}`} className="link">
+                          Order #{issue.orderId}
+                        </Link>
+                      ) : '—'}
+                    </td>
+                    <td>
+                      {issue.productId ? (
+                        <Link to={`/products/${issue.productId}`} className="link">
+                          Product #{issue.productId}
+                        </Link>
+                      ) : '—'}
+                    </td>
+                    <td style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+                      {new Date(issue.createdAt).toLocaleString()}
+                    </td>
+                    <td>
+                      <Link to={`/issues/${issue.id}`} className="link">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
