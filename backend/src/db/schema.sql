@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
   order_id BIGINT,
   created_by VARCHAR(100) NOT NULL DEFAULT 'SYSTEM',
   reference_id VARCHAR(100),
+  note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -478,6 +479,9 @@ ADD COLUMN IF NOT EXISTS image_url TEXT;
 
 ALTER TABLE products
 ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES categories(id) ON DELETE SET NULL;
+
+ALTER TABLE inventory_transactions
+ADD COLUMN IF NOT EXISTS note TEXT;
 
 INSERT INTO categories (name, slug)
 VALUES

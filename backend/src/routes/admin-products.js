@@ -33,6 +33,58 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.get("/:id/inventory-transactions", async (req, res) => {
+  const productId = parsePositiveInteger(req.params.id);
+  if (!productId) {
+    return res.status(400).json(validationError("Product id must be a positive integer"));
+  }
+
+  const limit = parsePaginationLimit(req.query.limit);
+  const offset = parsePaginationOffset(req.query.offset);
+
+  try {
+    const { rows } = await pool.query(
+      `
+        SELECT
+          it.id,
+          it.change_amount,
+          it.type,
+          it.order_id,
+          it.created_by,
+          it.reference_id,
+          it.note,
+          it.created_at
+        FROM inventory_transactions it
+        JOIN inventory i ON i.id = it.inventory_id
+        WHERE i.product_id = $1
+        ORDER BY it.created_at DESC, it.id DESC
+        LIMIT $2 OFFSET $3
+      `,
+      [productId, limit, offset],
+    );
+
+    const countResult = await pool.query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM inventory_transactions it
+        JOIN inventory i ON i.id = it.inventory_id
+        WHERE i.product_id = $1
+      `,
+      [productId],
+    );
+
+    return res.json({
+      items: rows.map(mapInventoryTransactionRow),
+      total: Number(countResult.rows[0]?.total ?? 0),
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error(`GET /admin/products/${productId}/inventory-transactions failed:`, error);
+    return res.status(500).json(internalError("Failed to fetch inventory transactions"));
+  }
+});
+
 router.post("/", async (req, res) => {
   const validationMessage = validateCreateProductBody(req.body);
   if (validationMessage) {
@@ -102,6 +154,131 @@ router.post("/", async (req, res) => {
     }
 
     return res.status(500).json(internalError("Failed to create product"));
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/:id/stock-in", async (req, res) => {
+  const productId = parsePositiveInteger(req.params.id);
+  if (!productId) {
+    return res.status(400).json(validationError("Product id must be a positive integer"));
+  }
+
+  const validationMessage = validateStockInBody(req.body);
+  if (validationMessage) {
+    return res.status(400).json(validationError(validationMessage));
+  }
+
+  const quantity = Number(req.body.quantity);
+  const note = String(req.body.note ?? "").trim() || null;
+  const createdBy = formatInventoryActor(req.authCustomer);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const productResult = await client.query(
+      `
+        SELECT id
+        FROM products
+        WHERE id = $1
+        FOR UPDATE
+      `,
+      [productId],
+    );
+
+    if (productResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json(notFound("Product not found"));
+    }
+
+    let inventoryResult = await client.query(
+      `
+        SELECT
+          id,
+          stock_qty
+        FROM inventory
+        WHERE product_id = $1
+        FOR UPDATE
+      `,
+      [productId],
+    );
+
+    if (inventoryResult.rows.length === 0) {
+      inventoryResult = await client.query(
+        `
+          INSERT INTO inventory (
+            product_id,
+            stock_qty,
+            reserved_qty,
+            min_stock_level,
+            ads,
+            doi
+          )
+          VALUES ($1, 0, 0, 5, 0, 0)
+          RETURNING id, stock_qty
+        `,
+        [productId],
+      );
+    }
+
+    const inventory = inventoryResult.rows[0];
+    const previousStockQty = Number(inventory.stock_qty);
+    const nextStockQty = previousStockQty + quantity;
+    const referenceId = `ADMIN_STOCK_IN_${productId}_${Date.now()}`;
+
+    await client.query(
+      `
+        UPDATE inventory
+        SET
+          stock_qty = $2,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [inventory.id, nextStockQty],
+    );
+
+    const transactionResult = await client.query(
+      `
+        INSERT INTO inventory_transactions (
+          inventory_id,
+          change_amount,
+          type,
+          order_id,
+          created_by,
+          reference_id,
+          note
+        )
+        VALUES ($1, $2, 'RESTOCK', NULL, $3, $4, $5)
+        RETURNING
+          id,
+          change_amount,
+          type,
+          order_id,
+          created_by,
+          reference_id,
+          note,
+          created_at
+      `,
+      [inventory.id, quantity, createdBy, referenceId, note],
+    );
+
+    const updatedProduct = await client.query(`${listProductsQuery} WHERE p.id = $1`, [productId]);
+    await client.query("COMMIT");
+
+    return res.status(201).json({
+      product: mapAdminProductRow(updatedProduct.rows[0]),
+      transaction: {
+        ...mapInventoryTransactionRow(transactionResult.rows[0]),
+        previousStockQty,
+        nextStockQty,
+      },
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(`POST /admin/products/${productId}/stock-in failed:`, error);
+    return res.status(500).json(internalError("Failed to stock in product"));
   } finally {
     client.release();
   }
@@ -483,6 +660,26 @@ function validateUpdateProductBody(body) {
   return null;
 }
 
+function validateStockInBody(body) {
+  if (!body || typeof body !== "object") {
+    return "Request body is required";
+  }
+
+  if (!isPositiveIntegerLike(body.quantity)) {
+    return "quantity must be a positive integer";
+  }
+
+  if (Number(body.quantity) > 1_000_000) {
+    return "quantity is too large";
+  }
+
+  if (body.note != null && String(body.note).length > 500) {
+    return "note cannot exceed 500 characters";
+  }
+
+  return null;
+}
+
 function normalizeCreateProductBody(body) {
   return {
     sku: body.sku.trim(),
@@ -606,9 +803,45 @@ function mapAdminProductRow(row) {
   };
 }
 
+function mapInventoryTransactionRow(row) {
+  return {
+    id: Number(row.id),
+    changeAmount: Number(row.change_amount),
+    type: row.type,
+    orderId: row.order_id == null ? null : Number(row.order_id),
+    createdBy: row.created_by,
+    referenceId: row.reference_id,
+    note: row.note,
+    createdAt: row.created_at,
+  };
+}
+
+function formatInventoryActor(customer) {
+  if (!customer) {
+    return "SYSTEM";
+  }
+
+  const email = customer.email ? `:${customer.email}` : "";
+  return `${customer.role || "admin"}:${customer.id}${email}`.slice(0, 100);
+}
+
 function parsePositiveInteger(value) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parsePaginationLimit(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return 50;
+  }
+
+  return Math.min(parsed, 100);
+}
+
+function parsePaginationOffset(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function isNonNegativeInteger(value) {

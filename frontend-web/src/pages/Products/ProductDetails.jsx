@@ -1,34 +1,35 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import ApiService from '../../api';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import ErrorMessage from '../../components/ui/ErrorMessage';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import ApiService from "../../api";
+import LoadingSpinner from "../../components/ui/LoadingSpinner";
+import ErrorMessage from "../../components/ui/ErrorMessage";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
 
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const INVENTORY_LOG_PAGE_SIZE = 50;
 
 function resolveContentType(file) {
   if (file?.type) return file.type;
-  const fileName = file?.name?.toLowerCase() || '';
-  if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) return 'image/jpeg';
-  if (fileName.endsWith('.png')) return 'image/png';
-  if (fileName.endsWith('.webp')) return 'image/webp';
-  if (fileName.endsWith('.gif')) return 'image/gif';
-  return '';
+  const fileName = file?.name?.toLowerCase() || "";
+  if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) return "image/jpeg";
+  if (fileName.endsWith(".png")) return "image/png";
+  if (fileName.endsWith(".webp")) return "image/webp";
+  if (fileName.endsWith(".gif")) return "image/gif";
+  return "";
 }
 
 function isAcceptedImageFile(file) {
   if (!file) return false;
-  const normalizedType = (file.type || '').toLowerCase();
+  const normalizedType = (file.type || "").toLowerCase();
   if (normalizedType && ACCEPTED_IMAGE_TYPES.includes(normalizedType)) return true;
   const fileName = file.name.toLowerCase();
   return ACCEPTED_EXTENSIONS.some((ext) => fileName.endsWith(ext));
 }
 
 function formatFileSize(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -41,32 +42,57 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewUrl, setPreviewUrl] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [uploadSuccess, setUploadSuccess] = useState('');
+  const [uploadError, setUploadError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [inventoryTransactions, setInventoryTransactions] = useState([]);
+  const [inventoryTransactionTotal, setInventoryTransactionTotal] = useState(0);
+  const [loadingMoreTransactions, setLoadingMoreTransactions] = useState(false);
+  const [stockInQuantity, setStockInQuantity] = useState("");
+  const [stockInNote, setStockInNote] = useState("");
+  const [stockInSubmitting, setStockInSubmitting] = useState(false);
+  const [stockInError, setStockInError] = useState("");
+  const [stockInSuccess, setStockInSuccess] = useState("");
   const fileInputRef = useRef(null);
+
+  const loadProductDetails = useCallback(
+    async ({ showLoading = true } = {}) => {
+      if (showLoading) {
+        setLoading(true);
+      }
+
+      const [productData, transactionData] = await Promise.all([
+        ApiService.getProduct(id),
+        ApiService.getProductInventoryTransactions(id, {
+          limit: INVENTORY_LOG_PAGE_SIZE,
+          offset: 0,
+        }),
+      ]);
+
+      setProduct(productData);
+      setInventoryTransactions(Array.isArray(transactionData?.items) ? transactionData.items : []);
+      setInventoryTransactionTotal(Number(transactionData?.total ?? 0));
+      setError(null);
+    },
+    [id],
+  );
 
   useEffect(() => {
     let isActive = true;
     setLoading(true);
-    
-    ApiService.getProduct(id)
-      .then((data) => {
+
+    loadProductDetails()
+      .then(() => {
         if (isActive) {
-          setProduct(data);
-          setError(null);
+          setLoading(false);
         }
       })
       .catch((err) => {
         if (isActive) {
           setError(err);
-        }
-      })
-      .finally(() => {
-        if (isActive) {
           setLoading(false);
         }
       });
@@ -74,11 +100,11 @@ export default function ProductDetails() {
     return () => {
       isActive = false;
     };
-  }, [id]);
+  }, [loadProductDetails]);
 
   useEffect(() => {
     if (!selectedFile) {
-      setPreviewUrl('');
+      setPreviewUrl("");
       return;
     }
 
@@ -92,8 +118,8 @@ export default function ProductDetails() {
 
   const handleFileChange = useCallback((event) => {
     const file = event.target.files?.[0];
-    setUploadError('');
-    setUploadSuccess('');
+    setUploadError("");
+    setUploadSuccess("");
 
     if (!file) {
       setSelectedFile(null);
@@ -102,15 +128,15 @@ export default function ProductDetails() {
 
     if (!isAcceptedImageFile(file)) {
       setSelectedFile(null);
-      setUploadError('Invalid file type. Allowed: jpeg, png, webp, gif.');
-      event.target.value = '';
+      setUploadError("Invalid file type. Allowed: jpeg, png, webp, gif.");
+      event.target.value = "";
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
       setSelectedFile(null);
       setUploadError(`File too large. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`);
-      event.target.value = '';
+      event.target.value = "";
       return;
     }
 
@@ -121,12 +147,12 @@ export default function ProductDetails() {
     if (!product || !selectedFile || uploading) return;
 
     setUploading(true);
-    setUploadError('');
-    setUploadSuccess('');
+    setUploadError("");
+    setUploadSuccess("");
 
     const contentType = resolveContentType(selectedFile);
     if (!contentType) {
-      setUploadError('Could not detect file content type.');
+      setUploadError("Could not detect file content type.");
       setUploading(false);
       return;
     }
@@ -136,13 +162,68 @@ export default function ProductDetails() {
       setProduct(result);
       setSelectedFile(null);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
-      setUploadSuccess('Product image updated successfully.');
+      setUploadSuccess("Product image updated successfully.");
     } catch (err) {
-      setUploadError(err.message || 'Unable to upload and save product image.');
+      setUploadError(err.message || "Unable to upload and save product image.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleStockInSubmit = async (event) => {
+    event.preventDefault();
+    if (!product || stockInSubmitting) return;
+
+    const quantity = Number(stockInQuantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setStockInError("Quantity must be a positive integer.");
+      setStockInSuccess("");
+      return;
+    }
+
+    setStockInSubmitting(true);
+    setStockInError("");
+    setStockInSuccess("");
+
+    try {
+      const result = await ApiService.stockInProduct(product.id, {
+        quantity,
+        note: stockInNote.trim(),
+      });
+
+      if (result?.product) {
+        setProduct(result.product);
+      }
+
+      setStockInQuantity("");
+      setStockInNote("");
+      setStockInSuccess(`Stock increased by ${quantity.toLocaleString("vi-VN")} unit(s).`);
+      await loadProductDetails({ showLoading: false });
+    } catch (err) {
+      setStockInError(err.message || "Unable to stock in product.");
+    } finally {
+      setStockInSubmitting(false);
+    }
+  };
+
+  const handleLoadMoreTransactions = async () => {
+    if (loadingMoreTransactions) return;
+
+    setLoadingMoreTransactions(true);
+    try {
+      const result = await ApiService.getProductInventoryTransactions(id, {
+        limit: INVENTORY_LOG_PAGE_SIZE,
+        offset: inventoryTransactions.length,
+      });
+      const nextItems = Array.isArray(result?.items) ? result.items : [];
+      setInventoryTransactions((current) => [...current, ...nextItems]);
+      setInventoryTransactionTotal(Number(result?.total ?? inventoryTransactionTotal));
+    } catch (err) {
+      setStockInError(err.message || "Unable to load older inventory logs.");
+    } finally {
+      setLoadingMoreTransactions(false);
     }
   };
 
@@ -154,11 +235,14 @@ export default function ProductDetails() {
     setDeleting(true);
     try {
       await ApiService.deleteProduct(id);
-      navigate('/products');
+      navigate("/products");
     } catch (err) {
-      console.error('Delete error:', err);
-      if (err.code === 'CONFLICT') {
-        setError({ code: 'CONFLICT', message: 'Cannot delete product with active orders or reservations' });
+      console.error("Delete error:", err);
+      if (err.code === "CONFLICT") {
+        setError({
+          code: "CONFLICT",
+          message: "Cannot delete product with active orders or reservations",
+        });
       } else {
         setError(err);
       }
@@ -177,18 +261,45 @@ export default function ProductDetails() {
   if (!product) return null;
 
   const isLowStock = product.availableQty < product.minStockLevel;
+  const canLoadMoreTransactions = inventoryTransactions.length < inventoryTransactionTotal;
 
   const metricCards = [
-    { label: 'Gross Stock', value: product.stockQty, bg: 'var(--color-bg)', border: 'var(--color-border)', color: 'var(--color-dark)' },
-    { label: 'Reserved (Orders)', value: product.reservedQty, bg: 'var(--color-bg)', border: 'var(--color-border)', color: 'var(--color-dark)' },
-    { label: 'Available To Sell', value: product.availableQty, bg: isLowStock ? 'var(--color-warning-bg)' : '#e8f0fe', border: isLowStock ? '#ffc107' : 'var(--color-border)', color: isLowStock ? 'var(--color-danger)' : 'var(--color-primary)' },
-    { label: 'Min Level Limit', value: product.minStockLevel, bg: 'var(--color-bg)', border: 'var(--color-border)', color: 'var(--color-dark)' },
+    {
+      label: "Gross Stock",
+      value: product.stockQty,
+      bg: "var(--color-bg)",
+      border: "var(--color-border)",
+      color: "var(--color-dark)",
+    },
+    {
+      label: "Reserved (Orders)",
+      value: product.reservedQty,
+      bg: "var(--color-bg)",
+      border: "var(--color-border)",
+      color: "var(--color-dark)",
+    },
+    {
+      label: "Available To Sell",
+      value: product.availableQty,
+      bg: isLowStock ? "var(--color-warning-bg)" : "#e8f0fe",
+      border: isLowStock ? "#ffc107" : "var(--color-border)",
+      color: isLowStock ? "var(--color-danger)" : "var(--color-primary)",
+    },
+    {
+      label: "Min Level Limit",
+      value: product.minStockLevel,
+      bg: "var(--color-bg)",
+      border: "var(--color-border)",
+      color: "var(--color-dark)",
+    },
   ];
 
   return (
     <div className="animate-fadeIn">
-      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-        <Link to="/products" className="link">&larr; Back to Inventory</Link>
+      <div style={{ marginBottom: "var(--spacing-lg)" }}>
+        <Link to="/products" className="link">
+          &larr; Back to Inventory
+        </Link>
       </div>
 
       {/* Header */}
@@ -198,7 +309,11 @@ export default function ProductDetails() {
           <p className="page-subtitle">SKU: {product.sku}</p>
         </div>
         <div className="page-header-actions">
-          <Link to={`/products/${id}/edit`} className="btn-primary" style={{ textDecoration: 'none' }}>
+          <Link
+            to={`/products/${id}/edit`}
+            className="btn-primary"
+            style={{ textDecoration: "none" }}
+          >
             Edit
           </Link>
           <button
@@ -207,53 +322,96 @@ export default function ProductDetails() {
             className="btn-danger"
             disabled={deleting}
           >
-            {deleting ? 'Deleting...' : 'Delete'}
+            {deleting ? "Deleting..." : "Delete"}
           </button>
-          <span style={{
-            padding: '6px 14px',
-            backgroundColor: isLowStock ? 'var(--color-danger-light)' : 'var(--color-success-light)',
-            color: isLowStock ? 'var(--color-danger)' : 'var(--color-success)',
-            borderRadius: 'var(--radius-full)',
-            fontWeight: 'var(--font-weight-semibold)',
-            fontSize: 'var(--font-size-xs)',
-            border: `1px solid ${isLowStock ? 'var(--color-danger)' : 'var(--color-success)'}`,
-          }}>
-            {isLowStock ? '⚠️ LOW STOCK' : '✓ IN STOCK'}
+          <span
+            style={{
+              padding: "6px 14px",
+              backgroundColor: isLowStock
+                ? "var(--color-danger-light)"
+                : "var(--color-success-light)",
+              color: isLowStock ? "var(--color-danger)" : "var(--color-success)",
+              borderRadius: "var(--radius-full)",
+              fontWeight: "var(--font-weight-semibold)",
+              fontSize: "var(--font-size-xs)",
+              border: `1px solid ${isLowStock ? "var(--color-danger)" : "var(--color-success)"}`,
+            }}
+          >
+            {isLowStock ? "⚠️ LOW STOCK" : "✓ IN STOCK"}
           </span>
         </div>
       </div>
 
       {/* Product Image */}
-      <div className="card" style={{ padding: 'var(--spacing-xl)', marginBottom: 'var(--spacing-xl)' }}>
-        <h3 style={{ margin: '0 0 var(--spacing-md) 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
+      <div
+        className="card"
+        style={{ padding: "var(--spacing-xl)", marginBottom: "var(--spacing-xl)" }}
+      >
+        <h3
+          style={{
+            margin: "0 0 var(--spacing-md) 0",
+            borderBottom: "1px solid var(--color-border)",
+            paddingBottom: "var(--spacing-sm)",
+            fontSize: "var(--font-size-md)",
+            fontWeight: "var(--font-weight-semibold)",
+          }}
+        >
           Product Image
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--spacing-lg)' }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: "var(--spacing-lg)",
+          }}
+        >
           <div>
-            <div style={{
-              border: '1px dashed var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              minHeight: '240px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--color-bg)',
-              overflow: 'hidden',
-            }}>
+            <div
+              style={{
+                border: "1px dashed var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                minHeight: "240px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "var(--color-bg)",
+                overflow: "hidden",
+              }}
+            >
               {product.imageUrl ? (
                 <img
                   src={product.imageUrl}
                   alt={`${product.name} current`}
-                  style={{ width: '100%', height: '100%', maxHeight: '320px', objectFit: 'contain', display: 'block' }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    maxHeight: "320px",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
                 />
               ) : (
-                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', padding: 'var(--spacing-lg)', textAlign: 'center' }}>
+                <div
+                  style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: "var(--font-size-sm)",
+                    padding: "var(--spacing-lg)",
+                    textAlign: "center",
+                  }}
+                >
                   No product image yet
                 </div>
               )}
             </div>
-            <div style={{ marginTop: 'var(--spacing-xs)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', wordBreak: 'break-word' }}>
-              {product.imageUrl || 'Placeholder is displayed until an image is uploaded.'}
+            <div
+              style={{
+                marginTop: "var(--spacing-xs)",
+                fontSize: "var(--font-size-sm)",
+                color: "var(--color-text-muted)",
+                wordBreak: "break-word",
+              }}
+            >
+              {product.imageUrl || "Placeholder is displayed until an image is uploaded."}
             </div>
           </div>
 
@@ -265,44 +423,83 @@ export default function ProductDetails() {
               id="product-image-upload"
               ref={fileInputRef}
               type="file"
-              accept={ACCEPTED_IMAGE_TYPES.join(',')}
+              accept={ACCEPTED_IMAGE_TYPES.join(",")}
               onChange={handleFileChange}
               disabled={uploading}
               className="form-input"
-              style={{ width: '100%', marginBottom: 'var(--spacing-md)' }}
+              style={{ width: "100%", marginBottom: "var(--spacing-md)" }}
             />
 
             {selectedFile && (
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-dark)', marginBottom: 'var(--spacing-sm)' }}>
+              <div
+                style={{
+                  fontSize: "var(--font-size-sm)",
+                  color: "var(--color-dark)",
+                  marginBottom: "var(--spacing-sm)",
+                }}
+              >
                 {selectedFile.name} ({formatFileSize(selectedFile.size)})
               </div>
             )}
 
             {previewUrl && (
-              <div style={{
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                marginBottom: 'var(--spacing-md)',
-                padding: 'var(--spacing-xs)',
-                background: '#ffffff',
-              }}>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--spacing-xs)' }}>Preview</div>
+              <div
+                style={{
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-md)",
+                  marginBottom: "var(--spacing-md)",
+                  padding: "var(--spacing-xs)",
+                  background: "#ffffff",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "var(--font-size-xs)",
+                    color: "var(--color-text-muted)",
+                    marginBottom: "var(--spacing-xs)",
+                  }}
+                >
+                  Preview
+                </div>
                 <img
                   src={previewUrl}
                   alt="Upload preview"
-                  style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', display: 'block' }}
+                  style={{
+                    width: "100%",
+                    maxHeight: "220px",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
                 />
               </div>
             )}
 
             {uploadError && (
-              <div style={{ marginBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)', background: 'var(--color-danger-bg)', padding: 'var(--spacing-sm)', borderRadius: 'var(--radius-md)' }}>
+              <div
+                style={{
+                  marginBottom: "var(--spacing-sm)",
+                  fontSize: "var(--font-size-sm)",
+                  color: "var(--color-danger)",
+                  background: "var(--color-danger-bg)",
+                  padding: "var(--spacing-sm)",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
                 {uploadError}
               </div>
             )}
 
             {uploadSuccess && (
-              <div style={{ marginBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-sm)', color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: 'var(--spacing-sm)', borderRadius: 'var(--radius-md)' }}>
+              <div
+                style={{
+                  marginBottom: "var(--spacing-sm)",
+                  fontSize: "var(--font-size-sm)",
+                  color: "var(--color-success)",
+                  background: "var(--color-success-bg)",
+                  padding: "var(--spacing-sm)",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
                 {uploadSuccess}
               </div>
             )}
@@ -313,37 +510,339 @@ export default function ProductDetails() {
               disabled={uploading || !selectedFile}
               onClick={handleUploadImage}
             >
-              {uploading ? 'Uploading...' : 'Upload & Save Image'}
+              {uploading ? "Uploading..." : "Upload & Save Image"}
             </button>
           </div>
         </div>
       </div>
 
       {/* General Info */}
-      <div className="card" style={{ padding: 'var(--spacing-xl)', marginBottom: 'var(--spacing-xl)' }}>
-        <h3 style={{ margin: '0 0 var(--spacing-md) 0', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--spacing-sm)', fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>General Information</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)' }}>
-          <div><strong>ID:</strong> {product.id}</div>
-          <div><strong>SKU:</strong> <code style={{ fontSize: 'var(--font-size-sm)', background: 'var(--color-bg)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{product.sku}</code></div>
-          <div><strong>Category:</strong> <span style={{ textTransform: 'capitalize' }}>{product.category}</span></div>
-          <div><strong>Base Price:</strong> <span style={{ color: 'var(--color-primary)', fontWeight: 'var(--font-weight-semibold)' }}>{(product.basePrice || 0).toLocaleString()} đ</span></div>
-          <div><strong>Created:</strong> {new Date(product.createdAt).toLocaleString()}</div>
+      <div
+        className="card"
+        style={{ padding: "var(--spacing-xl)", marginBottom: "var(--spacing-xl)" }}
+      >
+        <h3
+          style={{
+            margin: "0 0 var(--spacing-md) 0",
+            borderBottom: "1px solid var(--color-border)",
+            paddingBottom: "var(--spacing-sm)",
+            fontSize: "var(--font-size-md)",
+            fontWeight: "var(--font-weight-semibold)",
+          }}
+        >
+          General Information
+        </h3>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "var(--spacing-md)",
+            fontSize: "var(--font-size-sm)",
+          }}
+        >
+          <div>
+            <strong>ID:</strong> {product.id}
+          </div>
+          <div>
+            <strong>SKU:</strong>{" "}
+            <code
+              style={{
+                fontSize: "var(--font-size-sm)",
+                background: "var(--color-bg)",
+                padding: "2px 6px",
+                borderRadius: "var(--radius-sm)",
+              }}
+            >
+              {product.sku}
+            </code>
+          </div>
+          <div>
+            <strong>Category:</strong>{" "}
+            <span style={{ textTransform: "capitalize" }}>{product.category}</span>
+          </div>
+          <div>
+            <strong>Base Price:</strong>{" "}
+            <span
+              style={{ color: "var(--color-primary)", fontWeight: "var(--font-weight-semibold)" }}
+            >
+              {(product.basePrice || 0).toLocaleString()} đ
+            </span>
+          </div>
+          <div>
+            <strong>Created:</strong> {new Date(product.createdAt).toLocaleString()}
+          </div>
         </div>
       </div>
 
       {/* Inventory Metrics */}
-      <h3 style={{ margin: '0 0 var(--spacing-md) 0', fontSize: 'var(--font-size-md)', color: 'var(--color-dark)' }}>Inventory Metrics</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 'var(--spacing-lg)' }}>
+      <h3
+        style={{
+          margin: "0 0 var(--spacing-md) 0",
+          fontSize: "var(--font-size-md)",
+          color: "var(--color-dark)",
+        }}
+      >
+        Inventory Metrics
+      </h3>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: "var(--spacing-lg)",
+        }}
+      >
         {metricCards.map((card) => (
-          <div key={card.label} className="card" style={{ padding: 'var(--spacing-lg)', background: card.bg, borderColor: card.border }}>
-            <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', fontWeight: 'var(--font-weight-semibold)', letterSpacing: '0.4px' }}>
+          <div
+            key={card.label}
+            className="card"
+            style={{ padding: "var(--spacing-lg)", background: card.bg, borderColor: card.border }}
+          >
+            <div
+              style={{
+                color: "var(--color-text-secondary)",
+                fontSize: "var(--font-size-xs)",
+                textTransform: "uppercase",
+                fontWeight: "var(--font-weight-semibold)",
+                letterSpacing: "0.4px",
+              }}
+            >
               {card.label}
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 'var(--font-weight-bold)', marginTop: 'var(--spacing-xs)', color: card.color }}>
+            <div
+              style={{
+                fontSize: "28px",
+                fontWeight: "var(--font-weight-bold)",
+                marginTop: "var(--spacing-xs)",
+                color: card.color,
+              }}
+            >
               {card.value}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Stock In */}
+      <div
+        className="card"
+        style={{
+          padding: "var(--spacing-xl)",
+          marginTop: "var(--spacing-xl)",
+          marginBottom: "var(--spacing-xl)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "var(--spacing-md)",
+            alignItems: "flex-start",
+            marginBottom: "var(--spacing-md)",
+          }}
+        >
+          <div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "var(--font-size-md)",
+                fontWeight: "var(--font-weight-semibold)",
+                color: "var(--color-dark)",
+              }}
+            >
+              Stock In
+            </h3>
+            <p
+              style={{
+                margin: "var(--spacing-xs) 0 0 0",
+                color: "var(--color-text-muted)",
+                fontSize: "var(--font-size-sm)",
+              }}
+            >
+              Add received stock and keep an audit log for inventory control.
+            </p>
+          </div>
+          <div
+            style={{
+              textAlign: "right",
+              color: "var(--color-text-muted)",
+              fontSize: "var(--font-size-sm)",
+            }}
+          >
+            Current gross stock
+            <div
+              style={{
+                color: "var(--color-dark)",
+                fontSize: "24px",
+                fontWeight: "var(--font-weight-bold)",
+              }}
+            >
+              {product.stockQty}
+            </div>
+          </div>
+        </div>
+
+        <form
+          onSubmit={handleStockInSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "var(--spacing-md)",
+            alignItems: "end",
+            marginBottom: "var(--spacing-lg)",
+          }}
+        >
+          <div>
+            <label htmlFor="stock-in-quantity" className="form-label">
+              Quantity
+            </label>
+            <input
+              id="stock-in-quantity"
+              className="form-input"
+              type="number"
+              min="1"
+              step="1"
+              value={stockInQuantity}
+              onChange={(event) => setStockInQuantity(event.target.value)}
+              disabled={stockInSubmitting}
+              placeholder="e.g. 50"
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="stock-in-note" className="form-label">
+              Note
+            </label>
+            <input
+              id="stock-in-note"
+              className="form-input"
+              type="text"
+              maxLength={500}
+              value={stockInNote}
+              onChange={(event) => setStockInNote(event.target.value)}
+              disabled={stockInSubmitting}
+              placeholder="Supplier, invoice, batch, or reason"
+              style={{ marginBottom: 0 }}
+            />
+          </div>
+
+          <button type="submit" className="btn-primary" disabled={stockInSubmitting}>
+            {stockInSubmitting ? "Saving..." : "Add Stock"}
+          </button>
+        </form>
+
+        {stockInError && (
+          <div
+            style={{
+              marginBottom: "var(--spacing-md)",
+              fontSize: "var(--font-size-sm)",
+              color: "var(--color-danger)",
+              background: "var(--color-danger-bg)",
+              padding: "var(--spacing-sm)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            {stockInError}
+          </div>
+        )}
+
+        {stockInSuccess && (
+          <div
+            style={{
+              marginBottom: "var(--spacing-md)",
+              fontSize: "var(--font-size-sm)",
+              color: "var(--color-success)",
+              background: "var(--color-success-bg)",
+              padding: "var(--spacing-sm)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            {stockInSuccess}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "var(--spacing-md)",
+            alignItems: "center",
+            marginBottom: "var(--spacing-sm)",
+          }}
+        >
+          <h4
+            style={{
+              margin: 0,
+              color: "var(--color-dark)",
+              fontSize: "var(--font-size-sm)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
+            Recent Inventory Logs
+          </h4>
+          <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+            Showing {inventoryTransactions.length} / {inventoryTransactionTotal}
+          </span>
+        </div>
+        {inventoryTransactions.length === 0 ? (
+          <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+            No inventory log has been recorded for this product.
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Change</th>
+                  <th>Created By</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryTransactions.map((transaction) => (
+                  <tr key={transaction.id}>
+                    <td>{formatDateTime(transaction.createdAt)}</td>
+                    <td>{transaction.type}</td>
+                    <td
+                      style={{
+                        color:
+                          transaction.changeAmount > 0
+                            ? "var(--color-success)"
+                            : "var(--color-danger)",
+                        fontWeight: "var(--font-weight-semibold)",
+                      }}
+                    >
+                      {formatSignedQuantity(transaction.changeAmount)}
+                    </td>
+                    <td>{transaction.createdBy || "—"}</td>
+                    <td>{transaction.note || transaction.referenceId || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {canLoadMoreTransactions ? (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  marginTop: "var(--spacing-md)",
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleLoadMoreTransactions}
+                  disabled={loadingMoreTransactions}
+                >
+                  {loadingMoreTransactions ? "Loading..." : "Load older logs"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -359,4 +858,17 @@ export default function ProductDetails() {
       />
     </div>
   );
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("vi-VN");
+}
+
+function formatSignedQuantity(value) {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity)) return "—";
+  return quantity > 0 ? `+${quantity.toLocaleString("vi-VN")}` : quantity.toLocaleString("vi-VN");
 }
