@@ -905,6 +905,8 @@ const listOrdersBaseQuery = `
         json_build_object(
           'id', oi.id,
           'productId', oi.product_id,
+          'name', p.name,
+          'imageUrl', p.image_url,
           'quantity', oi.quantity,
           'priceAtPurchase', oi.price_at_purchase
         )
@@ -922,6 +924,7 @@ const listOrdersBaseQuery = `
     LIMIT 1
   ) latest_rr ON true
   LEFT JOIN order_items oi ON oi.order_id = o.id
+  LEFT JOIN products p ON p.id = oi.product_id
 `;
 
 function validateOrderPayload(body) {
@@ -1082,6 +1085,8 @@ function mapOrderItemRow(item) {
   return {
     id: item.id,
     productId: item.productId ?? item.product_id,
+    name: item.name ?? null,
+    imageUrl: item.imageUrl ?? item.image_url ?? null,
     quantity: Number(item.quantity),
     priceAtPurchase: Number(item.priceAtPurchase ?? item.price_at_purchase),
   };
