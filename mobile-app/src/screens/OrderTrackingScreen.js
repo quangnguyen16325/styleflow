@@ -72,6 +72,10 @@ function Stepper({ currentStep }) {
 }
 
 function OrderItemRow({ item }) {
+  const quantity = Number(item.quantity || 0);
+  const unitPrice = Number(item.priceAtPurchase || 0);
+  const lineTotal = unitPrice * quantity;
+
   return (
     <View style={styles.orderItemRow}>
       {item.imageUrl ? (
@@ -85,9 +89,16 @@ function OrderItemRow({ item }) {
         <Text style={styles.orderItemName} numberOfLines={2}>
           {item.name || `Sản phẩm #${item.productId}`}
         </Text>
-        <Text style={styles.orderItemMeta}>Số lượng: {item.quantity}</Text>
+        <Text style={styles.orderItemMeta}>Mã sản phẩm: #{item.productId}</Text>
+        <View style={styles.itemPriceBreakdown}>
+          <Text style={styles.orderItemMeta}>Đơn giá: {formatPrice(unitPrice)}</Text>
+          <Text style={styles.orderItemMeta}>SL: {quantity}</Text>
+        </View>
       </View>
-      <Text style={styles.orderItemPrice}>{formatPrice(item.priceAtPurchase * item.quantity)}</Text>
+      <View style={styles.orderItemAmountWrap}>
+        <Text style={styles.orderItemAmountLabel}>Thành tiền</Text>
+        <Text style={styles.orderItemPrice}>{formatPrice(lineTotal)}</Text>
+      </View>
     </View>
   );
 }
@@ -167,6 +178,8 @@ export default function OrderTrackingScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <BackPillButton onPress={() => navigation.goBack()} />
+
         <View style={styles.heroCard}>
           <Text style={styles.heroEyebrow}>Tracking</Text>
           <Text style={styles.heroTitle}>Đơn hàng #{order.id}</Text>
@@ -232,10 +245,17 @@ export default function OrderTrackingScreen({ route, navigation }) {
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Sản phẩm trong đơn</Text>
-          {(order.items || []).map((item) => (
-            <OrderItemRow key={item.id || `${item.productId}-${item.quantity}`} item={item} />
-          ))}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Sản phẩm trong đơn</Text>
+            <Text style={styles.sectionCount}>{order.items?.length || 0} dòng</Text>
+          </View>
+          {(order.items || []).length > 0 ? (
+            (order.items || []).map((item) => (
+              <OrderItemRow key={item.id || `${item.productId}-${item.quantity}`} item={item} />
+            ))
+          ) : (
+            <Text style={styles.emptyItemsText}>Đơn hàng chưa có thông tin sản phẩm.</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -263,6 +283,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E1815",
     borderRadius: 24,
     padding: 20,
+    marginTop: 14,
     marginBottom: 16,
   },
   heroEyebrow: {
@@ -351,6 +372,18 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 14,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  sectionCount: {
+    color: "#8A7B6F",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
   approvedReturnNotice: {
     backgroundColor: "#EAF7F3",
     borderRadius: 22,
@@ -414,9 +447,8 @@ const styles = StyleSheet.create({
   },
   orderItemRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingBottom: 12,
-    marginBottom: 12,
+    alignItems: "flex-start",
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F0E5D8",
   },
@@ -446,18 +478,40 @@ const styles = StyleSheet.create({
   },
   orderItemName: {
     color: "#241A13",
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
     marginBottom: 4,
+    lineHeight: 20,
   },
   orderItemMeta: {
     color: "#8A7B6F",
     fontSize: 12,
+    lineHeight: 18,
+  },
+  itemPriceBreakdown: {
+    marginTop: 4,
+  },
+  orderItemAmountWrap: {
+    minWidth: 92,
+    alignItems: "flex-end",
+  },
+  orderItemAmountLabel: {
+    color: "#AA9C8F",
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginBottom: 4,
   },
   orderItemPrice: {
     color: "#9B4B1F",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "900",
+    textAlign: "right",
+  },
+  emptyItemsText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 22,
   },
   emptyTitle: {
     color: "#1E1815",
