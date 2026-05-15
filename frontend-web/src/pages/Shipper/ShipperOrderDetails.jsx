@@ -71,7 +71,7 @@ export default function ShipperOrderDetails() {
           <StatusBadge value={order.status} showIcon />
           <StatusBadge value={order.deliveryStatus || "pending"} showIcon />
           <StatusBadge value={order.paymentStatus || "unpaid"} showIcon />
-          {order.latestRefundRequestStatus === "approved" ? <ReturnPickupBadge /> : null}
+          {shouldShowReturnPickupBadge(order) ? <ReturnPickupBadge /> : null}
         </div>
       </div>
 
@@ -136,7 +136,12 @@ export default function ShipperOrderDetails() {
                       >
                         {item.productName || `Product #${item.productId}`}
                       </div>
-                      <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+                      <div
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--font-size-sm)",
+                        }}
+                      >
                         Product #{item.productId} · Qty {item.quantity}
                       </div>
                     </div>
@@ -154,9 +159,13 @@ export default function ShipperOrderDetails() {
           <section className="card" style={{ padding: "var(--spacing-lg)" }}>
             <SectionTitle title="Payment" />
             <InfoRow label="Gateway" value={order.paymentGateway || "—"} />
-            <InfoRow label="Payment status" value={<StatusBadge value={order.paymentStatus || "unpaid"} />} />
+            <InfoRow
+              label="Payment status"
+              value={<StatusBadge value={order.paymentStatus || "unpaid"} />}
+            />
             <InfoRow label="Shipping fee" value={formatCurrency(order.shippingFee)} />
-            <InfoRow label="Total collect" value={formatCurrency(order.totalAmount)} strong />
+            <InfoRow label="Order total" value={formatCurrency(order.totalAmount)} />
+            <InfoRow label="Shipper collect" value={formatShipperCollectionAmount(order)} strong />
             <InfoRow
               label="Return request"
               value={
@@ -211,6 +220,38 @@ function ReturnPickupBadge() {
       Return pickup
     </span>
   );
+}
+
+function shouldShowReturnPickupBadge(order) {
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  return refundStatus === "approved" && deliveryStatus !== "returned";
+}
+
+function getShipperCollectionAmount(order) {
+  const paymentGateway = String(order.paymentGateway || "").toUpperCase();
+  const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+
+  if (["returned", "returning"].includes(deliveryStatus)) {
+    return 0;
+  }
+
+  if (["paid", "paid_held", "refunded"].includes(paymentStatus)) {
+    return 0;
+  }
+
+  if (paymentGateway !== "COD") {
+    return 0;
+  }
+
+  const amount = Number(order.totalAmount);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function formatShipperCollectionAmount(order) {
+  const amount = getShipperCollectionAmount(order);
+  return amount > 0 ? formatCurrency(amount) : "No extra collection";
 }
 
 function SectionTitle({ title, aside }) {

@@ -85,7 +85,7 @@ function getDeliveryLockMessage(order, availableStatuses) {
 }
 
 export default function ShipperDashboard() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get("q") || "";
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -147,6 +147,25 @@ export default function ShipperDashboard() {
     }
   };
 
+  const handleSearchChange = (event) => {
+    const value = event.target.value;
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (value.trim()) {
+      nextParams.set("q", value);
+    } else {
+      nextParams.delete("q");
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const clearSearch = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("q");
+    setSearchParams(nextParams, { replace: true });
+  };
+
   if (loading) return <LoadingSpinner message="Loading your deliveries..." />;
 
   return (
@@ -159,6 +178,32 @@ export default function ShipperDashboard() {
             {searchTerm ? ` Showing matches for "${searchTerm}".` : ""}
           </p>
         </div>
+      </div>
+
+      <div
+        className="card"
+        style={{
+          padding: "var(--spacing-lg)",
+          marginBottom: "var(--spacing-lg)",
+          display: "flex",
+          gap: "var(--spacing-sm)",
+          alignItems: "center",
+        }}
+      >
+        <input
+          className="form-input"
+          type="search"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          placeholder="Search order ID, receiver, phone, address, status..."
+          aria-label="Search deliveries"
+          style={{ marginBottom: 0 }}
+        />
+        {searchTerm ? (
+          <button type="button" className="btn-secondary btn-sm" onClick={clearSearch}>
+            Clear
+          </button>
+        ) : null}
       </div>
 
       {error && (
@@ -186,111 +231,141 @@ export default function ShipperDashboard() {
                 const availableStatuses = getAvailableDeliveryStatuses(order);
                 const deliveryLockMessage = getDeliveryLockMessage(order, availableStatuses);
                 const isDeliveryLocked = availableStatuses.length === 0;
+                const collectionAmount = getShipperCollectionAmount(order);
 
                 return (
                   <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "var(--spacing-md)",
-                  alignItems: "flex-start",
-                  marginBottom: "var(--spacing-md)",
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      margin: 0,
-                      color: "var(--color-dark)",
-                      fontSize: "var(--font-size-lg)",
-                    }}
-                  >
-                    Order #{order.id}
-                  </h3>
-                  <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
-                    {formatCurrency(order.totalAmount)}
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}>
-                  <StatusBadge value={order.status} />
-                  <StatusBadge value={order.deliveryStatus || "pending"} />
-                  {order.latestRefundRequestStatus === "approved" ? (
-                    <ReturnPickupBadge />
-                  ) : null}
-                </div>
-              </div>
-
-              <InfoRow label="Receiver" value={order.shipping?.receiverName || "—"} />
-              <InfoRow label="Phone" value={order.shipping?.receiverPhone || "—"} />
-              <InfoRow label="Address" value={order.shipping?.fullAddress || "—"} />
-              <InfoRow label="Payment" value={`${order.paymentGateway || "—"} · ${order.paymentStatus || "—"}`} />
-              <InfoRow label="Items" value={`${order.items?.length || 0} line(s)`} />
-              <InfoRow label="Return request" value={order.latestRefundRequestStatus || "—"} />
-              <InfoRow label="Fail count" value={String(order.deliveryFailCount || 0)} />
-
-              {order.lastDeliveryFailedReason ? (
-                <InfoRow label="Last fail" value={order.lastDeliveryFailedReason} />
-              ) : null}
-
-              <Link
-                to={`/shipper/orders/${order.id}`}
-                className="btn-secondary btn-sm"
-                style={{
-                  display: "inline-flex",
-                  marginTop: "var(--spacing-sm)",
-                  textDecoration: "none",
-                }}
-              >
-                View order details
-              </Link>
-
-              <div style={{ marginTop: "var(--spacing-md)" }}>
-                {deliveryLockMessage ? (
-                  <div
-                    style={{
-                      padding: "var(--spacing-md)",
-                      borderRadius: "var(--radius-md)",
-                      background: "var(--color-bg-muted)",
-                      color: "var(--color-text-muted)",
-                      fontSize: "var(--font-size-sm)",
-                    }}
-                  >
-                    {deliveryLockMessage}
-                  </div>
-                ) : null}
-                <textarea
-                  className="form-input"
-                  value={deliveryReasons[order.id] || ""}
-                  onChange={(event) =>
-                    setDeliveryReasons((current) => ({
-                      ...current,
-                      [order.id]: event.target.value,
-                    }))
-                  }
-                  placeholder="Reason, required when marking failed"
-                  rows={2}
-                  disabled={updatingOrderId === order.id || isDeliveryLocked}
-                  style={{ resize: "vertical", marginBottom: "var(--spacing-sm)" }}
-                />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-sm)" }}>
-                  {availableStatuses.map((statusOption) => (
-                    <button
-                      key={statusOption.value}
-                      className={
-                        statusOption.value === "DELIVERED" ? "btn-primary btn-sm" : "btn-secondary btn-sm"
-                      }
-                      disabled={
-                        updatingOrderId === order.id ||
-                        (statusOption.value === "FAILED" && !deliveryReasons[order.id]?.trim())
-                      }
-                      onClick={() => updateDeliveryStatus(order.id, statusOption.value)}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "var(--spacing-md)",
+                        alignItems: "flex-start",
+                        marginBottom: "var(--spacing-md)",
+                      }}
                     >
-                      {updatingOrderId === order.id ? "Updating..." : statusOption.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      <div>
+                        <h3
+                          style={{
+                            margin: 0,
+                            color: "var(--color-dark)",
+                            fontSize: "var(--font-size-lg)",
+                          }}
+                        >
+                          Order #{order.id}
+                        </h3>
+                        <div
+                          style={{
+                            color: "var(--color-text-muted)",
+                            fontSize: "var(--font-size-sm)",
+                          }}
+                        >
+                          {formatCurrency(order.totalAmount)}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: "var(--spacing-xs)",
+                            color: collectionAmount > 0 ? "#9a3412" : "var(--color-text-muted)",
+                            fontSize: "var(--font-size-sm)",
+                            fontWeight: "var(--font-weight-semibold)",
+                          }}
+                        >
+                          Collect: {formatShipperCollectionAmount(order)}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "var(--spacing-xs)",
+                        }}
+                      >
+                        <StatusBadge value={order.status} />
+                        <StatusBadge value={order.deliveryStatus || "pending"} />
+                        {shouldShowReturnPickupBadge(order) ? <ReturnPickupBadge /> : null}
+                      </div>
+                    </div>
+
+                    <InfoRow label="Receiver" value={order.shipping?.receiverName || "—"} />
+                    <InfoRow label="Phone" value={order.shipping?.receiverPhone || "—"} />
+                    <InfoRow label="Address" value={order.shipping?.fullAddress || "—"} />
+                    <InfoRow
+                      label="Payment"
+                      value={`${order.paymentGateway || "—"} · ${order.paymentStatus || "—"}`}
+                    />
+                    <InfoRow label="Collect" value={formatShipperCollectionAmount(order)} />
+                    <InfoRow label="Items" value={`${order.items?.length || 0} line(s)`} />
+                    <InfoRow
+                      label="Return request"
+                      value={order.latestRefundRequestStatus || "—"}
+                    />
+                    <InfoRow label="Fail count" value={String(order.deliveryFailCount || 0)} />
+
+                    {order.lastDeliveryFailedReason ? (
+                      <InfoRow label="Last fail" value={order.lastDeliveryFailedReason} />
+                    ) : null}
+
+                    <Link
+                      to={`/shipper/orders/${order.id}`}
+                      className="btn-secondary btn-sm"
+                      style={{
+                        display: "inline-flex",
+                        marginTop: "var(--spacing-sm)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      View order details
+                    </Link>
+
+                    <div style={{ marginTop: "var(--spacing-md)" }}>
+                      {deliveryLockMessage ? (
+                        <div
+                          style={{
+                            padding: "var(--spacing-md)",
+                            borderRadius: "var(--radius-md)",
+                            background: "var(--color-bg-muted)",
+                            color: "var(--color-text-muted)",
+                            fontSize: "var(--font-size-sm)",
+                          }}
+                        >
+                          {deliveryLockMessage}
+                        </div>
+                      ) : null}
+                      <textarea
+                        className="form-input"
+                        value={deliveryReasons[order.id] || ""}
+                        onChange={(event) =>
+                          setDeliveryReasons((current) => ({
+                            ...current,
+                            [order.id]: event.target.value,
+                          }))
+                        }
+                        placeholder="Reason, required when marking failed"
+                        rows={2}
+                        disabled={updatingOrderId === order.id || isDeliveryLocked}
+                        style={{ resize: "vertical", marginBottom: "var(--spacing-sm)" }}
+                      />
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-sm)" }}>
+                        {availableStatuses.map((statusOption) => (
+                          <button
+                            key={statusOption.value}
+                            className={
+                              statusOption.value === "DELIVERED"
+                                ? "btn-primary btn-sm"
+                                : "btn-secondary btn-sm"
+                            }
+                            disabled={
+                              updatingOrderId === order.id ||
+                              (statusOption.value === "FAILED" &&
+                                !deliveryReasons[order.id]?.trim())
+                            }
+                            onClick={() => updateDeliveryStatus(order.id, statusOption.value)}
+                          >
+                            {updatingOrderId === order.id ? "Updating..." : statusOption.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 );
               })()}
@@ -341,6 +416,38 @@ function ReturnPickupBadge() {
   );
 }
 
+function shouldShowReturnPickupBadge(order) {
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  return refundStatus === "approved" && deliveryStatus !== "returned";
+}
+
+function getShipperCollectionAmount(order) {
+  const paymentGateway = String(order.paymentGateway || "").toUpperCase();
+  const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+
+  if (["returned", "returning"].includes(deliveryStatus)) {
+    return 0;
+  }
+
+  if (["paid", "paid_held", "refunded"].includes(paymentStatus)) {
+    return 0;
+  }
+
+  if (paymentGateway !== "COD") {
+    return 0;
+  }
+
+  const amount = Number(order.totalAmount);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function formatShipperCollectionAmount(order) {
+  const amount = getShipperCollectionAmount(order);
+  return amount > 0 ? formatCurrency(amount) : "No extra collection";
+}
+
 function matchesDeliverySearch(order, term) {
   const compactTerm = term.replace(/\s+/g, "");
   const digitTerm = term.replace(/\D/g, "");
@@ -363,7 +470,10 @@ function matchesDeliverySearch(order, term) {
   return values.some((value) => {
     const normalizedValue = normalizeSearchText(value);
     if (!normalizedValue) return false;
-    if (normalizedValue.includes(term) || normalizedValue.replace(/\s+/g, "").includes(compactTerm)) {
+    if (
+      normalizedValue.includes(term) ||
+      normalizedValue.replace(/\s+/g, "").includes(compactTerm)
+    ) {
       return true;
     }
     return digitTerm && normalizedValue.replace(/\D/g, "").includes(digitTerm);
