@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS orders (
   ),
   delivery_fail_count INTEGER NOT NULL DEFAULT 0 CHECK (delivery_fail_count >= 0),
   last_delivery_failed_reason TEXT,
+  returned_abuse_score_applied BOOLEAN NOT NULL DEFAULT FALSE,
   address_change_status VARCHAR(50) NOT NULL DEFAULT 'none' CHECK (
     address_change_status IN (
       'none',
@@ -405,6 +406,19 @@ ADD COLUMN IF NOT EXISTS delivery_fail_count INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS last_delivery_failed_reason TEXT;
+
+ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS returned_abuse_score_applied BOOLEAN DEFAULT FALSE;
+
+UPDATE orders
+SET returned_abuse_score_applied = FALSE
+WHERE returned_abuse_score_applied IS NULL;
+
+ALTER TABLE orders
+ALTER COLUMN returned_abuse_score_applied SET DEFAULT FALSE;
+
+ALTER TABLE orders
+ALTER COLUMN returned_abuse_score_applied SET NOT NULL;
 
 ALTER TABLE orders
 ADD COLUMN IF NOT EXISTS address_change_status VARCHAR(50) DEFAULT 'none';

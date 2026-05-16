@@ -66,6 +66,8 @@ export async function applyDeliveryStatusUpdate(
         o.payment_gateway,
         o.delivery_fail_count,
         o.delivery_status,
+        o.returned_abuse_score_applied,
+        o.customer_id,
         latest_rr.status AS latest_refund_request_status,
         c.email AS customer_email
       FROM orders o
@@ -189,6 +191,9 @@ export async function applyDeliveryStatusUpdate(
     action = "return_pickup_failed";
     failCount = Number(order.delivery_fail_count);
   } else if (status === "RETURNED") {
+    const shouldApplyReturnedAbuseScore =
+      order.delivery_status !== "returned" && !order.returned_abuse_score_applied;
+
     if (order.status === "completed" && order.delivery_status !== "returned") {
       await applyOrderReturn(client, orderId);
     }
@@ -200,11 +205,29 @@ export async function applyDeliveryStatusUpdate(
           status = CASE WHEN status = 'completed' THEN 'failed' ELSE status END,
           delivery_status = 'returned',
           delivery_partner = COALESCE($2, delivery_partner),
+          returned_abuse_score_applied = CASE
+            WHEN $3::boolean THEN TRUE
+            ELSE returned_abuse_score_applied
+          END,
           updated_at = NOW()
         WHERE id = $1
       `,
-      [orderId, partner],
+      [orderId, partner, shouldApplyReturnedAbuseScore],
     );
+
+    if (shouldApplyReturnedAbuseScore) {
+      await client.query(
+        `
+          UPDATE customers
+          SET
+            abuse_score = abuse_score + 1,
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [order.customer_id],
+      );
+    }
+
     action = "returned";
     failCount = Number(order.delivery_fail_count);
   } else if (status === "FAILED") {
