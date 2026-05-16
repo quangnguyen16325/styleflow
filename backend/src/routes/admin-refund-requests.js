@@ -33,6 +33,7 @@ router.get("/", async (req, res) => {
           rr.reason,
           rr.status,
           rr.abuse_score_snapshot,
+          rr.abuse_score_applied,
           rr.review_note,
           rr.created_at,
           rr.updated_at
@@ -79,6 +80,7 @@ router.get("/:id", async (req, res) => {
           rr.reason,
           rr.status,
           rr.abuse_score_snapshot,
+          rr.abuse_score_applied,
           rr.review_note,
           rr.created_at,
           rr.updated_at
@@ -136,8 +138,32 @@ router.patch("/:id/status", async (req, res) => {
   const reviewNote =
     req.body?.reviewNote == null ? null : String(req.body.reviewNote).trim() || null;
 
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query(
+    await client.query("BEGIN");
+
+    const currentResult = await client.query(
+      `
+        SELECT status, abuse_score_applied
+        FROM refund_requests
+        WHERE id = $1
+        FOR UPDATE
+      `,
+      [refundRequestId],
+    );
+
+    if (currentResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        error: {
+          code: "NOT_FOUND",
+          message: "Refund request not found",
+        },
+      });
+    }
+
+    const currentRefundRequest = currentResult.rows[0];
+    const { rows } = await client.query(
       `
         UPDATE refund_requests
         SET
@@ -153,6 +179,7 @@ router.patch("/:id/status", async (req, res) => {
           reason,
           status,
           abuse_score_snapshot,
+          abuse_score_applied,
           review_note,
           created_at,
           updated_at
@@ -161,6 +188,7 @@ router.patch("/:id/status", async (req, res) => {
     );
 
     if (rows.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({
         error: {
           code: "NOT_FOUND",
@@ -169,8 +197,69 @@ router.patch("/:id/status", async (req, res) => {
       });
     }
 
-    return res.json(mapRefundRequestRow(rows[0]));
+    let updatedRefundRequest = rows[0];
+    if (
+      nextStatus === "refunded" &&
+      currentRefundRequest.status !== "refunded" &&
+      !currentRefundRequest.abuse_score_applied
+    ) {
+      const abuseAppliedResult = await client.query(
+        `
+          UPDATE refund_requests rr
+          SET
+            abuse_score_applied = TRUE,
+            updated_at = NOW()
+          FROM orders o
+          WHERE rr.id = $1
+            AND rr.order_id = o.id
+            AND rr.status = 'refunded'
+            AND rr.abuse_score_applied = FALSE
+            AND o.total_amount < $2
+          RETURNING rr.customer_id
+        `,
+        [refundRequestId, LOW_VALUE_REFUNDED_ORDER_THRESHOLD],
+      );
+
+      if (abuseAppliedResult.rows.length > 0) {
+        await client.query(
+          `
+            UPDATE customers
+            SET
+              abuse_score = abuse_score + 1,
+              updated_at = NOW()
+            WHERE id = $1
+          `,
+          [abuseAppliedResult.rows[0].customer_id],
+        );
+
+        const refreshedResult = await client.query(
+          `
+            SELECT
+              id,
+              order_id,
+              customer_id,
+              image_url,
+              reason,
+              status,
+              abuse_score_snapshot,
+              abuse_score_applied,
+              review_note,
+              created_at,
+              updated_at
+            FROM refund_requests
+            WHERE id = $1
+            LIMIT 1
+          `,
+          [refundRequestId],
+        );
+        updatedRefundRequest = refreshedResult.rows[0] || updatedRefundRequest;
+      }
+    }
+
+    await client.query("COMMIT");
+    return res.json(mapRefundRequestRow(updatedRefundRequest));
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error(`PATCH /admin/refund-requests/${refundRequestId}/status failed:`, error);
     return res.status(500).json({
       error: {
@@ -178,6 +267,8 @@ router.patch("/:id/status", async (req, res) => {
         message: "Failed to update refund request status",
       },
     });
+  } finally {
+    client.release();
   }
 });
 
@@ -208,3 +299,5 @@ const REFUND_REQUEST_STATUSES = [
   "rejected",
   "refunded",
 ];
+
+const LOW_VALUE_REFUNDED_ORDER_THRESHOLD = 200000;

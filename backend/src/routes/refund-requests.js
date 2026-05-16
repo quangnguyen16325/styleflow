@@ -168,6 +168,7 @@ router.post("/", async (req, res) => {
           reason,
           status,
           abuse_score_snapshot,
+          abuse_score_applied,
           review_note,
           created_at,
           updated_at
@@ -277,6 +278,10 @@ export function mapRefundRequestRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+
+  if (row.abuse_score_applied != null) {
+    mapped.abuseScoreApplied = Boolean(row.abuse_score_applied);
+  }
 
   if (row.order_total_amount != null) {
     mapped.orderAmount = Number(row.order_total_amount);
