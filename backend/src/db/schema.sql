@@ -204,6 +204,7 @@ CREATE TABLE IF NOT EXISTS refund_requests (
     )
   ),
   abuse_score_snapshot INTEGER NOT NULL DEFAULT 0 CHECK (abuse_score_snapshot >= 0),
+  abuse_score_applied BOOLEAN NOT NULL DEFAULT FALSE,
   review_note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -536,6 +537,19 @@ ALTER COLUMN abuse_score_snapshot SET DEFAULT 0;
 
 ALTER TABLE refund_requests
 ALTER COLUMN abuse_score_snapshot SET NOT NULL;
+
+ALTER TABLE refund_requests
+ADD COLUMN IF NOT EXISTS abuse_score_applied BOOLEAN DEFAULT FALSE;
+
+UPDATE refund_requests
+SET abuse_score_applied = FALSE
+WHERE abuse_score_applied IS NULL;
+
+ALTER TABLE refund_requests
+ALTER COLUMN abuse_score_applied SET DEFAULT FALSE;
+
+ALTER TABLE refund_requests
+ALTER COLUMN abuse_score_applied SET NOT NULL;
 
 ALTER TABLE refund_requests
 DROP CONSTRAINT IF EXISTS refund_requests_status_check;
