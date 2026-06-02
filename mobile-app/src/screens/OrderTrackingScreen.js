@@ -15,7 +15,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import BankTransferPaymentCard, {
   shouldShowBankTransferPayment,
 } from "../components/BankTransferPaymentCard";
@@ -24,11 +26,13 @@ import BackPillButton from "../components/BackPillButton";
 import AppImage from "../components/AppImage";
 import api, {
   createProductReview,
+  createProductReviewUpload,
   DELIVERY_STATUS_LABEL,
   formatPrice,
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL,
   PAYMENT_GATEWAY_LABEL,
+  uploadFileToSignedUrl,
   updateProductReview,
 } from "../services/api";
 
@@ -156,6 +160,40 @@ function ApprovedReturnNotice() {
   );
 }
 
+function resolveImageMeta(asset) {
+  const uri = asset?.uri;
+  const mimeType = asset?.mimeType || inferContentTypeFromUri(uri);
+  const fileName = asset?.fileName || `review-${Date.now()}.${extensionFromContentType(mimeType)}`;
+
+  return {
+    uri,
+    mimeType,
+    fileName,
+    publicUrl: null,
+  };
+}
+
+function inferContentTypeFromUri(uri) {
+  const normalized = String(uri || "").toLowerCase();
+  if (normalized.endsWith(".png")) return "image/png";
+  if (normalized.endsWith(".webp")) return "image/webp";
+  if (normalized.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
+function extensionFromContentType(contentType) {
+  switch (contentType) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    default:
+      return "jpeg";
+  }
+}
+
 export default function OrderTrackingScreen({ route, navigation }) {
   const { orderId } = route?.params || {};
   const [order, setOrder] = useState(null);
@@ -163,6 +201,7 @@ export default function OrderTrackingScreen({ route, navigation }) {
   const [reviewingItem, setReviewingItem] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState([]);
   const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
@@ -202,6 +241,11 @@ export default function OrderTrackingScreen({ route, navigation }) {
     setReviewingItem(item);
     setReviewRating(Number(item.review?.rating || 5));
     setReviewComment(item.review?.comment || "");
+    setReviewImages(
+      Array.isArray(item.review?.images)
+        ? item.review.images.map((url) => ({ uri: url, publicUrl: url }))
+        : [],
+    );
   };
 
   const closeReviewModal = () => {
@@ -209,6 +253,39 @@ export default function OrderTrackingScreen({ route, navigation }) {
     setReviewingItem(null);
     setReviewComment("");
     setReviewRating(5);
+    setReviewImages([]);
+  };
+
+  const handlePickReviewImage = async () => {
+    try {
+      if (reviewImages.length >= 4) {
+        Alert.alert("Giới hạn ảnh", "Bạn có thể gửi tối đa 4 ảnh cho mỗi đánh giá.");
+        return;
+      }
+
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Quyền truy cập", "Vui lòng cấp quyền truy cập thư viện ảnh.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        setReviewImages((current) => [...current, resolveImageMeta(result.assets[0])].slice(0, 4));
+      }
+    } catch (error) {
+      console.warn("Lỗi chọn ảnh đánh giá:", error);
+    }
+  };
+
+  const handleRemoveReviewImage = (index) => {
+    setReviewImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const handleSubmitReview = async () => {
@@ -216,15 +293,33 @@ export default function OrderTrackingScreen({ route, navigation }) {
 
     try {
       setSubmittingReview(true);
+      const uploadedImageUrls = [];
+      for (const image of reviewImages) {
+        if (image.publicUrl) {
+          uploadedImageUrls.push(image.publicUrl);
+          continue;
+        }
+
+        const upload = await createProductReviewUpload(reviewingItem.productId, {
+          orderItemId: reviewingItem.id,
+          fileName: image.fileName,
+          contentType: image.mimeType,
+        });
+        await uploadFileToSignedUrl(upload.uploadUrl, image.uri, image.mimeType);
+        uploadedImageUrls.push(upload.publicUrl);
+      }
+
       const savedReview = reviewingItem.review?.id
         ? await updateProductReview(reviewingItem.productId, reviewingItem.review.id, {
             rating: reviewRating,
             comment: reviewComment,
+            images: uploadedImageUrls,
           })
         : await createProductReview(reviewingItem.productId, {
             orderItemId: reviewingItem.id,
             rating: reviewRating,
             comment: reviewComment,
+            images: uploadedImageUrls,
           });
 
       setOrder((current) => {
@@ -243,6 +338,7 @@ export default function OrderTrackingScreen({ route, navigation }) {
       setReviewingItem(null);
       setReviewComment("");
       setReviewRating(5);
+      setReviewImages([]);
     } catch (error) {
       const message =
         error?.code === "CONFLICT"
@@ -365,9 +461,12 @@ export default function OrderTrackingScreen({ route, navigation }) {
         visible={!!reviewingItem}
         rating={reviewRating}
         comment={reviewComment}
+        images={reviewImages}
         submitting={submittingReview}
         onRatingChange={setReviewRating}
         onCommentChange={setReviewComment}
+        onPickImage={handlePickReviewImage}
+        onRemoveImage={handleRemoveReviewImage}
         onClose={closeReviewModal}
         onSubmit={handleSubmitReview}
       />
@@ -380,9 +479,12 @@ function ReviewModal({
   item,
   rating,
   comment,
+  images,
   submitting,
   onRatingChange,
   onCommentChange,
+  onPickImage,
+  onRemoveImage,
   onClose,
   onSubmit,
 }) {
@@ -429,6 +531,38 @@ function ReviewModal({
             onSubmitEditing={Keyboard.dismiss}
           />
           <Text style={styles.reviewInputHint}>{comment.length}/1000 ký tự</Text>
+
+          <View style={styles.reviewImageHeader}>
+            <Text style={styles.reviewImageTitle}>Ảnh đánh giá</Text>
+            <TouchableOpacity
+              style={styles.reviewImageAddBtn}
+              onPress={onPickImage}
+              activeOpacity={0.85}
+              disabled={submitting || images.length >= 4}
+            >
+              <Text style={styles.reviewImageAddText}>Thêm ảnh</Text>
+            </TouchableOpacity>
+          </View>
+          {images.length > 0 ? (
+            <View style={styles.reviewImageList}>
+              {images.map((image, index) => (
+                <View key={`${image.uri}-${index}`} style={styles.reviewImageWrap}>
+                  <Image source={{ uri: image.uri }} style={styles.reviewImageThumb} />
+                  <TouchableOpacity
+                    style={styles.reviewImageRemove}
+                    onPress={() => onRemoveImage(index)}
+                    disabled={submitting}
+                  >
+                    <Text style={styles.reviewImageRemoveText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.reviewImageHint}>
+              Có thể thêm tối đa 4 ảnh thực tế của sản phẩm.
+            </Text>
+          )}
 
           <View style={styles.reviewModalActions}>
             <TouchableOpacity
@@ -801,6 +935,65 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "right",
     marginTop: 8,
+  },
+  reviewImageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  reviewImageTitle: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  reviewImageAddBtn: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#F5ECE3",
+  },
+  reviewImageAddText: {
+    color: "#9B4B1F",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  reviewImageList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  reviewImageWrap: {
+    position: "relative",
+  },
+  reviewImageThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    backgroundColor: "#EFE8E0",
+  },
+  reviewImageRemove: {
+    position: "absolute",
+    top: -7,
+    right: -7,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#1E1815",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewImageRemoveText: {
+    color: "#FFFDF9",
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "900",
+  },
+  reviewImageHint: {
+    color: "#AA9C8F",
+    fontSize: 12,
+    fontWeight: "700",
   },
   reviewModalActions: {
     flexDirection: "row",

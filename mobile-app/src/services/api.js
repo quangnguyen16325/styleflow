@@ -107,6 +107,11 @@ export async function createProductReview(productId, payload) {
   return res.data;
 }
 
+export async function createProductReviewUpload(productId, payload) {
+  const res = await api.post(`/products/${productId}/reviews/uploads/presign`, payload);
+  return res.data;
+}
+
 export async function updateProductReview(productId, reviewId, payload) {
   const res = await api.put(`/products/${productId}/reviews/${reviewId}`, payload);
   return res.data;

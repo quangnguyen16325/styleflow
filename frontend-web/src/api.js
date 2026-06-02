@@ -103,6 +103,20 @@ class ApiService {
     return client.get(`/admin/products/${id}/inventory-transactions`, { params });
   }
 
+  // PRODUCT REVIEWS
+  static async getReviews(params = {}) {
+    const cleanParams = {};
+    Object.entries(params).forEach(([key, value]) => {
+      if (value != null && value !== "" && value !== "ALL") {
+        cleanParams[key] = value;
+      }
+    });
+    return client.get("/admin/reviews", { params: cleanParams });
+  }
+  static async updateReviewStatus(id, payload) {
+    return client.patch(`/admin/reviews/${id}/status`, payload);
+  }
+
   // CATEGORIES
   static async getCategories() {
     return client.get("/categories");

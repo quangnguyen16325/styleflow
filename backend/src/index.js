@@ -11,6 +11,7 @@ import adminOrdersRouter from "./routes/admin-orders.js";
 import adminPaymentIncidentsRouter from "./routes/admin-payment-incidents.js";
 import adminProductsRouter from "./routes/admin-products.js";
 import adminRefundRequestsRouter from "./routes/admin-refund-requests.js";
+import adminReviewsRouter from "./routes/admin-reviews.js";
 import adminShippersRouter from "./routes/admin-shippers.js";
 import adminSystemConfigRouter from "./routes/admin-system-config.js";
 import adminUploadsRouter from "./routes/admin-uploads.js";
@@ -67,6 +68,7 @@ app.use(
   requireRole("admin", "staff"),
   adminRefundRequestsRouter,
 );
+app.use("/admin/reviews", requireAuth, requireRole("admin", "staff"), adminReviewsRouter);
 app.use(
   "/admin/system-config",
   requireAuth,

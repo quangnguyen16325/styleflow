@@ -1,6 +1,12 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { requireAuth } from "../middleware/require-auth.js";
+import {
+  createReviewImageUploadUrl,
+  getR2Config,
+  isAllowedImageContentType,
+  isValidImageUrl,
+} from "../r2.js";
 
 const router = Router();
 
@@ -159,6 +165,7 @@ router.post("/:id/reviews", requireAuth, async (req, res) => {
   const orderItemId = parsePositiveInteger(req.body.orderItemId);
   const rating = Number(req.body.rating);
   const comment = normalizeComment(req.body.comment);
+  const images = normalizeReviewImages(req.body.images);
 
   try {
     const reviewContext = await resolveReviewableOrderItem({
@@ -185,10 +192,11 @@ router.post("/:id/reviews", requireAuth, async (req, res) => {
           order_item_id,
           rating,
           comment,
+          images,
           customer_name_snapshot,
           product_name_snapshot
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
         RETURNING *
       `,
       [
@@ -198,6 +206,7 @@ router.post("/:id/reviews", requireAuth, async (req, res) => {
         orderItemId,
         rating,
         comment,
+        JSON.stringify(images),
         req.authCustomer.fullName,
         reviewContext.product_name,
       ],
@@ -240,8 +249,7 @@ router.put("/:productId/reviews/:reviewId", requireAuth, async (req, res) => {
         SET
           rating = $4,
           comment = $5,
-          status = 'visible',
-          hidden_reason = NULL,
+          images = $6::jsonb,
           updated_at = NOW()
         WHERE id = $1
           AND product_id = $2
@@ -255,6 +263,7 @@ router.put("/:productId/reviews/:reviewId", requireAuth, async (req, res) => {
         req.authCustomer.id,
         Number(req.body.rating),
         normalizeComment(req.body.comment),
+        JSON.stringify(normalizeReviewImages(req.body.images)),
       ],
     );
 
@@ -297,6 +306,56 @@ router.delete("/:productId/reviews/:reviewId", requireAuth, async (req, res) => 
   } catch (error) {
     console.error(`DELETE /products/${productId}/reviews/${reviewId} failed:`, error);
     return res.status(500).json(internalError("Failed to delete product review"));
+  }
+});
+
+router.post("/:id/reviews/uploads/presign", requireAuth, async (req, res) => {
+  const productId = parsePositiveInteger(req.params.id);
+  if (!productId) {
+    return res.status(400).json(validationError("Product id must be a positive integer"));
+  }
+
+  const validationMessage = validateReviewUploadBody(req.body);
+  if (validationMessage) {
+    return res.status(400).json(validationError(validationMessage));
+  }
+
+  if (!getR2Config()) {
+    return res.status(500).json(internalError("R2 upload is not configured"));
+  }
+
+  const orderItemId = parsePositiveInteger(req.body.orderItemId);
+  const fileName = req.body.fileName.trim();
+  const contentType = req.body.contentType.trim().toLowerCase();
+
+  try {
+    const reviewContext = await resolveReviewableOrderItem({
+      productId,
+      orderItemId,
+      customerId: req.authCustomer.id,
+    });
+
+    if (!reviewContext) {
+      return res.status(403).json({
+        error: {
+          code: "FORBIDDEN",
+          message: "This product is not reviewable from this order item",
+        },
+      });
+    }
+
+    const upload = await createReviewImageUploadUrl({
+      customerId: req.authCustomer.id,
+      productId,
+      orderItemId,
+      fileName,
+      contentType,
+    });
+
+    return res.status(201).json(upload);
+  } catch (error) {
+    console.error(`POST /products/${productId}/reviews/uploads/presign failed:`, error);
+    return res.status(500).json(internalError("Failed to create review image upload URL"));
   }
 });
 
@@ -400,7 +459,69 @@ function validateReviewBody(body, { requireOrderItemId }) {
     return "comment must be at most 1000 characters";
   }
 
+  const imagesValidation = validateReviewImages(body.images);
+  if (imagesValidation) {
+    return imagesValidation;
+  }
+
   return null;
+}
+
+function validateReviewUploadBody(body) {
+  if (!body || typeof body !== "object") {
+    return "Request body is required";
+  }
+
+  if (!parsePositiveInteger(body.orderItemId)) {
+    return "orderItemId must be a positive integer";
+  }
+
+  if (!body.fileName?.trim()) {
+    return "fileName is required";
+  }
+
+  if (!body.contentType?.trim()) {
+    return "contentType is required";
+  }
+
+  if (!isAllowedImageContentType(body.contentType)) {
+    return "contentType must be one of image/jpeg, image/png, image/webp, image/gif";
+  }
+
+  return null;
+}
+
+function validateReviewImages(images) {
+  if (images == null) {
+    return null;
+  }
+
+  if (!Array.isArray(images)) {
+    return "images must be an array";
+  }
+
+  if (images.length > 4) {
+    return "images must contain at most 4 URLs";
+  }
+
+  for (const image of images) {
+    if (!isValidImageUrl(image)) {
+      return "Each review image must be a valid http or https URL";
+    }
+  }
+
+  return null;
+}
+
+function normalizeReviewImages(images) {
+  if (!Array.isArray(images)) {
+    return [];
+  }
+
+  return images
+    .map((image) => String(image).trim())
+    .filter(Boolean)
+    .slice(0, 4);
 }
 
 function normalizeComment(value) {

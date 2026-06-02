@@ -148,6 +148,20 @@ function isApprovedReturn(order) {
   );
 }
 
+function canReviewOrder(order) {
+  const status = String(order?.status || "").toLowerCase();
+  const deliveryStatus = String(order?.deliveryStatus || "").toLowerCase();
+  return status === "completed" || ["delivered", "returned"].includes(deliveryStatus);
+}
+
+function getPendingReviewCount(order) {
+  if (!canReviewOrder(order) || !Array.isArray(order?.items)) {
+    return 0;
+  }
+
+  return order.items.filter((item) => !item.review?.id).length;
+}
+
 function hasRefundRequest(latestRefundRequestStatus) {
   return (
     typeof latestRefundRequestStatus === "string" && latestRefundRequestStatus.trim().length > 0
@@ -679,6 +693,7 @@ export default function OrderScreen({ navigation }) {
             const refundRequested = hasRefundRequest(order.latestRefundRequestStatus);
             const approvedReturn = isApprovedReturn(order);
             const needsBankTransferPayment = shouldShowBankTransferPayment(order);
+            const pendingReviewCount = getPendingReviewCount(order);
 
             return (
               <View key={order.id} style={styles.orderCard}>
@@ -762,6 +777,18 @@ export default function OrderScreen({ navigation }) {
                 {approvedReturn ? <ApprovedReturnNotice compact /> : null}
 
                 <View style={styles.actionsRow}>
+                  {pendingReviewCount > 0 ? (
+                    <TouchableOpacity
+                      style={styles.reviewAction}
+                      onPress={() => navigation.navigate("OrderTracking", { orderId: order.id })}
+                      activeOpacity={0.88}
+                    >
+                      <Text style={styles.reviewActionText}>
+                        Đánh giá{pendingReviewCount > 1 ? ` (${pendingReviewCount})` : ""}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
                   {canChangeAddress(order) ? (
                     <TouchableOpacity
                       style={styles.secondaryAction}
@@ -1099,6 +1126,19 @@ const styles = StyleSheet.create({
     color: "#65574C",
     fontSize: 13,
     fontWeight: "700",
+  },
+  reviewAction: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#FFF2D8",
+    borderWidth: 1,
+    borderColor: "#E6B06D",
+  },
+  reviewActionText: {
+    color: "#9B4B1F",
+    fontSize: 13,
+    fontWeight: "900",
   },
   primaryAction: {
     backgroundColor: "#1E1815",

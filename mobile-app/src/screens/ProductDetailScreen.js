@@ -318,6 +318,13 @@ function ReviewCard({ review }) {
         <StarRating rating={Number(review.rating || 0)} size={14} />
       </View>
       {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+      {Array.isArray(review.images) && review.images.length > 0 ? (
+        <View style={styles.reviewImageList}>
+          {review.images.slice(0, 4).map((image) => (
+            <AppImage key={image} source={{ uri: image }} style={styles.reviewImageThumb} />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -580,6 +587,18 @@ const styles = StyleSheet.create({
     color: "#54483E",
     fontSize: 14,
     lineHeight: 21,
+  },
+  reviewImageList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  reviewImageThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: "#EFE8E0",
   },
   emptyReviewCard: {
     backgroundColor: "#FCF9F4",

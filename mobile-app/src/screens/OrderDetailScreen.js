@@ -65,12 +65,27 @@ export default function OrderDetailScreen({ navigation }) {
     return PAYMENT_GATEWAY_LABEL[gateway] || "Chưa chọn";
   };
 
+  const canReviewOrder = (order) => {
+    const orderStatus = String(order?.status || "").toLowerCase();
+    const deliveryStatus = String(order?.deliveryStatus || "").toLowerCase();
+    return orderStatus === "completed" || ["delivered", "returned"].includes(deliveryStatus);
+  };
+
+  const getPendingReviewCount = (order) => {
+    if (!canReviewOrder(order) || !Array.isArray(order.items)) {
+      return 0;
+    }
+
+    return order.items.filter((item) => !item.review?.id).length;
+  };
+
   const renderOrderCard = (order) => {
     const statusInfo = getStatusDisplay(order.status);
     const totalQuantity = Array.isArray(order.items)
       ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
       : 0;
     const itemsList = Array.isArray(order.items) ? order.items : [];
+    const pendingReviewCount = getPendingReviewCount(order);
     const FALLBACK_TONES = ["#F5ECE3", "#E8DDD4", "#F0E5D8", "#EBE1D7"];
 
     return (
@@ -118,6 +133,18 @@ export default function OrderDetailScreen({ navigation }) {
           {/* Tổng tiền */}
           {order.totalAmount ? (
             <Text style={styles.totalText}>{formatPrice(order.totalAmount)}</Text>
+          ) : null}
+
+          {pendingReviewCount > 0 ? (
+            <TouchableOpacity
+              style={styles.reviewCta}
+              activeOpacity={0.85}
+              onPress={() => handlePressItem(order.id)}
+            >
+              <Text style={styles.reviewCtaText}>
+                Đánh giá {pendingReviewCount} sản phẩm chưa nhận xét
+              </Text>
+            </TouchableOpacity>
           ) : null}
 
           <View style={styles.cardBottomRow}>
@@ -300,6 +327,21 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#9B4B1F",
     marginBottom: 8,
+  },
+  reviewCta: {
+    alignSelf: "flex-start",
+    backgroundColor: "#FFF4E8",
+    borderWidth: 1,
+    borderColor: "#E7B27D",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  reviewCtaText: {
+    color: "#9B4B1F",
+    fontSize: 12,
+    fontWeight: "900",
   },
   cardBottomRow: {
     flexDirection: "row",

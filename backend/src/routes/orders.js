@@ -915,6 +915,7 @@ const listOrdersBaseQuery = `
               'id', pr.id,
               'rating', pr.rating,
               'comment', pr.comment,
+              'images', pr.images,
               'status', pr.status,
               'createdAt', pr.created_at,
               'updatedAt', pr.updated_at
@@ -1114,6 +1115,7 @@ function mapOrderItemReview(review) {
     id: Number(review.id),
     rating: Number(review.rating),
     comment: review.comment || "",
+    images: Array.isArray(review.images) ? review.images : [],
     status: review.status || "visible",
     createdAt: review.createdAt ?? review.created_at ?? null,
     updatedAt: review.updatedAt ?? review.updated_at ?? null,
