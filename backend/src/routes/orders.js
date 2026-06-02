@@ -908,7 +908,18 @@ const listOrdersBaseQuery = `
           'name', p.name,
           'imageUrl', p.image_url,
           'quantity', oi.quantity,
-          'priceAtPurchase', oi.price_at_purchase
+          'priceAtPurchase', oi.price_at_purchase,
+          'review', CASE
+            WHEN pr.id IS NULL THEN NULL
+            ELSE json_build_object(
+              'id', pr.id,
+              'rating', pr.rating,
+              'comment', pr.comment,
+              'status', pr.status,
+              'createdAt', pr.created_at,
+              'updatedAt', pr.updated_at
+            )
+          END
         )
         ORDER BY oi.id
       ) FILTER (WHERE oi.id IS NOT NULL),
@@ -925,6 +936,7 @@ const listOrdersBaseQuery = `
   ) latest_rr ON true
   LEFT JOIN order_items oi ON oi.order_id = o.id
   LEFT JOIN products p ON p.id = oi.product_id
+  LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id AND pr.status <> 'deleted'
 `;
 
 function validateOrderPayload(body) {
@@ -1089,6 +1101,22 @@ function mapOrderItemRow(item) {
     imageUrl: item.imageUrl ?? item.image_url ?? null,
     quantity: Number(item.quantity),
     priceAtPurchase: Number(item.priceAtPurchase ?? item.price_at_purchase),
+    review: mapOrderItemReview(item.review),
+  };
+}
+
+function mapOrderItemReview(review) {
+  if (!review || typeof review !== "object") {
+    return null;
+  }
+
+  return {
+    id: Number(review.id),
+    rating: Number(review.rating),
+    comment: review.comment || "",
+    status: review.status || "visible",
+    createdAt: review.createdAt ?? review.created_at ?? null,
+    updatedAt: review.updatedAt ?? review.updated_at ?? null,
   };
 }
 

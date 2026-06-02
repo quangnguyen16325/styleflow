@@ -29,6 +29,7 @@ import api, {
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL,
   PAYMENT_GATEWAY_LABEL,
+  updateProductReview,
 } from "../services/api";
 
 function formatDate(dateString) {
@@ -87,10 +88,11 @@ function Stepper({ currentStep }) {
   );
 }
 
-function OrderItemRow({ item, canReview, isReviewed, onReview }) {
+function OrderItemRow({ item, canReview, onReview }) {
   const quantity = Number(item.quantity || 0);
   const unitPrice = Number(item.priceAtPurchase || 0);
   const lineTotal = unitPrice * quantity;
+  const hasReview = !!item.review?.id;
 
   return (
     <View style={styles.orderItemRow}>
@@ -112,13 +114,12 @@ function OrderItemRow({ item, canReview, isReviewed, onReview }) {
         </View>
         {canReview ? (
           <TouchableOpacity
-            style={[styles.reviewItemBtn, isReviewed && styles.reviewItemBtnDone]}
+            style={[styles.reviewItemBtn, hasReview && styles.reviewItemBtnDone]}
             activeOpacity={0.85}
             onPress={() => onReview(item)}
-            disabled={isReviewed}
           >
-            <Text style={[styles.reviewItemBtnText, isReviewed && styles.reviewItemBtnTextDone]}>
-              {isReviewed ? "Đã đánh giá" : "Đánh giá sản phẩm"}
+            <Text style={[styles.reviewItemBtnText, hasReview && styles.reviewItemBtnTextDone]}>
+              {hasReview ? "Xem đánh giá" : "Đánh giá sản phẩm"}
             </Text>
           </TouchableOpacity>
         ) : null}
@@ -163,7 +164,6 @@ export default function OrderTrackingScreen({ route, navigation }) {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [reviewedItemIds, setReviewedItemIds] = useState(() => new Set());
 
   useEffect(() => {
     if (!orderId) {
@@ -200,8 +200,8 @@ export default function OrderTrackingScreen({ route, navigation }) {
 
   const openReviewModal = (item) => {
     setReviewingItem(item);
-    setReviewRating(5);
-    setReviewComment("");
+    setReviewRating(Number(item.review?.rating || 5));
+    setReviewComment(item.review?.comment || "");
   };
 
   const closeReviewModal = () => {
@@ -216,18 +216,30 @@ export default function OrderTrackingScreen({ route, navigation }) {
 
     try {
       setSubmittingReview(true);
-      await createProductReview(reviewingItem.productId, {
-        orderItemId: reviewingItem.id,
-        rating: reviewRating,
-        comment: reviewComment,
-      });
+      const savedReview = reviewingItem.review?.id
+        ? await updateProductReview(reviewingItem.productId, reviewingItem.review.id, {
+            rating: reviewRating,
+            comment: reviewComment,
+          })
+        : await createProductReview(reviewingItem.productId, {
+            orderItemId: reviewingItem.id,
+            rating: reviewRating,
+            comment: reviewComment,
+          });
 
-      setReviewedItemIds((current) => {
-        const next = new Set(current);
-        next.add(Number(reviewingItem.id));
-        return next;
+      setOrder((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          items: (current.items || []).map((item) =>
+            Number(item.id) === Number(reviewingItem.id) ? { ...item, review: savedReview } : item,
+          ),
+        };
       });
-      Alert.alert("Đã gửi đánh giá", "Cảm ơn bạn đã đánh giá sản phẩm.");
+      Alert.alert(
+        reviewingItem.review?.id ? "Đã cập nhật đánh giá" : "Đã gửi đánh giá",
+        "Cảm ơn bạn đã đánh giá sản phẩm.",
+      );
       setReviewingItem(null);
       setReviewComment("");
       setReviewRating(5);
@@ -236,13 +248,6 @@ export default function OrderTrackingScreen({ route, navigation }) {
         error?.code === "CONFLICT"
           ? "Sản phẩm trong đơn này đã được đánh giá trước đó."
           : error?.message || "Không thể gửi đánh giá. Vui lòng thử lại.";
-      if (error?.code === "CONFLICT" && reviewingItem?.id) {
-        setReviewedItemIds((current) => {
-          const next = new Set(current);
-          next.add(Number(reviewingItem.id));
-          return next;
-        });
-      }
       Alert.alert("Lỗi đánh giá", message);
     } finally {
       setSubmittingReview(false);
@@ -346,7 +351,6 @@ export default function OrderTrackingScreen({ route, navigation }) {
                 key={item.id || `${item.productId}-${item.quantity}`}
                 item={item}
                 canReview={reviewable}
-                isReviewed={reviewedItemIds.has(Number(item.id))}
                 onReview={openReviewModal}
               />
             ))
@@ -391,7 +395,9 @@ function ReviewModal({
         <Pressable style={styles.modalDismissArea} onPress={Keyboard.dismiss} />
         <Pressable style={styles.reviewModalSheet} onPress={Keyboard.dismiss}>
           <View style={styles.modalHandle} />
-          <Text style={styles.reviewModalTitle}>Đánh giá sản phẩm</Text>
+          <Text style={styles.reviewModalTitle}>
+            {item?.review?.id ? "Xem và chỉnh sửa đánh giá" : "Đánh giá sản phẩm"}
+          </Text>
           <Text style={styles.reviewModalProduct} numberOfLines={2}>
             {item?.name || `Sản phẩm #${item?.productId || ""}`}
           </Text>
@@ -442,7 +448,9 @@ function ReviewModal({
               {submitting ? (
                 <ActivityIndicator color="#FFFDF9" size="small" />
               ) : (
-                <Text style={styles.reviewSubmitText}>Gửi đánh giá</Text>
+                <Text style={styles.reviewSubmitText}>
+                  {item?.review?.id ? "Lưu đánh giá" : "Gửi đánh giá"}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
