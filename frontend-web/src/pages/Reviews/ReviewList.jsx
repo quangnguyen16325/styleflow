@@ -61,8 +61,15 @@ export default function ReviewList() {
   };
 
   const updateReviewStatus = async (review, status) => {
-    const hiddenReason =
-      status === "hidden" ? window.prompt("Reason for hiding this review?", "") || "" : null;
+    let hiddenReason = null;
+
+    if (status === "hidden") {
+      hiddenReason = window.prompt("Reason for hiding this review?", "");
+      if (hiddenReason === null) {
+        return;
+      }
+      hiddenReason = hiddenReason.trim();
+    }
 
     try {
       setUpdatingId(review.id);
