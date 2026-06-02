@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Modal,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { getProductById, getProductReviews, formatPrice } from "../services/api";
@@ -33,6 +34,7 @@ export default function ProductDetailScreen() {
   const [reviewTotal, setReviewTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [selectedReviewImage, setSelectedReviewImage] = useState(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -244,7 +246,7 @@ export default function ProductDetailScreen() {
           {reviews.length > 0 ? (
             <View style={styles.reviewList}>
               {reviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
+                <ReviewCard key={review.id} review={review} onOpenImage={setSelectedReviewImage} />
               ))}
             </View>
           ) : (
@@ -278,6 +280,35 @@ export default function ProductDetailScreen() {
           <Text style={styles.primaryBtnText}>{isOutOfStock ? "Không thể mua" : "Mua ngay"}</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={!!selectedReviewImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedReviewImage(null)}
+      >
+        <View style={styles.imageViewerOverlay}>
+          <TouchableOpacity
+            style={styles.imageViewerBackdrop}
+            activeOpacity={1}
+            onPress={() => setSelectedReviewImage(null)}
+          />
+          <View style={styles.imageViewerContent}>
+            <AppImage
+              source={{ uri: selectedReviewImage }}
+              style={styles.imageViewerImage}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              style={styles.imageViewerClose}
+              activeOpacity={0.85}
+              onPress={() => setSelectedReviewImage(null)}
+            >
+              <Text style={styles.imageViewerCloseText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -303,7 +334,7 @@ function StarRating({ rating, size = 15 }) {
   );
 }
 
-function ReviewCard({ review }) {
+function ReviewCard({ review, onOpenImage }) {
   const createdLabel = review.createdAt
     ? new Date(review.createdAt).toLocaleDateString("vi-VN")
     : "Không rõ ngày";
@@ -321,7 +352,9 @@ function ReviewCard({ review }) {
       {Array.isArray(review.images) && review.images.length > 0 ? (
         <View style={styles.reviewImageList}>
           {review.images.slice(0, 4).map((image) => (
-            <AppImage key={image} source={{ uri: image }} style={styles.reviewImageThumb} />
+            <TouchableOpacity key={image} activeOpacity={0.85} onPress={() => onOpenImage(image)}>
+              <AppImage source={{ uri: image }} style={styles.reviewImageThumb} />
+            </TouchableOpacity>
           ))}
         </View>
       ) : null}
@@ -599,6 +632,39 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 12,
     backgroundColor: "#EFE8E0",
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(18, 13, 10, 0.86)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 18,
+  },
+  imageViewerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  imageViewerContent: {
+    width: "100%",
+    maxHeight: "84%",
+    alignItems: "center",
+  },
+  imageViewerImage: {
+    width: "100%",
+    height: SCREEN_HEIGHT * 0.68,
+    borderRadius: 18,
+    backgroundColor: "#1E1815",
+  },
+  imageViewerClose: {
+    marginTop: 16,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: "#FFFDF9",
+  },
+  imageViewerCloseText: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "800",
   },
   emptyReviewCard: {
     backgroundColor: "#FCF9F4",
