@@ -108,8 +108,8 @@ router.patch("/:id/status", async (req, res) => {
       `
         UPDATE product_reviews
         SET
-          status = $2,
-          hidden_reason = CASE WHEN $2 = 'hidden' THEN NULLIF($3, '') ELSE NULL END,
+          status = $2::varchar,
+          hidden_reason = CASE WHEN $2::varchar = 'hidden' THEN NULLIF($3, '') ELSE NULL END,
           updated_at = NOW()
         WHERE id = $1
         RETURNING *
