@@ -562,9 +562,20 @@ const listProductsQuery = `
     p.created_at,
     COALESCE(i.stock_qty, 0) AS stock_qty,
     COALESCE(i.reserved_qty, 0) AS reserved_qty,
-    COALESCE(i.min_stock_level, 0) AS min_stock_level
+    COALESCE(i.min_stock_level, 0) AS min_stock_level,
+    COALESCE(rs.review_count, 0) AS review_count,
+    COALESCE(rs.rating_average, 0) AS rating_average
   FROM products p
   LEFT JOIN inventory i ON i.product_id = p.id
+  LEFT JOIN (
+    SELECT
+      product_id,
+      COUNT(*)::int AS review_count,
+      ROUND(AVG(rating)::numeric, 2) AS rating_average
+    FROM product_reviews
+    WHERE status = 'visible'
+    GROUP BY product_id
+  ) rs ON rs.product_id = p.id
 `;
 
 function validateCreateProductBody(body) {
@@ -799,6 +810,8 @@ function mapAdminProductRow(row) {
     reservedQty: Number(row.reserved_qty),
     availableQty: Number(row.stock_qty) - Number(row.reserved_qty),
     minStockLevel: Number(row.min_stock_level),
+    reviewCount: Number(row.review_count ?? 0),
+    ratingAverage: Number(row.rating_average ?? 0),
     createdAt: row.created_at,
   };
 }

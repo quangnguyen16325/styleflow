@@ -234,6 +234,25 @@ CREATE TABLE IF NOT EXISTS order_items (
   price_at_purchase NUMERIC(12, 2) NOT NULL CHECK (price_at_purchase >= 0)
 );
 
+CREATE TABLE IF NOT EXISTS product_reviews (
+  id BIGSERIAL PRIMARY KEY,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_item_id BIGINT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT NOT NULL DEFAULT '',
+  images JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status VARCHAR(30) NOT NULL DEFAULT 'visible' CHECK (
+    status IN ('visible', 'hidden', 'deleted')
+  ),
+  hidden_reason TEXT,
+  customer_name_snapshot VARCHAR(255),
+  product_name_snapshot VARCHAR(255),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 ALTER TABLE customers
 ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
@@ -626,6 +645,12 @@ CREATE INDEX IF NOT EXISTS idx_orders_incident_id ON orders(incident_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_product_id ON product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_customer_id ON product_reviews(customer_id);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_status ON product_reviews(status);
+CREATE INDEX IF NOT EXISTS idx_product_reviews_created_at ON product_reviews(created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_product_reviews_order_item_id
+ON product_reviews(order_item_id);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_order_id ON payment_logs(order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_gateway_name ON payment_logs(gateway_name);
 CREATE INDEX IF NOT EXISTS idx_payment_logs_transaction_ref ON payment_logs(transaction_ref);

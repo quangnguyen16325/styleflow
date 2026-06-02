@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { getProductById, formatPrice } from "../services/api";
+import { getProductById, getProductReviews, formatPrice } from "../services/api";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import BackPillButton from "../components/BackPillButton";
@@ -29,6 +29,8 @@ export default function ProductDetailScreen() {
   const { isInWishlist, toggleWishlist } = useWishlist();
 
   const [product, setProduct] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewTotal, setReviewTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
 
@@ -38,9 +40,21 @@ export default function ProductDetailScreen() {
         setLoading(true);
         const data = await getProductById(productId);
         setProduct(data);
+
+        try {
+          const reviewData = await getProductReviews(productId, { limit: 3 });
+          setReviews(Array.isArray(reviewData?.items) ? reviewData.items : []);
+          setReviewTotal(Number(reviewData?.total ?? 0));
+        } catch (reviewError) {
+          console.warn("Error fetching product reviews:", reviewError);
+          setReviews([]);
+          setReviewTotal(0);
+        }
       } catch (error) {
         console.error("Error fetching product:", error);
         setProduct(null);
+        setReviews([]);
+        setReviewTotal(0);
       } finally {
         setLoading(false);
       }
@@ -62,6 +76,8 @@ export default function ProductDetailScreen() {
   const minStockLevel = Number(product?.minStockLevel ?? 0);
   const isOutOfStock = availableQty <= 0;
   const imageUrl = product?.imageUrl || null;
+  const reviewCount = Number(product?.reviewCount ?? reviewTotal ?? 0);
+  const ratingAverage = Number(product?.ratingAverage ?? 0);
 
   const stockLabel = isOutOfStock
     ? "Hết hàng"
@@ -156,6 +172,19 @@ export default function ProductDetailScreen() {
             <Text style={styles.stockBadgeText}>{stockLabel}</Text>
           </View>
 
+          <View style={styles.reviewSummaryCard}>
+            <View>
+              <Text style={styles.reviewSummaryLabel}>Đánh giá sản phẩm</Text>
+              <View style={styles.reviewScoreRow}>
+                <StarRating rating={Math.round(ratingAverage)} />
+                <Text style={styles.reviewScoreText}>
+                  {reviewCount > 0 ? `${ratingAverage.toFixed(1)} / 5` : "Chưa có đánh giá"}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.reviewCountText}>{reviewCount} nhận xét</Text>
+          </View>
+
           <Text style={styles.sectionTitle}>Thông tin sản phẩm</Text>
           <Text style={styles.descText}>
             {product.category
@@ -211,6 +240,22 @@ export default function ProductDetailScreen() {
             <SummaryRow label="Tạm tính" value={formatPrice(product.basePrice * quantity)} />
           </View>
 
+          <Text style={styles.sectionTitle}>Nhận xét từ khách hàng</Text>
+          {reviews.length > 0 ? (
+            <View style={styles.reviewList}>
+              {reviews.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyReviewCard}>
+              <Text style={styles.emptyReviewTitle}>Chưa có nhận xét</Text>
+              <Text style={styles.emptyReviewText}>
+                Những đánh giá từ khách đã mua sẽ xuất hiện tại đây.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
@@ -242,6 +287,37 @@ function SummaryRow({ label, value }) {
     <View style={styles.summaryRow}>
       <Text style={styles.summaryLabel}>{label}</Text>
       <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  );
+}
+
+function StarRating({ rating, size = 15 }) {
+  return (
+    <View style={styles.starRow}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Text key={star} style={[styles.starText, { fontSize: size }]}>
+          {star <= rating ? "★" : "☆"}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function ReviewCard({ review }) {
+  const createdLabel = review.createdAt
+    ? new Date(review.createdAt).toLocaleDateString("vi-VN")
+    : "Không rõ ngày";
+
+  return (
+    <View style={styles.reviewCard}>
+      <View style={styles.reviewCardTop}>
+        <View>
+          <Text style={styles.reviewCustomer}>{review.customerName || "Khách hàng"}</Text>
+          <Text style={styles.reviewDate}>{createdLabel}</Text>
+        </View>
+        <StarRating rating={Number(review.rating || 0)} size={14} />
+      </View>
+      {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
     </View>
   );
 }
@@ -345,6 +421,47 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#1E1815",
   },
+  reviewSummaryCard: {
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#EBE1D7",
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  reviewSummaryLabel: {
+    color: "#76675B",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  reviewScoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  reviewScoreText: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  reviewCountText: {
+    color: "#8A7B6F",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 8,
+  },
+  starRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  starText: {
+    color: "#D99152",
+    fontWeight: "900",
+    marginRight: 1,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
@@ -431,6 +548,56 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 16,
+  },
+  reviewList: {
+    gap: 10,
+  },
+  reviewCard: {
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#EBE1D7",
+    borderRadius: 18,
+    padding: 14,
+  },
+  reviewCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 10,
+  },
+  reviewCustomer: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  reviewDate: {
+    color: "#AA9C8F",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  reviewComment: {
+    color: "#54483E",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  emptyReviewCard: {
+    backgroundColor: "#FCF9F4",
+    borderWidth: 1,
+    borderColor: "#EBE1D7",
+    borderRadius: 18,
+    padding: 16,
+  },
+  emptyReviewTitle: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  emptyReviewText: {
+    color: "#76675B",
+    fontSize: 13,
+    lineHeight: 20,
   },
   summaryRow: {
     flexDirection: "row",

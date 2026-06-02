@@ -1,6 +1,21 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  SafeAreaView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+} from "react-native";
 import BankTransferPaymentCard, {
   shouldShowBankTransferPayment,
 } from "../components/BankTransferPaymentCard";
@@ -8,6 +23,7 @@ import MomoPaymentCard, { shouldShowMomoPayment } from "../components/MomoPaymen
 import BackPillButton from "../components/BackPillButton";
 import AppImage from "../components/AppImage";
 import api, {
+  createProductReview,
   DELIVERY_STATUS_LABEL,
   formatPrice,
   ORDER_STATUS_LABEL,
@@ -71,7 +87,7 @@ function Stepper({ currentStep }) {
   );
 }
 
-function OrderItemRow({ item }) {
+function OrderItemRow({ item, canReview, isReviewed, onReview }) {
   const quantity = Number(item.quantity || 0);
   const unitPrice = Number(item.priceAtPurchase || 0);
   const lineTotal = unitPrice * quantity;
@@ -94,6 +110,18 @@ function OrderItemRow({ item }) {
           <Text style={styles.orderItemMeta}>Đơn giá: {formatPrice(unitPrice)}</Text>
           <Text style={styles.orderItemMeta}>SL: {quantity}</Text>
         </View>
+        {canReview ? (
+          <TouchableOpacity
+            style={[styles.reviewItemBtn, isReviewed && styles.reviewItemBtnDone]}
+            activeOpacity={0.85}
+            onPress={() => onReview(item)}
+            disabled={isReviewed}
+          >
+            <Text style={[styles.reviewItemBtnText, isReviewed && styles.reviewItemBtnTextDone]}>
+              {isReviewed ? "Đã đánh giá" : "Đánh giá sản phẩm"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <View style={styles.orderItemAmountWrap}>
         <Text style={styles.orderItemAmountLabel}>Thành tiền</Text>
@@ -101,6 +129,12 @@ function OrderItemRow({ item }) {
       </View>
     </View>
   );
+}
+
+function canReviewOrder(order) {
+  const orderStatus = String(order?.status || "").toLowerCase();
+  const deliveryStatus = String(order?.deliveryStatus || "").toLowerCase();
+  return orderStatus === "completed" || ["delivered", "returned"].includes(deliveryStatus);
 }
 
 function isApprovedReturn(order) {
@@ -125,6 +159,11 @@ export default function OrderTrackingScreen({ route, navigation }) {
   const { orderId } = route?.params || {};
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reviewingItem, setReviewingItem] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewedItemIds, setReviewedItemIds] = useState(() => new Set());
 
   useEffect(() => {
     if (!orderId) {
@@ -157,6 +196,58 @@ export default function OrderTrackingScreen({ route, navigation }) {
   }, [orderId]);
 
   const progressStep = useMemo(() => getProgressStep(order?.status), [order?.status]);
+  const reviewable = useMemo(() => canReviewOrder(order), [order]);
+
+  const openReviewModal = (item) => {
+    setReviewingItem(item);
+    setReviewRating(5);
+    setReviewComment("");
+  };
+
+  const closeReviewModal = () => {
+    if (submittingReview) return;
+    setReviewingItem(null);
+    setReviewComment("");
+    setReviewRating(5);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewingItem) return;
+
+    try {
+      setSubmittingReview(true);
+      await createProductReview(reviewingItem.productId, {
+        orderItemId: reviewingItem.id,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+
+      setReviewedItemIds((current) => {
+        const next = new Set(current);
+        next.add(Number(reviewingItem.id));
+        return next;
+      });
+      Alert.alert("Đã gửi đánh giá", "Cảm ơn bạn đã đánh giá sản phẩm.");
+      setReviewingItem(null);
+      setReviewComment("");
+      setReviewRating(5);
+    } catch (error) {
+      const message =
+        error?.code === "CONFLICT"
+          ? "Sản phẩm trong đơn này đã được đánh giá trước đó."
+          : error?.message || "Không thể gửi đánh giá. Vui lòng thử lại.";
+      if (error?.code === "CONFLICT" && reviewingItem?.id) {
+        setReviewedItemIds((current) => {
+          const next = new Set(current);
+          next.add(Number(reviewingItem.id));
+          return next;
+        });
+      }
+      Alert.alert("Lỗi đánh giá", message);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -251,14 +342,113 @@ export default function OrderTrackingScreen({ route, navigation }) {
           </View>
           {(order.items || []).length > 0 ? (
             (order.items || []).map((item) => (
-              <OrderItemRow key={item.id || `${item.productId}-${item.quantity}`} item={item} />
+              <OrderItemRow
+                key={item.id || `${item.productId}-${item.quantity}`}
+                item={item}
+                canReview={reviewable}
+                isReviewed={reviewedItemIds.has(Number(item.id))}
+                onReview={openReviewModal}
+              />
             ))
           ) : (
             <Text style={styles.emptyItemsText}>Đơn hàng chưa có thông tin sản phẩm.</Text>
           )}
         </View>
       </ScrollView>
+
+      <ReviewModal
+        item={reviewingItem}
+        visible={!!reviewingItem}
+        rating={reviewRating}
+        comment={reviewComment}
+        submitting={submittingReview}
+        onRatingChange={setReviewRating}
+        onCommentChange={setReviewComment}
+        onClose={closeReviewModal}
+        onSubmit={handleSubmitReview}
+      />
     </SafeAreaView>
+  );
+}
+
+function ReviewModal({
+  visible,
+  item,
+  rating,
+  comment,
+  submitting,
+  onRatingChange,
+  onCommentChange,
+  onClose,
+  onSubmit,
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Pressable style={styles.modalDismissArea} onPress={Keyboard.dismiss} />
+        <Pressable style={styles.reviewModalSheet} onPress={Keyboard.dismiss}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.reviewModalTitle}>Đánh giá sản phẩm</Text>
+          <Text style={styles.reviewModalProduct} numberOfLines={2}>
+            {item?.name || `Sản phẩm #${item?.productId || ""}`}
+          </Text>
+
+          <View style={styles.reviewStars}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <TouchableOpacity
+                key={star}
+                activeOpacity={0.8}
+                onPress={() => onRatingChange(star)}
+                disabled={submitting}
+              >
+                <Text style={styles.reviewStarText}>{star <= rating ? "★" : "☆"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TextInput
+            style={styles.reviewInput}
+            value={comment}
+            onChangeText={onCommentChange}
+            placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
+            placeholderTextColor="#AA9C8F"
+            multiline
+            maxLength={1000}
+            editable={!submitting}
+            returnKeyType="done"
+            blurOnSubmit
+            onSubmitEditing={Keyboard.dismiss}
+          />
+          <Text style={styles.reviewInputHint}>{comment.length}/1000 ký tự</Text>
+
+          <View style={styles.reviewModalActions}>
+            <TouchableOpacity
+              style={styles.reviewCancelBtn}
+              activeOpacity={0.85}
+              onPress={onClose}
+              disabled={submitting}
+            >
+              <Text style={styles.reviewCancelText}>Đóng</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reviewSubmitBtn, submitting && styles.reviewSubmitBtnDisabled]}
+              activeOpacity={0.85}
+              onPress={onSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#FFFDF9" size="small" />
+              ) : (
+                <Text style={styles.reviewSubmitText}>Gửi đánh giá</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -491,6 +681,25 @@ const styles = StyleSheet.create({
   itemPriceBreakdown: {
     marginTop: 4,
   },
+  reviewItemBtn: {
+    alignSelf: "flex-start",
+    backgroundColor: "#1E1815",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  reviewItemBtnDone: {
+    backgroundColor: "#F5ECE3",
+  },
+  reviewItemBtnText: {
+    color: "#FFFDF9",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  reviewItemBtnTextDone: {
+    color: "#7A685B",
+  },
   orderItemAmountWrap: {
     minWidth: 92,
     alignItems: "flex-end",
@@ -518,5 +727,103 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     marginBottom: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(24, 18, 14, 0.34)",
+  },
+  modalDismissArea: {
+    flex: 1,
+  },
+  reviewModalSheet: {
+    backgroundColor: "#FCF9F4",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 30,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D3C4B6",
+    marginBottom: 14,
+  },
+  reviewModalTitle: {
+    color: "#1E1815",
+    fontSize: 21,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  reviewModalProduct: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  reviewStars: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  reviewStarText: {
+    color: "#D99152",
+    fontSize: 34,
+    fontWeight: "900",
+    marginRight: 7,
+  },
+  reviewInput: {
+    minHeight: 116,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#1E1815",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: "top",
+  },
+  reviewInputHint: {
+    color: "#AA9C8F",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+    marginTop: 8,
+  },
+  reviewModalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  reviewCancelBtn: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: "#F5ECE3",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  reviewCancelText: {
+    color: "#7A685B",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  reviewSubmitBtn: {
+    flex: 1.3,
+    borderRadius: 16,
+    backgroundColor: "#1E1815",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  reviewSubmitBtnDisabled: {
+    opacity: 0.65,
+  },
+  reviewSubmitText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });
