@@ -105,6 +105,9 @@ class ApiService {
   static async getProductReviewInsights(id) {
     return client.get(`/admin/products/${id}/review-insights`);
   }
+  static async getReviewAiAlerts() {
+    return client.get("/admin/analytics/review-ai-alerts");
+  }
 
   // PRODUCT REVIEWS
   static async getReviews(params = {}) {
