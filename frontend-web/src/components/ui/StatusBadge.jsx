@@ -46,6 +46,7 @@ const STATUS_COLORS = {
   visible: { color: "#059669", bg: "#D1FAE5", icon: Eye },
   hidden: { color: "#F59E0B", bg: "#FEF3C7", icon: Eye },
   deleted: { color: "#6B7280", bg: "#F3F4F6", icon: X },
+  archived: { color: "#6B7280", bg: "#F3F4F6", icon: Package },
   blacklisted: { color: "#DC2626", bg: "#FEE2E2", icon: X },
   customer: { color: "#3B82F6", bg: "#DBEAFE", icon: CircleDot },
   shipper: { color: "#06B6D4", bg: "#CFFAFE", icon: Truck },

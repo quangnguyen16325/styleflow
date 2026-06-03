@@ -10,10 +10,11 @@ const REVIEW_STATUSES = [
   { value: "ALL", label: "All Statuses" },
   { value: "visible", label: "Visible" },
   { value: "hidden", label: "Hidden" },
-  { value: "deleted", label: "Deleted" },
+  { value: "deleted", label: "Archived" },
 ];
 
 const STATUS_VALUES = REVIEW_STATUSES.map((status) => status.value);
+const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 const AI_OVERALL_OPTIONS = [
   { value: "ALL", label: "All AI Sentiments" },
@@ -63,7 +64,10 @@ export default function ReviewList() {
     ATTENTION_VALUES,
   );
   const productIdFilter = normalizePositiveInteger(searchParams.get("productId"));
+  const page = normalizePositiveInteger(searchParams.get("page")) || 1;
+  const rowsPerPage = normalizeRowsPerPage(searchParams.get("limit"));
   const [reviews, setReviews] = useState([]);
+  const [totalReviews, setTotalReviews] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
@@ -81,10 +85,12 @@ export default function ReviewList() {
       aiAspectLabel: aiAspectLabelFilter !== "ALL" ? aiAspectLabelFilter : undefined,
       needsAttention: attentionFilter !== "ALL" ? attentionFilter : undefined,
       productId: productIdFilter || undefined,
-      limit: 100,
+      limit: rowsPerPage,
+      offset: (page - 1) * rowsPerPage,
     })
       .then((data) => {
         setReviews(Array.isArray(data?.items) ? data.items : []);
+        setTotalReviews(Number(data?.total ?? 0));
       })
       .catch((err) => setError(err))
       .finally(() => setLoading(false));
@@ -93,7 +99,9 @@ export default function ReviewList() {
     aiAspectLabelFilter,
     aiOverallFilter,
     attentionFilter,
+    page,
     productIdFilter,
+    rowsPerPage,
     statusFilter,
   ]);
 
@@ -105,6 +113,9 @@ export default function ReviewList() {
     () => reviews.filter((review) => review.status === "visible").length,
     [reviews],
   );
+  const totalPages = Math.max(1, Math.ceil(totalReviews / rowsPerPage));
+  const pageStart = totalReviews === 0 ? 0 : (page - 1) * rowsPerPage + 1;
+  const pageEnd = Math.min(page * rowsPerPage, totalReviews);
 
   const handleFilterChange = (key, nextValue) => {
     setLoading(true);
@@ -116,6 +127,25 @@ export default function ReviewList() {
     } else {
       nextParams.set(key, nextValue);
     }
+    nextParams.delete("page");
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handlePageChange = (nextPage) => {
+    const safePage = Math.min(Math.max(nextPage, 1), totalPages);
+    const nextParams = new URLSearchParams(searchParams);
+    if (safePage <= 1) {
+      nextParams.delete("page");
+    } else {
+      nextParams.set("page", String(safePage));
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleRowsPerPageChange = (nextLimit) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("limit", String(nextLimit));
+    nextParams.delete("page");
     setSearchParams(nextParams, { replace: true });
   };
 
@@ -171,7 +201,8 @@ export default function ReviewList() {
         <div>
           <h2>Product Reviews</h2>
           <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
-            {reviews.length} reviews · {visibleCount} visible
+            Showing {pageStart}-{pageEnd} of {totalReviews} reviews · {visibleCount} visible on this
+            page
             {productIdFilter ? ` · product #${productIdFilter}` : ""}
           </span>
         </div>
@@ -200,6 +231,25 @@ export default function ReviewList() {
           {aiBackfillResult.failed}.
         </div>
       ) : null}
+
+      <div
+        className="card"
+        style={{
+          marginBottom: "var(--spacing-lg)",
+          padding: "var(--spacing-md)",
+          color: "var(--color-text-secondary)",
+          fontSize: "var(--font-size-sm)",
+          display: "grid",
+          gap: "6px",
+        }}
+      >
+        <div>
+          <strong>Visible</strong>: shown to customers. <strong>Hidden</strong>: temporarily hidden
+          and can be shown again. <strong>Archived</strong>: soft-deleted from public display and
+          can be restored.
+        </div>
+        <div>Rows with a soft orange highlight are flagged by AI for moderation review.</div>
+      </div>
 
       <div
         style={{
@@ -274,6 +324,45 @@ export default function ReviewList() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div
+        style={{
+          marginBottom: "var(--spacing-md)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "var(--spacing-md)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+          Page {page} / {totalPages}
+        </div>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--spacing-sm)",
+            color: "var(--color-text-secondary)",
+            fontSize: "var(--font-size-sm)",
+          }}
+        >
+          Rows per page
+          <select
+            value={rowsPerPage}
+            onChange={(event) => handleRowsPerPageChange(Number(event.target.value))}
+            className="form-select"
+            style={{ width: "100px", marginBottom: 0 }}
+            aria-label="Rows per page"
+          >
+            {ROWS_PER_PAGE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {reviews.length === 0 ? (
@@ -377,7 +466,9 @@ export default function ReviewList() {
                         )}
                       </td>
                       <td>
-                        <StatusBadge value={review.status} />
+                        <StatusBadge
+                          value={review.status === "deleted" ? "archived" : review.status}
+                        />
                       </td>
                       <td style={{ minWidth: "210px" }}>
                         <ReviewAiSummary aiAnalysis={review.aiAnalysis} />
@@ -416,9 +507,17 @@ export default function ReviewList() {
                               disabled={updatingId === review.id}
                               onClick={() => updateReviewStatus(review, "deleted")}
                             >
-                              Delete
+                              Archive
                             </button>
-                          ) : null}
+                          ) : (
+                            <button
+                              className="btn-secondary btn-sm"
+                              disabled={updatingId === review.id}
+                              onClick={() => updateReviewStatus(review, "visible")}
+                            >
+                              Restore
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -426,6 +525,44 @@ export default function ReviewList() {
                 })}
               </tbody>
             </table>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "var(--spacing-md)",
+              flexWrap: "wrap",
+              padding: "var(--spacing-md)",
+              borderTop: "1px solid var(--color-border)",
+            }}
+          >
+            <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+              Showing {pageStart}-{pageEnd} of {totalReviews}
+            </span>
+            <div style={{ display: "flex", gap: "var(--spacing-sm)", alignItems: "center" }}>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                disabled={page <= 1}
+                onClick={() => handlePageChange(page - 1)}
+              >
+                Previous
+              </button>
+              <span
+                style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)" }}
+              >
+                Page {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn-secondary btn-sm"
+                disabled={page >= totalPages}
+                onClick={() => handlePageChange(page + 1)}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -520,6 +657,11 @@ function normalizeFilterValue(value, allowedValues) {
 function normalizePositiveInteger(value) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeRowsPerPage(value) {
+  const parsed = Number(value);
+  return ROWS_PER_PAGE_OPTIONS.includes(parsed) ? parsed : 25;
 }
 
 function formatAiLabel(label) {
