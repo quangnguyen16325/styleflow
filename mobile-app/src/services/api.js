@@ -102,6 +102,11 @@ export async function getProductReviews(productId, params = {}) {
   return res.data;
 }
 
+export async function getProductReviewSummary(productId) {
+  const res = await api.get(`/products/${productId}/review-summary`);
+  return res.data;
+}
+
 export async function createProductReview(productId, payload) {
   const res = await api.post(`/products/${productId}/reviews`, payload);
   return res.data;

@@ -11,7 +11,12 @@ import {
   Modal,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { getProductById, getProductReviews, formatPrice } from "../services/api";
+import {
+  getProductById,
+  getProductReviews,
+  getProductReviewSummary,
+  formatPrice,
+} from "../services/api";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import BackPillButton from "../components/BackPillButton";
@@ -35,6 +40,10 @@ export default function ProductDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedReviewImage, setSelectedReviewImage] = useState(null);
+  const [aiSummaryVisible, setAiSummaryVisible] = useState(false);
+  const [aiSummary, setAiSummary] = useState(null);
+  const [loadingAiSummary, setLoadingAiSummary] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState("");
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -114,6 +123,25 @@ export default function ProductDetailScreen() {
     navigation.navigate("Checkout");
   };
 
+  const handleOpenAiSummary = async () => {
+    setAiSummaryVisible(true);
+    setAiSummaryError("");
+
+    if (aiSummary) {
+      return;
+    }
+
+    try {
+      setLoadingAiSummary(true);
+      const summary = await getProductReviewSummary(productId);
+      setAiSummary(summary);
+    } catch (error) {
+      setAiSummaryError(error.message || "Không thể tải phân tích AI. Vui lòng thử lại.");
+    } finally {
+      setLoadingAiSummary(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -184,7 +212,16 @@ export default function ProductDetailScreen() {
                 </Text>
               </View>
             </View>
-            <Text style={styles.reviewCountText}>{reviewCount} nhận xét</Text>
+            <View style={styles.reviewSummaryRight}>
+              <Text style={styles.reviewCountText}>{reviewCount} nhận xét</Text>
+              <TouchableOpacity
+                style={styles.aiSummaryBtn}
+                activeOpacity={0.85}
+                onPress={handleOpenAiSummary}
+              >
+                <Text style={styles.aiSummaryBtnText}>AI phân tích</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <Text style={styles.sectionTitle}>Thông tin sản phẩm</Text>
@@ -324,6 +361,76 @@ export default function ProductDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={aiSummaryVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAiSummaryVisible(false)}
+      >
+        <View style={styles.aiModalOverlay}>
+          <TouchableOpacity
+            style={styles.aiModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setAiSummaryVisible(false)}
+          />
+          <View style={styles.aiModalSheet}>
+            <View style={styles.aiModalHandle} />
+            <Text style={styles.aiModalTitle}>AI phân tích đánh giá</Text>
+            <Text style={styles.aiModalSubtitle}>
+              Tóm tắt tự động từ các bình luận hiển thị của khách hàng.
+            </Text>
+
+            {loadingAiSummary ? (
+              <ActivityIndicator color="#9B4B1F" style={{ marginVertical: 20 }} />
+            ) : aiSummaryError ? (
+              <View style={styles.aiEmptyCard}>
+                <Text style={styles.aiEmptyTitle}>Không tải được phân tích</Text>
+                <Text style={styles.aiEmptyText}>{aiSummaryError}</Text>
+              </View>
+            ) : !aiSummary || Number(aiSummary.aiReviewCount || 0) === 0 ? (
+              <View style={styles.aiEmptyCard}>
+                <Text style={styles.aiEmptyTitle}>Chưa đủ dữ liệu</Text>
+                <Text style={styles.aiEmptyText}>
+                  Sản phẩm chưa có đủ đánh giá đã được AI phân tích.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.aiContent}>
+                <View style={styles.aiMetricGrid}>
+                  <AiMetric label="Đã phân tích" value={`${aiSummary.aiReviewCount}`} />
+                  <AiMetric label="Tích cực" value={`${aiSummary.positiveRate}%`} />
+                  <AiMetric
+                    label="Điểm TB"
+                    value={`${Number(aiSummary.ratingAverage || 0).toFixed(1)}/5`}
+                  />
+                </View>
+
+                <AspectList
+                  title="Khách hàng đánh giá cao"
+                  aspects={aiSummary.praisedAspects}
+                  emptyText="Chưa có khía cạnh tích cực nổi bật."
+                  tone="positive"
+                />
+                <AspectList
+                  title="Một số điểm cần chú ý"
+                  aspects={aiSummary.concernAspects}
+                  emptyText="Chưa ghi nhận điểm tiêu cực nổi bật."
+                  tone="negative"
+                />
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.aiCloseBtn}
+              activeOpacity={0.85}
+              onPress={() => setAiSummaryVisible(false)}
+            >
+              <Text style={styles.aiCloseBtnText}>Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -345,6 +452,51 @@ function StarRating({ rating, size = 15 }) {
           {star <= rating ? "★" : "☆"}
         </Text>
       ))}
+    </View>
+  );
+}
+
+function AiMetric({ label, value }) {
+  return (
+    <View style={styles.aiMetricCard}>
+      <Text style={styles.aiMetricLabel}>{label}</Text>
+      <Text style={styles.aiMetricValue}>{value}</Text>
+    </View>
+  );
+}
+
+function AspectList({ title, aspects, emptyText, tone }) {
+  const hasAspects = Array.isArray(aspects) && aspects.length > 0;
+  return (
+    <View style={styles.aiAspectBlock}>
+      <Text style={styles.aiAspectTitle}>{title}</Text>
+      {hasAspects ? (
+        <View style={styles.aiAspectList}>
+          {aspects.map((aspect) => (
+            <View
+              key={`${aspect.key}-${aspect.label}`}
+              style={[
+                styles.aiAspectChip,
+                tone === "negative" ? styles.aiAspectChipNegative : styles.aiAspectChipPositive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.aiAspectChipText,
+                  tone === "negative"
+                    ? styles.aiAspectChipTextNegative
+                    : styles.aiAspectChipTextPositive,
+                ]}
+              >
+                {aspect.label}
+                {aspect.count ? ` · ${aspect.count}` : ""}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.aiAspectEmpty}>{emptyText}</Text>
+      )}
     </View>
   );
 }
@@ -485,6 +637,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginTop: 8,
   },
+  reviewSummaryRight: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   reviewSummaryLabel: {
     color: "#76675B",
     fontSize: 12,
@@ -506,7 +665,17 @@ const styles = StyleSheet.create({
     color: "#8A7B6F",
     fontSize: 12,
     fontWeight: "700",
-    marginTop: 8,
+  },
+  aiSummaryBtn: {
+    borderRadius: 999,
+    backgroundColor: "#1E1815",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  aiSummaryBtnText: {
+    color: "#FFFDF9",
+    fontSize: 12,
+    fontWeight: "800",
   },
   starRow: {
     flexDirection: "row",
@@ -660,6 +829,144 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 12,
     backgroundColor: "#EFE8E0",
+  },
+  aiModalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(24, 18, 14, 0.36)",
+  },
+  aiModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  aiModalSheet: {
+    backgroundColor: "#FCF9F4",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 30,
+    maxHeight: "82%",
+  },
+  aiModalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D3C4B6",
+    marginBottom: 14,
+  },
+  aiModalTitle: {
+    color: "#1E1815",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  aiModalSubtitle: {
+    color: "#76675B",
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  aiEmptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+  },
+  aiEmptyTitle: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  aiEmptyText: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  aiContent: {
+    gap: 12,
+  },
+  aiMetricGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  aiMetricCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+    padding: 12,
+  },
+  aiMetricLabel: {
+    color: "#8A7B6F",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  aiMetricValue: {
+    color: "#1E1815",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  aiAspectBlock: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+    padding: 14,
+  },
+  aiAspectTitle: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+  aiAspectList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  aiAspectChip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  aiAspectChipPositive: {
+    backgroundColor: "#E6F4EA",
+  },
+  aiAspectChipNegative: {
+    backgroundColor: "#FDE8E8",
+  },
+  aiAspectChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  aiAspectChipTextPositive: {
+    color: "#1F7A3F",
+  },
+  aiAspectChipTextNegative: {
+    color: "#B42318",
+  },
+  aiAspectEmpty: {
+    color: "#8A7B6F",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  aiCloseBtn: {
+    marginTop: 16,
+    borderRadius: 16,
+    backgroundColor: "#1E1815",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  aiCloseBtnText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "900",
   },
   imageViewerOverlay: {
     flex: 1,

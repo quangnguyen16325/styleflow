@@ -161,6 +161,81 @@ router.get("/:id/reviews", async (req, res) => {
   }
 });
 
+router.get("/:id/review-summary", async (req, res) => {
+  const productId = parsePositiveInteger(req.params.id);
+  if (!productId) {
+    return res.status(400).json(validationError("Product id must be a positive integer"));
+  }
+
+  try {
+    const productExists = await pool.query("SELECT id FROM products WHERE id = $1 LIMIT 1", [
+      productId,
+    ]);
+    if (productExists.rows.length === 0) {
+      return res.status(404).json(notFound("Product not found"));
+    }
+
+    const [summaryResult, aspectResult] = await Promise.all([
+      pool.query(
+        `
+          SELECT
+            COUNT(pr.id)::int AS review_count,
+            COUNT(pra.id)::int AS ai_review_count,
+            COALESCE(ROUND(AVG(pr.rating)::numeric, 2), 0) AS rating_average,
+            COUNT(*) FILTER (WHERE pra.overall_label = 'POSITIVE')::int AS positive_count,
+            COUNT(*) FILTER (WHERE pra.overall_label = 'NEGATIVE')::int AS negative_count,
+            COUNT(*) FILTER (WHERE pra.overall_label = 'NEUTRAL')::int AS neutral_count
+          FROM product_reviews pr
+          LEFT JOIN product_review_ai_analysis pra ON pra.review_id = pr.id
+          WHERE pr.product_id = $1
+            AND pr.status = 'visible'
+        `,
+        [productId],
+      ),
+      pool.query(
+        `
+          SELECT
+            aspect_item->>'key' AS aspect_key,
+            aspect_item->>'aspect' AS aspect_name,
+            aspect_item->>'label' AS label,
+            COUNT(*)::int AS count
+          FROM product_review_ai_analysis pra
+          JOIN product_reviews pr ON pr.id = pra.review_id
+          CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pra.aspects, '[]'::jsonb)) AS aspect_item
+          WHERE pr.product_id = $1
+            AND pr.status = 'visible'
+            AND aspect_item->>'label' IN ('POSITIVE', 'NEGATIVE')
+          GROUP BY aspect_key, aspect_name, label
+          ORDER BY count DESC, aspect_name ASC
+        `,
+        [productId],
+      ),
+    ]);
+
+    const summary = summaryResult.rows[0] || {};
+    const aiReviewCount = Number(summary.ai_review_count || 0);
+    const positiveCount = Number(summary.positive_count || 0);
+
+    return res.json({
+      productId,
+      reviewCount: Number(summary.review_count || 0),
+      aiReviewCount,
+      ratingAverage: Number(summary.rating_average || 0),
+      positiveRate: aiReviewCount > 0 ? Math.round((positiveCount / aiReviewCount) * 100) : 0,
+      sentiment: {
+        positive: positiveCount,
+        negative: Number(summary.negative_count || 0),
+        neutral: Number(summary.neutral_count || 0),
+      },
+      praisedAspects: mapPublicAspectSummary(aspectResult.rows, "POSITIVE"),
+      concernAspects: mapPublicAspectSummary(aspectResult.rows, "NEGATIVE"),
+    });
+  } catch (error) {
+    console.error(`GET /products/${productId}/review-summary failed:`, error);
+    return res.status(500).json(internalError("Failed to fetch product review summary"));
+  }
+});
+
 router.post("/:id/reviews", requireAuth, async (req, res) => {
   const productId = parsePositiveInteger(req.params.id);
   if (!productId) {
@@ -427,6 +502,29 @@ function mapReviewRow(row, options = {}) {
   }
 
   return review;
+}
+
+function mapPublicAspectSummary(rows, label) {
+  return rows
+    .filter((row) => row.label === label)
+    .slice(0, 4)
+    .map((row) => ({
+      key: row.aspect_key,
+      label: getAspectDisplayLabel(row.aspect_key, row.aspect_name),
+      count: Number(row.count || 0),
+    }));
+}
+
+function getAspectDisplayLabel(key, fallback) {
+  const labels = {
+    material: "Chất liệu",
+    design: "Thiết kế",
+    price: "Giá cả",
+    service: "Dịch vụ",
+    general: "Tổng quan",
+  };
+
+  return labels[key] || fallback || key;
 }
 
 async function resolveReviewableOrderItem({ productId, orderItemId, customerId }) {
