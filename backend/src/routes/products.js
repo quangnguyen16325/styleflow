@@ -97,6 +97,13 @@ router.get("/:id/reviews", async (req, res) => {
 
   const limit = parsePaginationLimit(req.query.limit);
   const offset = parsePaginationOffset(req.query.offset);
+  const hasImages = parseOptionalBoolean(req.query.hasImages);
+  if (req.query.hasImages != null && hasImages == null) {
+    return res.status(400).json(validationError("hasImages must be a boolean"));
+  }
+
+  const imageFilterClause = hasImages ? "AND jsonb_array_length(pr.images) > 0" : "";
+  const countImageFilterClause = hasImages ? "AND jsonb_array_length(images) > 0" : "";
 
   try {
     const productExists = await pool.query("SELECT id FROM products WHERE id = $1 LIMIT 1", [
@@ -124,6 +131,7 @@ router.get("/:id/reviews", async (req, res) => {
           pr.updated_at
         FROM product_reviews pr
         WHERE pr.product_id = $1 AND pr.status = 'visible'
+        ${imageFilterClause}
         ORDER BY pr.created_at DESC, pr.id DESC
         LIMIT $2 OFFSET $3
       `,
@@ -135,6 +143,7 @@ router.get("/:id/reviews", async (req, res) => {
         SELECT COUNT(*)::int AS total
         FROM product_reviews
         WHERE product_id = $1 AND status = 'visible'
+        ${countImageFilterClause}
       `,
       [productId],
     );
@@ -545,6 +554,22 @@ function parsePaginationLimit(value) {
 function parsePaginationOffset(value) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function parseOptionalBoolean(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  if (value === true || value === "true" || value === "1") {
+    return true;
+  }
+
+  if (value === false || value === "false" || value === "0") {
+    return false;
+  }
+
+  return null;
 }
 
 function validationError(message) {

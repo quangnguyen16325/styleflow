@@ -242,7 +242,22 @@ export default function ProductDetailScreen() {
             <SummaryRow label="Tạm tính" value={formatPrice(product.basePrice * quantity)} />
           </View>
 
-          <Text style={styles.sectionTitle}>Nhận xét từ khách hàng</Text>
+          <View style={styles.reviewSectionHeader}>
+            <Text style={styles.sectionTitle}>Nhận xét từ khách hàng</Text>
+            {reviewCount > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() =>
+                  navigation.navigate("ProductReviews", {
+                    productId: product.id,
+                    productName: product.name,
+                  })
+                }
+              >
+                <Text style={styles.reviewViewAllText}>Xem tất cả</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           {reviews.length > 0 ? (
             <View style={styles.reviewList}>
               {reviews.map((review) => (
@@ -506,6 +521,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#1E1815",
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  reviewSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  reviewViewAllText: {
+    color: "#9B4B1F",
+    fontSize: 13,
+    fontWeight: "800",
     marginTop: 20,
     marginBottom: 10,
   },
