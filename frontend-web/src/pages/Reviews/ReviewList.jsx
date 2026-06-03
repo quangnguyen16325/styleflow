@@ -300,114 +300,130 @@ export default function ReviewList() {
                 </tr>
               </thead>
               <tbody>
-                {reviews.map((review) => (
-                  <tr key={review.id}>
-                    <td style={{ fontWeight: "var(--font-weight-bold)" }}>#{review.id}</td>
-                    <td>
-                      <Link to={`/products/${review.productId}`} className="link">
-                        {review.productName || `Product #${review.productId}`}
-                      </Link>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: "var(--font-weight-semibold)" }}>
-                        {review.customerName || `Customer #${review.customerId}`}
-                      </div>
-                      <div
+                {reviews.map((review) => {
+                  const needsAttention = isReviewAiNeedsAttention(review.aiAnalysis);
+                  return (
+                    <tr
+                      key={review.id}
+                      style={
+                        needsAttention
+                          ? {
+                              backgroundColor: "#FFF9E8",
+                              boxShadow: "inset 4px 0 0 #D99152",
+                            }
+                          : undefined
+                      }
+                    >
+                      <td style={{ fontWeight: "var(--font-weight-bold)" }}>#{review.id}</td>
+                      <td>
+                        <Link to={`/products/${review.productId}`} className="link">
+                          {review.productName || `Product #${review.productId}`}
+                        </Link>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: "var(--font-weight-semibold)" }}>
+                          {review.customerName || `Customer #${review.customerId}`}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "var(--font-size-xs)",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          {review.customerEmail || "—"}
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ color: "#d99152", fontWeight: "var(--font-weight-bold)" }}>
+                          {"★".repeat(review.rating)}
+                          {"☆".repeat(Math.max(0, 5 - review.rating))}
+                        </span>
+                      </td>
+                      <td style={{ maxWidth: "280px", whiteSpace: "normal" }}>
+                        {review.comment || "—"}
+                        {review.hiddenReason ? (
+                          <div
+                            style={{
+                              marginTop: "var(--spacing-xs)",
+                              color: "var(--color-warning)",
+                              fontSize: "var(--font-size-xs)",
+                            }}
+                          >
+                            Hidden: {review.hiddenReason}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        {Array.isArray(review.images) && review.images.length > 0 ? (
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            {review.images.slice(0, 3).map((image) => (
+                              <a key={image} href={image} target="_blank" rel="noreferrer">
+                                <img
+                                  src={image}
+                                  alt="Review"
+                                  style={{
+                                    width: "42px",
+                                    height: "42px",
+                                    objectFit: "cover",
+                                    borderRadius: "8px",
+                                    border: "1px solid var(--color-border)",
+                                  }}
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        <StatusBadge value={review.status} />
+                      </td>
+                      <td style={{ minWidth: "210px" }}>
+                        <ReviewAiSummary aiAnalysis={review.aiAnalysis} />
+                      </td>
+                      <td
                         style={{
-                          fontSize: "var(--font-size-xs)",
+                          fontSize: "var(--font-size-sm)",
                           color: "var(--color-text-muted)",
                         }}
                       >
-                        {review.customerEmail || "—"}
-                      </div>
-                    </td>
-                    <td>
-                      <span style={{ color: "#d99152", fontWeight: "var(--font-weight-bold)" }}>
-                        {"★".repeat(review.rating)}
-                        {"☆".repeat(Math.max(0, 5 - review.rating))}
-                      </span>
-                    </td>
-                    <td style={{ maxWidth: "280px", whiteSpace: "normal" }}>
-                      {review.comment || "—"}
-                      {review.hiddenReason ? (
-                        <div
-                          style={{
-                            marginTop: "var(--spacing-xs)",
-                            color: "var(--color-warning)",
-                            fontSize: "var(--font-size-xs)",
-                          }}
-                        >
-                          Hidden: {review.hiddenReason}
+                        {review.createdAt ? new Date(review.createdAt).toLocaleString() : "—"}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {review.status !== "visible" ? (
+                            <button
+                              className="btn-secondary btn-sm"
+                              disabled={updatingId === review.id}
+                              onClick={() => updateReviewStatus(review, "visible")}
+                            >
+                              Show
+                            </button>
+                          ) : null}
+                          {review.status !== "hidden" ? (
+                            <button
+                              className="btn-secondary btn-sm"
+                              disabled={updatingId === review.id}
+                              onClick={() => updateReviewStatus(review, "hidden")}
+                            >
+                              Hide
+                            </button>
+                          ) : null}
+                          {review.status !== "deleted" ? (
+                            <button
+                              className="btn-danger btn-sm"
+                              disabled={updatingId === review.id}
+                              onClick={() => updateReviewStatus(review, "deleted")}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
                         </div>
-                      ) : null}
-                    </td>
-                    <td>
-                      {Array.isArray(review.images) && review.images.length > 0 ? (
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          {review.images.slice(0, 3).map((image) => (
-                            <a key={image} href={image} target="_blank" rel="noreferrer">
-                              <img
-                                src={image}
-                                alt="Review"
-                                style={{
-                                  width: "42px",
-                                  height: "42px",
-                                  objectFit: "cover",
-                                  borderRadius: "8px",
-                                  border: "1px solid var(--color-border)",
-                                }}
-                              />
-                            </a>
-                          ))}
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <StatusBadge value={review.status} />
-                    </td>
-                    <td style={{ minWidth: "210px" }}>
-                      <ReviewAiSummary aiAnalysis={review.aiAnalysis} />
-                    </td>
-                    <td
-                      style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}
-                    >
-                      {review.createdAt ? new Date(review.createdAt).toLocaleString() : "—"}
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        {review.status !== "visible" ? (
-                          <button
-                            className="btn-secondary btn-sm"
-                            disabled={updatingId === review.id}
-                            onClick={() => updateReviewStatus(review, "visible")}
-                          >
-                            Show
-                          </button>
-                        ) : null}
-                        {review.status !== "hidden" ? (
-                          <button
-                            className="btn-secondary btn-sm"
-                            disabled={updatingId === review.id}
-                            onClick={() => updateReviewStatus(review, "hidden")}
-                          >
-                            Hide
-                          </button>
-                        ) : null}
-                        {review.status !== "deleted" ? (
-                          <button
-                            className="btn-danger btn-sm"
-                            disabled={updatingId === review.id}
-                            onClick={() => updateReviewStatus(review, "deleted")}
-                          >
-                            Delete
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -429,29 +445,11 @@ function ReviewAiSummary({ aiAnalysis }) {
   const usefulAspects = Array.isArray(aiAnalysis.aspects)
     ? aiAnalysis.aspects.filter((aspect) => aspect.label && aspect.label !== "NO_ASPECT")
     : [];
-  const needsAttention = isReviewAiNeedsAttention(aiAnalysis);
 
   return (
     <div style={{ display: "grid", gap: "8px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
         <AiBadge label={aiAnalysis.overall.label} />
-        {needsAttention ? (
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              padding: "5px 10px",
-              borderRadius: "999px",
-              backgroundColor: "#FFF4D6",
-              color: "#925F00",
-              fontSize: "var(--font-size-xs)",
-              fontWeight: "var(--font-weight-bold)",
-              lineHeight: 1.2,
-            }}
-          >
-            Needs attention
-          </span>
-        ) : null}
         <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
           {formatConfidence(aiAnalysis.overall.confidence)}
         </span>
