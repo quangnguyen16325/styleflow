@@ -33,6 +33,24 @@ router.get("/", async (req, res) => {
     conditions.push(`pr.product_id = $${params.length}`);
   }
 
+  const needsAttention = parseOptionalBoolean(req.query.needsAttention);
+  if (req.query.needsAttention != null && needsAttention == null) {
+    return res.status(400).json(validationError("needsAttention must be a boolean"));
+  }
+
+  if (needsAttention === true) {
+    conditions.push(`
+      (
+        pra.overall_label = 'NEGATIVE'
+        OR EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(pra.aspects, '[]'::jsonb)) AS attention_aspect
+          WHERE attention_aspect->>'label' = 'NEGATIVE'
+        )
+      )
+    `);
+  }
+
   const aiOverall = normalizeAiLabelFilter(req.query.aiOverall);
   if (req.query.aiOverall != null && !aiOverall) {
     return res.status(400).json(validationError("Invalid AI overall filter"));
@@ -282,6 +300,26 @@ function parsePaginationLimit(value) {
 function parsePaginationOffset(value) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function parseOptionalBoolean(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes"].includes(normalized)) {
+    return true;
+  }
+  if (["false", "0", "no"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
 }
 
 function validationError(message) {

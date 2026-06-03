@@ -43,6 +43,12 @@ const AI_OVERALL_VALUES = AI_OVERALL_OPTIONS.map((option) => option.value);
 const AI_ASPECT_VALUES = AI_ASPECT_OPTIONS.map((option) => option.value);
 const AI_ASPECT_LABEL_VALUES = AI_ASPECT_LABEL_OPTIONS.map((option) => option.value);
 
+const ATTENTION_OPTIONS = [
+  { value: "ALL", label: "All Review Priority" },
+  { value: "true", label: "Needs Attention" },
+];
+const ATTENTION_VALUES = ATTENTION_OPTIONS.map((option) => option.value);
+
 export default function ReviewList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = normalizeFilterValue(searchParams.get("status"), STATUS_VALUES);
@@ -51,6 +57,10 @@ export default function ReviewList() {
   const aiAspectLabelFilter = normalizeFilterValue(
     searchParams.get("aiAspectLabel"),
     AI_ASPECT_LABEL_VALUES,
+  );
+  const attentionFilter = normalizeFilterValue(
+    searchParams.get("needsAttention"),
+    ATTENTION_VALUES,
   );
   const productIdFilter = normalizePositiveInteger(searchParams.get("productId"));
   const [reviews, setReviews] = useState([]);
@@ -69,6 +79,7 @@ export default function ReviewList() {
       aiOverall: aiOverallFilter !== "ALL" ? aiOverallFilter : undefined,
       aiAspect: aiAspectFilter !== "ALL" ? aiAspectFilter : undefined,
       aiAspectLabel: aiAspectLabelFilter !== "ALL" ? aiAspectLabelFilter : undefined,
+      needsAttention: attentionFilter !== "ALL" ? attentionFilter : undefined,
       productId: productIdFilter || undefined,
       limit: 100,
     })
@@ -77,7 +88,14 @@ export default function ReviewList() {
       })
       .catch((err) => setError(err))
       .finally(() => setLoading(false));
-  }, [aiAspectFilter, aiAspectLabelFilter, aiOverallFilter, productIdFilter, statusFilter]);
+  }, [
+    aiAspectFilter,
+    aiAspectLabelFilter,
+    aiOverallFilter,
+    attentionFilter,
+    productIdFilter,
+    statusFilter,
+  ]);
 
   useEffect(() => {
     fetchReviews();
@@ -201,6 +219,19 @@ export default function ReviewList() {
           {REVIEW_STATUSES.map((status) => (
             <option key={status.value} value={status.value}>
               {status.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={attentionFilter}
+          onChange={(event) => handleFilterChange("needsAttention", event.target.value)}
+          className="form-select"
+          style={{ width: "220px" }}
+          aria-label="Filter reviews by moderation priority"
+        >
+          {ATTENTION_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -398,11 +429,29 @@ function ReviewAiSummary({ aiAnalysis }) {
   const usefulAspects = Array.isArray(aiAnalysis.aspects)
     ? aiAnalysis.aspects.filter((aspect) => aspect.label && aspect.label !== "NO_ASPECT")
     : [];
+  const needsAttention = isReviewAiNeedsAttention(aiAnalysis);
 
   return (
     <div style={{ display: "grid", gap: "8px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
         <AiBadge label={aiAnalysis.overall.label} />
+        {needsAttention ? (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "5px 10px",
+              borderRadius: "999px",
+              backgroundColor: "#FFF4D6",
+              color: "#925F00",
+              fontSize: "var(--font-size-xs)",
+              fontWeight: "var(--font-weight-bold)",
+              lineHeight: 1.2,
+            }}
+          >
+            Needs attention
+          </span>
+        ) : null}
         <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
           {formatConfidence(aiAnalysis.overall.confidence)}
         </span>
@@ -425,6 +474,16 @@ function ReviewAiSummary({ aiAnalysis }) {
       )}
     </div>
   );
+}
+
+function isReviewAiNeedsAttention(aiAnalysis) {
+  if (String(aiAnalysis?.overall?.label || "").toUpperCase() === "NEGATIVE") {
+    return true;
+  }
+
+  return Array.isArray(aiAnalysis?.aspects)
+    ? aiAnalysis.aspects.some((aspect) => String(aspect.label || "").toUpperCase() === "NEGATIVE")
+    : false;
 }
 
 function AiBadge({ label, text = null, compact = false }) {
