@@ -33,6 +33,10 @@ mobile-app/web-build/
 *.pid
 n8n_data/
 
+# Local AI model artifacts are too large for normal git; upload/sync them to servers separately.
+ai/saved_model_stage1/
+ai/saved_model_stage2/
+
 
 .agents/
 .codex

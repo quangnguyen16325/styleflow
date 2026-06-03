@@ -12,6 +12,17 @@ services:
       timeout: 5s
       retries: 10
 
+  ai-service:
+    build:
+      context: .
+      dockerfile: ai-service/Dockerfile
+    container_name: styleflow-ai-service
+    restart: unless-stopped
+    environment:
+      AI_STAGE1_MODEL_PATH: /app/ai/saved_model_stage1
+      AI_STAGE2_MODEL_PATH: /app/ai/saved_model_stage2
+      AI_MODEL_VERSION: stage1_v1_stage2_v1
+
   backend:
     build:
       context: ./backend
@@ -32,6 +43,7 @@ services:
       R2_ENDPOINT: ${R2_ENDPOINT}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME}
       R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL}
+      AI_SERVICE_URL: http://ai-service:8000
     depends_on:
       redis:
         condition: service_healthy
