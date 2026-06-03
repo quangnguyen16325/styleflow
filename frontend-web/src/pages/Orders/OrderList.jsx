@@ -56,6 +56,11 @@ const PAGE_SIZE_OPTIONS = [
   { value: "ALL", label: "All rows" },
 ];
 
+const ACTION_QUEUE_FILTERS = [
+  { value: "ALL", label: "All action queues" },
+  { value: "needs_action", label: "Needs action" },
+];
+
 export default function OrderList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const allowedStatuses = ORDER_STATUSES.map((status) => status.value);
@@ -75,6 +80,10 @@ export default function OrderList() {
   const deliveryStatusFilter = normalizeFilterValue(
     searchParams.get("deliveryStatus"),
     allowedDeliveryStatuses,
+  );
+  const actionQueueFilter = normalizeFilterValue(
+    searchParams.get("actionQueue"),
+    ACTION_QUEUE_FILTERS.map((filter) => filter.value),
   );
   const searchTerm = searchParams.get("q") || "";
   const pageSize = normalizePageSize(searchParams.get("pageSize"));
@@ -228,12 +237,25 @@ export default function OrderList() {
       const matchesDeliveryStatus =
         deliveryStatusFilter === "ALL" ||
         String(order.deliveryStatus || "").toLowerCase() === deliveryStatusFilter;
+      const matchesActionQueue =
+        actionQueueFilter === "ALL" || matchesOrderActionQueue(order, actionQueueFilter);
 
       return (
-        matchesSearch && matchesPaymentStatus && matchesPaymentGateway && matchesDeliveryStatus
+        matchesSearch &&
+        matchesPaymentStatus &&
+        matchesPaymentGateway &&
+        matchesDeliveryStatus &&
+        matchesActionQueue
       );
     });
-  }, [orders, searchTerm, paymentStatusFilter, paymentGatewayFilter, deliveryStatusFilter]);
+  }, [
+    orders,
+    searchTerm,
+    paymentStatusFilter,
+    paymentGatewayFilter,
+    deliveryStatusFilter,
+    actionQueueFilter,
+  ]);
 
   const totalAmount = useMemo(() => {
     return filteredOrders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
@@ -348,6 +370,18 @@ export default function OrderList() {
           ))}
         </select>
         <select
+          value={actionQueueFilter}
+          onChange={(e) => updateFilterParam("actionQueue", e.target.value)}
+          className="form-select"
+          aria-label="Filter orders by action queue"
+        >
+          {ACTION_QUEUE_FILTERS.map((filter) => (
+            <option key={filter.value} value={filter.value}>
+              {filter.label}
+            </option>
+          ))}
+        </select>
+        <select
           value={pageSize}
           onChange={(e) => updatePageSizeParam(e.target.value)}
           className="form-select"
@@ -394,7 +428,11 @@ export default function OrderList() {
                     </td>
                     <td>
                       <div
-                        style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-xs)" }}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "var(--spacing-xs)",
+                        }}
                       >
                         <StatusBadge value={order.paymentStatus || "unpaid"} size="sm" showIcon />
                         <span
@@ -415,7 +453,10 @@ export default function OrderList() {
                         {formatCurrency(order.totalAmount)}
                       </div>
                       <div
-                        style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--font-size-xs)",
+                        }}
                       >
                         Ship {formatCurrency(order.shippingFee)}
                       </div>
@@ -425,12 +466,17 @@ export default function OrderList() {
                         {order.customer?.fullName || "—"}
                       </div>
                       <div
-                        style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--font-size-xs)",
+                        }}
                       >
                         {order.customer?.phone || "—"}
                       </div>
                     </td>
-                    <td style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
+                    <td
+                      style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}
+                    >
                       {new Date(order.createdAt).toLocaleString()}
                     </td>
                     <td>
@@ -498,7 +544,9 @@ function normalizeFilterValue(value, allowedValues, options = {}) {
 }
 
 function normalizePageSize(value) {
-  const normalizedValue = String(value || "25").trim().toUpperCase();
+  const normalizedValue = String(value || "25")
+    .trim()
+    .toUpperCase();
   return PAGE_SIZE_OPTIONS.some((option) => option.value === normalizedValue)
     ? normalizedValue
     : "25";
@@ -518,7 +566,9 @@ function CustomerRequestsCell({ order }) {
   const requests = getCustomerRequests(order);
 
   if (requests.length === 0) {
-    return <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>—</span>;
+    return (
+      <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>—</span>
+    );
   }
 
   return (
@@ -573,6 +623,28 @@ function getRefundRequestMeta(value) {
   if (status === "rejected") return "Return rejected";
   if (status === "refunded") return "Refund completed";
   return "Return request";
+}
+
+function matchesOrderActionQueue(order, queue) {
+  if (queue !== "needs_action") {
+    return true;
+  }
+
+  const paymentStatus = String(order.paymentStatus || "").toLowerCase();
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  const orderStatus = String(order.status || "").toLowerCase();
+  const addressChangeStatus = String(order.addressChangeStatus || "").toLowerCase();
+  const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
+
+  return (
+    addressChangeStatus === "requested" ||
+    ["payment_unknown", "payment_failed", "payment_pending"].includes(paymentStatus) ||
+    ["retry_pending", "delivery_failed", "returning", "ready_to_ship", "handover"].includes(
+      deliveryStatus,
+    ) ||
+    ["pending", "manual_review_required"].includes(refundStatus) ||
+    orderStatus === "pending"
+  );
 }
 
 function normalizeSearchText(value) {

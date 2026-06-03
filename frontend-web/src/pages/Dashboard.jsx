@@ -415,7 +415,7 @@ export default function Dashboard() {
           title="Orders Needing Action"
           subtitle="Payment, delivery, address change and return queues."
           emptyText="No urgent order queue right now."
-          viewAllTo="/orders"
+          viewAllTo="/orders?actionQueue=needs_action"
         >
           {stats.actionOrders?.slice(0, 4).map(({ order, action }) => (
             <Link
