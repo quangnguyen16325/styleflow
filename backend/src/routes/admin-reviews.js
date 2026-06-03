@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
+import { runReviewAiBackfill } from "../services/review-ai-backfill.js";
 
 const router = Router();
 const REVIEW_STATUSES = new Set(["visible", "hidden", "deleted"]);
@@ -174,6 +175,33 @@ router.patch("/:id/status", async (req, res) => {
   } catch (error) {
     console.error(`PATCH /admin/reviews/${reviewId}/status failed:`, error);
     return res.status(500).json(internalError("Failed to update review status"));
+  }
+});
+
+router.post("/ai-backfill", async (req, res) => {
+  const force = Boolean(req.body?.force);
+  if (force && req.authCustomer?.role !== "admin") {
+    return res.status(403).json({
+      error: {
+        code: "FORBIDDEN",
+        message: "Only admin can force re-analyze existing review AI results",
+      },
+    });
+  }
+
+  try {
+    const result = await runReviewAiBackfill({
+      limit: req.body?.limit,
+      batchSize: req.body?.batchSize,
+      force,
+      dryRun: false,
+      includeDeleted: false,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error("POST /admin/reviews/ai-backfill failed:", error);
+    return res.status(500).json(internalError("Failed to run review AI backfill"));
   }
 });
 

@@ -56,6 +56,8 @@ export default function ReviewList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [aiBackfillRunning, setAiBackfillRunning] = useState(false);
+  const [aiBackfillResult, setAiBackfillResult] = useState(null);
 
   const fetchReviews = useCallback(() => {
     setLoading(true);
@@ -119,6 +121,27 @@ export default function ReviewList() {
     }
   };
 
+  const handleAiBackfill = async () => {
+    const confirmed = window.confirm(
+      "Analyze product reviews that do not have AI results yet? This will process up to 100 reviews.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setAiBackfillRunning(true);
+      setAiBackfillResult(null);
+      const result = await ApiService.backfillReviewAi({ limit: 100 });
+      setAiBackfillResult(result);
+      fetchReviews();
+    } catch (err) {
+      window.alert(err?.message || "Failed to analyze missing review AI results");
+    } finally {
+      setAiBackfillRunning(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner message="Loading product reviews..." />;
   if (error) return <ErrorMessage error={error} onRetry={fetchReviews} />;
 
@@ -131,7 +154,31 @@ export default function ReviewList() {
             {reviews.length} reviews · {visibleCount} visible
           </span>
         </div>
+        <button
+          className="btn-secondary"
+          type="button"
+          onClick={handleAiBackfill}
+          disabled={aiBackfillRunning}
+        >
+          {aiBackfillRunning ? "Analyzing..." : "Analyze Missing AI"}
+        </button>
       </div>
+
+      {aiBackfillResult ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: "var(--spacing-lg)",
+            padding: "var(--spacing-md)",
+            color:
+              aiBackfillResult.failed > 0 ? "var(--color-danger)" : "var(--color-text-secondary)",
+          }}
+        >
+          AI analysis completed: scanned {aiBackfillResult.scanned}, analyzed{" "}
+          {aiBackfillResult.analyzed}, skipped {aiBackfillResult.skipped}, failed{" "}
+          {aiBackfillResult.failed}.
+        </div>
+      ) : null}
 
       <div
         style={{

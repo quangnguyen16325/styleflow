@@ -116,6 +116,9 @@ class ApiService {
   static async updateReviewStatus(id, payload) {
     return client.patch(`/admin/reviews/${id}/status`, payload);
   }
+  static async backfillReviewAi(payload = {}) {
+    return client.post("/admin/reviews/ai-backfill", payload);
+  }
 
   // CATEGORIES
   static async getCategories() {
