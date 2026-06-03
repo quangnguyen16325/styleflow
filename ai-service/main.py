@@ -14,18 +14,18 @@ DEFAULT_STAGE1_LABELS = {
 }
 
 DEFAULT_STAGE2_LABELS = {
-    0: "NO_ASPECT",
-    1: "NEGATIVE",
-    2: "NEUTRAL",
-    3: "POSITIVE",
+    0: "NEGATIVE",
+    1: "NEUTRAL",
+    2: "POSITIVE",
+    3: "NO_ASPECT",
 }
 
 DEFAULT_ASPECTS = [
-    {"key": "material", "label": "Material", "prompt": "chất liệu vải, chất lượng vải"},
-    {"key": "design", "label": "Design", "prompt": "thiết kế, kiểu dáng, form dáng"},
-    {"key": "price", "label": "Price", "prompt": "giá bán, giá tiền, mức giá"},
-    {"key": "service", "label": "Service", "prompt": "dịch vụ, tư vấn, phản hồi, giao hàng"},
-    {"key": "general", "label": "General", "prompt": "cảm nhận chung về sản phẩm"},
+    {"key": "material", "label": "Material"},
+    {"key": "design", "label": "Design"},
+    {"key": "price", "label": "Price"},
+    {"key": "service", "label": "Service"},
+    {"key": "general", "label": "General"},
 ]
 
 
@@ -79,7 +79,11 @@ class SentimentPipeline:
             raise ValueError("text is required")
 
         overall = self._predict_stage1(normalized_text)
-        aspects = [self._predict_stage2(normalized_text, aspect) for aspect in self.aspects]
+        aspects = []
+        for aspect in self.aspects:
+            prediction = self._predict_stage2(normalized_text, aspect)
+            if prediction.label != "NO_ASPECT":
+                aspects.append(prediction)
 
         return AnalyzeReviewResponse(
             overall=overall,
@@ -105,11 +109,12 @@ class SentimentPipeline:
         )
 
     def _predict_stage2(self, text: str, aspect: dict[str, str]) -> AspectPrediction:
-        # Stage 2 is evaluated as a sentence-pair classification: review text + fixed aspect prompt.
+        # Stage 2 was trained as sentence-pair classification: review text + fixed aspect name.
         inputs = self.stage2_tokenizer(
             text,
-            aspect["prompt"],
+            aspect["label"],
             truncation=True,
+            padding="max_length",
             max_length=256,
             return_tensors="pt",
         ).to(self.device)
@@ -193,8 +198,7 @@ def load_aspects() -> list[dict[str, str]]:
             continue
         key = str(item.get("key", "")).strip().lower()
         label = str(item.get("label", "")).strip()
-        prompt = str(item.get("prompt", "")).strip()
-        if key and label and prompt:
-            aspects.append({"key": key, "label": label, "prompt": prompt})
+        if key and label:
+            aspects.append({"key": key, "label": label})
 
     return aspects or DEFAULT_ASPECTS
