@@ -215,20 +215,33 @@ router.get("/:id/review-summary", async (req, res) => {
     const summary = summaryResult.rows[0] || {};
     const aiReviewCount = Number(summary.ai_review_count || 0);
     const positiveCount = Number(summary.positive_count || 0);
+    const positiveRate = aiReviewCount > 0 ? Math.round((positiveCount / aiReviewCount) * 100) : 0;
+    const praisedAspects = mapPublicAspectSummary(aspectResult.rows, "POSITIVE");
+    const concernAspects = mapPublicAspectSummary(aspectResult.rows, "NEGATIVE");
 
     return res.json({
       productId,
       reviewCount: Number(summary.review_count || 0),
       aiReviewCount,
       ratingAverage: Number(summary.rating_average || 0),
-      positiveRate: aiReviewCount > 0 ? Math.round((positiveCount / aiReviewCount) * 100) : 0,
+      positiveRate,
+      summaryText: buildPublicReviewSummaryText({
+        aiReviewCount,
+        positiveRate,
+        praisedAspects,
+        concernAspects,
+      }),
+      dataNote:
+        aiReviewCount > 0
+          ? `Tóm tắt dựa trên ${aiReviewCount} đánh giá đã được AI phân tích, chỉ mang tính tham khảo.`
+          : "Chưa có đủ đánh giá để AI tổng hợp.",
       sentiment: {
         positive: positiveCount,
         negative: Number(summary.negative_count || 0),
         neutral: Number(summary.neutral_count || 0),
       },
-      praisedAspects: mapPublicAspectSummary(aspectResult.rows, "POSITIVE"),
-      concernAspects: mapPublicAspectSummary(aspectResult.rows, "NEGATIVE"),
+      praisedAspects,
+      concernAspects,
     });
   } catch (error) {
     console.error(`GET /products/${productId}/review-summary failed:`, error);
@@ -525,6 +538,42 @@ function getAspectDisplayLabel(key, fallback) {
   };
 
   return labels[key] || fallback || key;
+}
+
+function buildPublicReviewSummaryText({
+  aiReviewCount,
+  positiveRate,
+  praisedAspects,
+  concernAspects,
+}) {
+  if (aiReviewCount <= 0) {
+    return "Chưa có đủ đánh giá để AI tổng hợp xu hướng phản hồi của sản phẩm này.";
+  }
+
+  const praisedText = praisedAspects
+    .slice(0, 2)
+    .map((aspect) => aspect.label)
+    .join(", ");
+  const concernText = concernAspects
+    .slice(0, 2)
+    .map((aspect) => aspect.label)
+    .join(", ");
+
+  if (positiveRate >= 70 && praisedText) {
+    return `Phần lớn khách hàng phản hồi tích cực, nổi bật ở ${praisedText}.`;
+  }
+
+  if (positiveRate >= 50) {
+    return concernText
+      ? `Đánh giá nhìn chung khá tích cực, nhưng bạn nên xem thêm phản hồi về ${concernText}.`
+      : "Đánh giá nhìn chung khá tích cực theo các bình luận đã được AI phân tích.";
+  }
+
+  if (concernText) {
+    return `AI ghi nhận một số điểm cần cân nhắc về ${concernText}; nên xem bình luận gốc trước khi quyết định.`;
+  }
+
+  return "AI đã tổng hợp các đánh giá hiện có, bạn nên xem thêm bình luận gốc để có quyết định chính xác hơn.";
 }
 
 async function resolveReviewableOrderItem({ productId, orderItemId, customerId }) {

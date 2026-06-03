@@ -142,6 +142,14 @@ export default function ProductDetailScreen() {
     }
   };
 
+  const handleViewOriginalReviews = () => {
+    setAiSummaryVisible(false);
+    navigation.navigate("ProductReviews", {
+      productId: product.id,
+      productName: product.name,
+    });
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -397,6 +405,14 @@ export default function ProductDetailScreen() {
               </View>
             ) : (
               <View style={styles.aiContent}>
+                <View style={styles.aiSummaryTextCard}>
+                  <Text style={styles.aiSummaryMainText}>{aiSummary.summaryText}</Text>
+                  <Text style={styles.aiSummaryNote}>
+                    {aiSummary.dataNote ||
+                      `Tóm tắt dựa trên ${aiSummary.aiReviewCount} đánh giá đã được AI phân tích, chỉ mang tính tham khảo.`}
+                  </Text>
+                </View>
+
                 <View style={styles.aiMetricGrid}>
                   <AiMetric label="Đã phân tích" value={`${aiSummary.aiReviewCount}`} />
                   <AiMetric label="Tích cực" value={`${aiSummary.positiveRate}%`} />
@@ -420,6 +436,14 @@ export default function ProductDetailScreen() {
                 />
               </View>
             )}
+
+            <TouchableOpacity
+              style={styles.aiReviewsBtn}
+              activeOpacity={0.85}
+              onPress={handleViewOriginalReviews}
+            >
+              <Text style={styles.aiReviewsBtnText}>Xem đánh giá gốc</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.aiCloseBtn}
@@ -888,6 +912,25 @@ const styles = StyleSheet.create({
   aiContent: {
     gap: 12,
   },
+  aiSummaryTextCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#EDE0D3",
+    padding: 14,
+  },
+  aiSummaryMainText: {
+    color: "#1E1815",
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  aiSummaryNote: {
+    color: "#8A7B6F",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+  },
   aiMetricGrid: {
     flexDirection: "row",
     gap: 8,
@@ -957,7 +1000,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   aiCloseBtn: {
-    marginTop: 16,
+    marginTop: 10,
     borderRadius: 16,
     backgroundColor: "#1E1815",
     paddingVertical: 14,
@@ -965,6 +1008,18 @@ const styles = StyleSheet.create({
   },
   aiCloseBtnText: {
     color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  aiReviewsBtn: {
+    marginTop: 16,
+    borderRadius: 16,
+    backgroundColor: "#F5ECE3",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  aiReviewsBtnText: {
+    color: "#9B4B1F",
     fontSize: 14,
     fontWeight: "900",
   },
