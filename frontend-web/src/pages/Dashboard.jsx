@@ -20,6 +20,7 @@ export default function Dashboard() {
     orders: null,
     issues: null,
     refunds: null,
+    aiAlerts: null,
     revenue: null,
     actionOrders: [],
     lowStockProducts: [],
@@ -39,15 +40,17 @@ export default function Dashboard() {
           ApiService.getOrders(),
           ApiService.getIssues(),
           ApiService.getRefundRequests(),
+          ApiService.getReviewAiAlerts(),
         ]);
 
         if (!isActive) return;
 
-        const [productsRes, ordersRes, issuesRes, refundsRes] = results;
+        const [productsRes, ordersRes, issuesRes, refundsRes, aiAlertsRes] = results;
         const products = productsRes.status === "fulfilled" ? productsRes.value : [];
         const orders = ordersRes.status === "fulfilled" ? ordersRes.value : [];
         const issues = issuesRes.status === "fulfilled" ? issuesRes.value : [];
         const refundRequests = refundsRes.status === "fulfilled" ? refundsRes.value : [];
+        const aiAlerts = aiAlertsRes.status === "fulfilled" ? aiAlertsRes.value : null;
 
         const lowStockCount = Array.isArray(products)
           ? products.filter((p) => p.availableQty < p.minStockLevel).length
@@ -134,6 +137,7 @@ export default function Dashboard() {
             total: Array.isArray(refundRequests) ? refundRequests.length : 0,
             pending: pendingRefundRequests,
           },
+          aiAlerts,
           deliveryRisk: {
             returningOrFailed: returningOrFailedOrders,
           },
@@ -397,6 +401,8 @@ export default function Dashboard() {
         ))}
       </div>
 
+      <ReviewAiAlertsPanel alerts={stats.aiAlerts} />
+
       <div
         style={{
           display: "grid",
@@ -409,8 +415,9 @@ export default function Dashboard() {
           title="Orders Needing Action"
           subtitle="Payment, delivery, address change and return queues."
           emptyText="No urgent order queue right now."
+          viewAllTo="/orders"
         >
-          {stats.actionOrders?.map(({ order, action }) => (
+          {stats.actionOrders?.slice(0, 4).map(({ order, action }) => (
             <Link
               key={order.id}
               to={`/orders/${order.id}`}
@@ -467,8 +474,9 @@ export default function Dashboard() {
           title="Recent Activity"
           subtitle="Latest orders, issues and return requests."
           emptyText="No recent activity found."
+          viewAllTo="/orders"
         >
-          {stats.recentActivity?.map((activity) => (
+          {stats.recentActivity?.slice(0, 5).map((activity) => (
             <Link
               key={activity.id}
               to={activity.to}
@@ -553,20 +561,338 @@ export default function Dashboard() {
           <Link to="/products" className="btn-secondary" style={{ textDecoration: "none" }}>
             Inventory
           </Link>
+          <Link
+            to="/reviews?needsAttention=true"
+            className="btn-secondary"
+            style={{ textDecoration: "none" }}
+          >
+            AI Review Queue
+          </Link>
         </div>
       </div>
     </div>
   );
 }
 
-function DashboardPanel({ title, subtitle, emptyText, children }) {
+function ReviewAiAlertsPanel({ alerts }) {
+  const topAspects = Array.isArray(alerts?.topNegativeAspects) ? alerts.topNegativeAspects : [];
+  const topProducts = Array.isArray(alerts?.topProducts) ? alerts.topProducts : [];
+  const recentReviews = Array.isArray(alerts?.recentReviews) ? alerts.recentReviews : [];
+  const hasAlerts = Number(alerts?.needsAttentionCount || 0) > 0;
+
+  return (
+    <div
+      className="card"
+      style={{ padding: "var(--spacing-lg)", marginBottom: "var(--spacing-lg)" }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "var(--spacing-md)",
+          marginBottom: "var(--spacing-lg)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h3 style={{ margin: 0, fontSize: "var(--font-size-md)", color: "var(--color-dark)" }}>
+            AI Review Alerts
+          </h3>
+          <p
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: "var(--font-size-sm)",
+              marginTop: 3,
+              marginBottom: 0,
+            }}
+          >
+            Review sentiment and aspect issues that need admin attention.
+          </p>
+        </div>
+        <Link
+          to="/reviews?needsAttention=true"
+          className={hasAlerts ? "btn-danger" : "btn-secondary"}
+          style={{ textDecoration: "none" }}
+        >
+          Open review queue <ArrowUpRight size={14} />
+        </Link>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--spacing-md)",
+          marginBottom: "var(--spacing-lg)",
+        }}
+      >
+        <AiMetricCard
+          label="Needs attention"
+          value={String(alerts?.needsAttentionCount ?? 0)}
+          hint={`${alerts?.needsAttention7dCount ?? 0} new in 7 days`}
+          tone={hasAlerts ? "danger" : "default"}
+        />
+        <AiMetricCard
+          label="Waiting analysis"
+          value={String(alerts?.unanalyzedReviewCount ?? 0)}
+          hint={`${alerts?.visibleReviewCount ?? 0} visible reviews`}
+          tone={Number(alerts?.unanalyzedReviewCount || 0) > 0 ? "warning" : "default"}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: "var(--spacing-lg)",
+        }}
+      >
+        <div style={{ display: "grid", gap: "var(--spacing-md)", minWidth: 0 }}>
+          <section>
+            <SectionMiniTitle title="Top negative aspects" />
+            {topAspects.length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-sm)" }}>
+                {topAspects.map((aspect) => (
+                  <Link
+                    key={aspect.key || aspect.aspect}
+                    to={`/reviews?needsAttention=true&aiAspect=${encodeURIComponent(
+                      aspect.key,
+                    )}&aiAspectLabel=NEGATIVE`}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 10px",
+                      borderRadius: "var(--radius-full)",
+                      background: "var(--color-danger-light)",
+                      color: "var(--color-danger)",
+                      fontSize: "var(--font-size-sm)",
+                      fontWeight: "var(--font-weight-semibold)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    {aspect.aspect}
+                    <strong>{aspect.count}</strong>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyMiniState text="No negative aspect trend detected." />
+            )}
+          </section>
+
+          <section>
+            <SectionMiniTitle title="Affected products" />
+            {topProducts.length > 0 ? (
+              <div style={{ display: "grid", gap: "var(--spacing-sm)" }}>
+                {topProducts.slice(0, 4).map((product) => (
+                  <Link
+                    key={product.productId}
+                    to={`/products/${product.productId}`}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <DashboardListRow
+                      title={product.productName}
+                      description={`SKU ${product.sku || "N/A"} · Rating ${formatDecimal(
+                        product.ratingAverage,
+                      )}`}
+                      aside={
+                        <span style={{ color: "var(--color-danger)", fontWeight: 800 }}>
+                          {product.needsAttentionCount}
+                        </span>
+                      }
+                    />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyMiniState text="No affected product in the AI queue." />
+            )}
+          </section>
+        </div>
+
+        <section style={{ minWidth: 0 }}>
+          <SectionMiniTitle title="Latest reviews to inspect" />
+          {recentReviews.length > 0 ? (
+            <div style={{ display: "grid", gap: "var(--spacing-sm)" }}>
+              {recentReviews.slice(0, 5).map((review) => (
+                <Link
+                  key={review.id}
+                  to={`/reviews?needsAttention=true&productId=${review.productId}`}
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <div
+                    style={{
+                      padding: "var(--spacing-sm)",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-border-light)",
+                      background: "linear-gradient(90deg, var(--color-danger-light), #fff 60%)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "var(--spacing-sm)",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <strong style={{ color: "var(--color-dark)", overflowWrap: "anywhere" }}>
+                        {review.productName}
+                      </strong>
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          color: "var(--color-warning)",
+                          fontWeight: "var(--font-weight-bold)",
+                        }}
+                      >
+                        {review.rating}/5
+                      </span>
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "var(--color-text-muted)",
+                        fontSize: "var(--font-size-sm)",
+                        lineHeight: 1.45,
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {truncateText(review.comment, 120)}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyMiniState text="No recent review needs attention." />
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function AiMetricCard({ label, value, hint, tone = "default" }) {
+  const toneStyles = {
+    danger: {
+      background: "var(--color-danger-light)",
+      color: "var(--color-danger)",
+    },
+    warning: {
+      background: "var(--color-warning-light)",
+      color: "var(--color-warning)",
+    },
+    default: {
+      background: "var(--color-bg)",
+      color: "var(--color-dark)",
+    },
+  };
+  const style = toneStyles[tone] || toneStyles.default;
+
+  return (
+    <div
+      style={{
+        padding: "var(--spacing-md)",
+        borderRadius: "var(--radius-lg)",
+        background: style.background,
+        border: "1px solid var(--color-border-light)",
+      }}
+    >
+      <div
+        style={{
+          color: "var(--color-text-muted)",
+          fontSize: "var(--font-size-xs)",
+          textTransform: "uppercase",
+          letterSpacing: "0.055em",
+          fontWeight: "var(--font-weight-bold)",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          color: style.color,
+          fontSize: "var(--font-size-2xl)",
+          fontWeight: "var(--font-weight-bold)",
+          letterSpacing: "-0.04em",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+        {hint}
+      </div>
+    </div>
+  );
+}
+
+function SectionMiniTitle({ title }) {
+  return (
+    <h4
+      style={{
+        margin: "0 0 var(--spacing-sm)",
+        color: "var(--color-dark)",
+        fontSize: "var(--font-size-sm)",
+        textTransform: "uppercase",
+        letterSpacing: "0.055em",
+      }}
+    >
+      {title}
+    </h4>
+  );
+}
+
+function EmptyMiniState({ text }) {
+  return (
+    <div
+      style={{
+        color: "var(--color-text-muted)",
+        fontSize: "var(--font-size-sm)",
+        padding: "var(--spacing-md)",
+        background: "var(--color-bg)",
+        borderRadius: "var(--radius-md)",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function DashboardPanel({ title, subtitle, emptyText, children, viewAllTo = null }) {
   const hasChildren = Children.count(children) > 0;
 
   return (
     <div className="card" style={{ padding: "var(--spacing-lg)" }}>
-      <h3 style={{ margin: 0, fontSize: "var(--font-size-md)", color: "var(--color-dark)" }}>
-        {title}
-      </h3>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--spacing-md)",
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: "var(--font-size-md)", color: "var(--color-dark)" }}>
+          {title}
+        </h3>
+        {viewAllTo ? (
+          <Link
+            to={viewAllTo}
+            style={{
+              color: "var(--color-primary)",
+              fontSize: "var(--font-size-sm)",
+              fontWeight: "var(--font-weight-semibold)",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            View all
+          </Link>
+        ) : null}
+      </div>
       <p
         style={{
           color: "var(--color-text-muted)",
@@ -785,6 +1111,18 @@ function formatCurrencyCompact(value) {
   }
 
   return `${amount.toLocaleString("vi-VN")} đ`;
+}
+
+function formatDecimal(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "0";
+  return amount.toFixed(1);
+}
+
+function truncateText(value, maxLength) {
+  const text = String(value || "").trim();
+  if (text.length <= maxLength) return text || "No comment text";
+  return `${text.slice(0, maxLength - 1).trim()}…`;
 }
 
 function formatRelativeDate(value) {

@@ -97,6 +97,36 @@ export async function getProductById(id) {
   return res.data;
 }
 
+export async function getProductReviews(productId, params = {}) {
+  const res = await api.get(`/products/${productId}/reviews`, { params });
+  return res.data;
+}
+
+export async function getProductReviewSummary(productId) {
+  const res = await api.get(`/products/${productId}/review-summary`);
+  return res.data;
+}
+
+export async function createProductReview(productId, payload) {
+  const res = await api.post(`/products/${productId}/reviews`, payload);
+  return res.data;
+}
+
+export async function createProductReviewUpload(productId, payload) {
+  const res = await api.post(`/products/${productId}/reviews/uploads/presign`, payload);
+  return res.data;
+}
+
+export async function updateProductReview(productId, reviewId, payload) {
+  const res = await api.put(`/products/${productId}/reviews/${reviewId}`, payload);
+  return res.data;
+}
+
+export async function deleteProductReview(productId, reviewId) {
+  const res = await api.delete(`/products/${productId}/reviews/${reviewId}`);
+  return res.data;
+}
+
 export async function getCategories() {
   const res = await api.get("/categories");
   return res.data;

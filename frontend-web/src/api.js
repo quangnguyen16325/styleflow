@@ -102,6 +102,32 @@ class ApiService {
   static async getProductInventoryTransactions(id, params = {}) {
     return client.get(`/admin/products/${id}/inventory-transactions`, { params });
   }
+  static async getProductReviewInsights(id) {
+    return client.get(`/admin/products/${id}/review-insights`);
+  }
+  static async getReviewAiAlerts() {
+    return client.get("/admin/analytics/review-ai-alerts");
+  }
+  static async getReviewAiReport(params = {}) {
+    return client.get("/admin/analytics/review-ai-report", { params });
+  }
+
+  // PRODUCT REVIEWS
+  static async getReviews(params = {}) {
+    const cleanParams = {};
+    Object.entries(params).forEach(([key, value]) => {
+      if (value != null && value !== "" && value !== "ALL") {
+        cleanParams[key] = value;
+      }
+    });
+    return client.get("/admin/reviews", { params: cleanParams });
+  }
+  static async updateReviewStatus(id, payload) {
+    return client.patch(`/admin/reviews/${id}/status`, payload);
+  }
+  static async backfillReviewAi(payload = {}) {
+    return client.post("/admin/reviews/ai-backfill", payload);
+  }
 
   // CATEGORIES
   static async getCategories() {

@@ -40,6 +40,12 @@ const ADMIN_FUNCTIONS = [
     keywords: ["products", "product", "inventory", "stock", "san pham", "ton kho"],
   },
   {
+    label: "Reviews",
+    description: "Moderate product ratings and customer comments",
+    path: "/reviews",
+    keywords: ["reviews", "review", "rating", "comment", "danh gia", "binh luan"],
+  },
+  {
     label: "Create Product",
     description: "Add a new product",
     path: "/products/new",

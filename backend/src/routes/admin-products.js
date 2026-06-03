@@ -33,6 +33,102 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.get("/:id/review-insights", async (req, res) => {
+  const productId = parsePositiveInteger(req.params.id);
+  if (!productId) {
+    return res.status(400).json(validationError("Product id must be a positive integer"));
+  }
+
+  try {
+    const productResult = await pool.query("SELECT id FROM products WHERE id = $1 LIMIT 1", [
+      productId,
+    ]);
+    if (productResult.rows.length === 0) {
+      return res.status(404).json(notFound("Product not found"));
+    }
+
+    const [summaryResult, aspectResult, negativeReviewResult] = await Promise.all([
+      pool.query(
+        `
+          SELECT
+            COUNT(pr.id)::int AS review_count,
+            COUNT(pra.id)::int AS ai_review_count,
+            COALESCE(ROUND(AVG(pr.rating)::numeric, 2), 0) AS rating_average,
+            COUNT(*) FILTER (WHERE pra.overall_label = 'POSITIVE')::int AS positive_count,
+            COUNT(*) FILTER (WHERE pra.overall_label = 'NEGATIVE')::int AS negative_count,
+            COUNT(*) FILTER (WHERE pra.overall_label = 'NEUTRAL')::int AS neutral_count
+          FROM product_reviews pr
+          LEFT JOIN product_review_ai_analysis pra ON pra.review_id = pr.id
+          WHERE pr.product_id = $1
+            AND pr.status = 'visible'
+        `,
+        [productId],
+      ),
+      pool.query(
+        `
+          SELECT
+            aspect_item->>'key' AS aspect_key,
+            aspect_item->>'aspect' AS aspect_name,
+            aspect_item->>'label' AS label,
+            COUNT(*)::int AS count,
+            COALESCE(ROUND(AVG((aspect_item->>'confidence')::numeric), 4), 0) AS avg_confidence
+          FROM product_review_ai_analysis pra
+          JOIN product_reviews pr ON pr.id = pra.review_id
+          CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pra.aspects, '[]'::jsonb)) AS aspect_item
+          WHERE pr.product_id = $1
+            AND pr.status = 'visible'
+            AND aspect_item->>'label' IN ('POSITIVE', 'NEGATIVE', 'NEUTRAL')
+          GROUP BY aspect_key, aspect_name, label
+          ORDER BY count DESC, avg_confidence DESC, aspect_name ASC
+        `,
+        [productId],
+      ),
+      pool.query(
+        `
+          SELECT
+            pr.id,
+            pr.rating,
+            pr.comment,
+            pr.customer_name_snapshot,
+            pr.created_at,
+            pra.overall_label,
+            pra.overall_confidence,
+            pra.aspects
+          FROM product_reviews pr
+          JOIN product_review_ai_analysis pra ON pra.review_id = pr.id
+          WHERE pr.product_id = $1
+            AND pr.status = 'visible'
+            AND pra.overall_label = 'NEGATIVE'
+          ORDER BY pr.created_at DESC, pr.id DESC
+          LIMIT 5
+        `,
+        [productId],
+      ),
+    ]);
+
+    const summary = summaryResult.rows[0] || {};
+
+    return res.json({
+      productId,
+      reviewCount: Number(summary.review_count || 0),
+      aiReviewCount: Number(summary.ai_review_count || 0),
+      ratingAverage: Number(summary.rating_average || 0),
+      sentiment: {
+        positive: Number(summary.positive_count || 0),
+        negative: Number(summary.negative_count || 0),
+        neutral: Number(summary.neutral_count || 0),
+      },
+      topPositiveAspects: mapTopAspects(aspectResult.rows, "POSITIVE"),
+      topNegativeAspects: mapTopAspects(aspectResult.rows, "NEGATIVE"),
+      topNeutralAspects: mapTopAspects(aspectResult.rows, "NEUTRAL"),
+      recentNegativeReviews: negativeReviewResult.rows.map(mapInsightReviewRow),
+    });
+  } catch (error) {
+    console.error(`GET /admin/products/${productId}/review-insights failed:`, error);
+    return res.status(500).json(internalError("Failed to fetch product review insights"));
+  }
+});
+
 router.get("/:id/inventory-transactions", async (req, res) => {
   const productId = parsePositiveInteger(req.params.id);
   if (!productId) {
@@ -562,9 +658,20 @@ const listProductsQuery = `
     p.created_at,
     COALESCE(i.stock_qty, 0) AS stock_qty,
     COALESCE(i.reserved_qty, 0) AS reserved_qty,
-    COALESCE(i.min_stock_level, 0) AS min_stock_level
+    COALESCE(i.min_stock_level, 0) AS min_stock_level,
+    COALESCE(rs.review_count, 0) AS review_count,
+    COALESCE(rs.rating_average, 0) AS rating_average
   FROM products p
   LEFT JOIN inventory i ON i.product_id = p.id
+  LEFT JOIN (
+    SELECT
+      product_id,
+      COUNT(*)::int AS review_count,
+      ROUND(AVG(rating)::numeric, 2) AS rating_average
+    FROM product_reviews
+    WHERE status = 'visible'
+    GROUP BY product_id
+  ) rs ON rs.product_id = p.id
 `;
 
 function validateCreateProductBody(body) {
@@ -799,6 +906,8 @@ function mapAdminProductRow(row) {
     reservedQty: Number(row.reserved_qty),
     availableQty: Number(row.stock_qty) - Number(row.reserved_qty),
     minStockLevel: Number(row.min_stock_level),
+    reviewCount: Number(row.review_count ?? 0),
+    ratingAverage: Number(row.rating_average ?? 0),
     createdAt: row.created_at,
   };
 }
@@ -813,6 +922,36 @@ function mapInventoryTransactionRow(row) {
     referenceId: row.reference_id,
     note: row.note,
     createdAt: row.created_at,
+  };
+}
+
+function mapTopAspects(rows, label) {
+  return rows
+    .filter((row) => row.label === label)
+    .slice(0, 5)
+    .map((row) => ({
+      key: row.aspect_key,
+      aspect: row.aspect_name || row.aspect_key,
+      label: row.label,
+      count: Number(row.count || 0),
+      avgConfidence: Number(row.avg_confidence || 0),
+    }));
+}
+
+function mapInsightReviewRow(row) {
+  return {
+    id: Number(row.id),
+    rating: Number(row.rating),
+    comment: row.comment || "",
+    customerName: row.customer_name_snapshot || null,
+    createdAt: row.created_at,
+    aiAnalysis: {
+      overall: {
+        label: row.overall_label,
+        confidence: Number(row.overall_confidence || 0),
+      },
+      aspects: Array.isArray(row.aspects) ? row.aspects : [],
+    },
   };
 }
 

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
+    "backfill:review-ai": "node src/scripts/backfill-review-ai.js",
     "lint": "eslint .",
     "format": "prettier . --write",
     "format:check": "prettier . --check",

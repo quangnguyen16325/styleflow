@@ -1,6 +1,23 @@
 /* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  SafeAreaView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Image,
+} from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import BankTransferPaymentCard, {
   shouldShowBankTransferPayment,
 } from "../components/BankTransferPaymentCard";
@@ -8,11 +25,15 @@ import MomoPaymentCard, { shouldShowMomoPayment } from "../components/MomoPaymen
 import BackPillButton from "../components/BackPillButton";
 import AppImage from "../components/AppImage";
 import api, {
+  createProductReview,
+  createProductReviewUpload,
   DELIVERY_STATUS_LABEL,
   formatPrice,
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL,
   PAYMENT_GATEWAY_LABEL,
+  uploadFileToSignedUrl,
+  updateProductReview,
 } from "../services/api";
 
 function formatDate(dateString) {
@@ -71,10 +92,11 @@ function Stepper({ currentStep }) {
   );
 }
 
-function OrderItemRow({ item }) {
+function OrderItemRow({ item, canReview, onReview }) {
   const quantity = Number(item.quantity || 0);
   const unitPrice = Number(item.priceAtPurchase || 0);
   const lineTotal = unitPrice * quantity;
+  const hasReview = !!item.review?.id;
 
   return (
     <View style={styles.orderItemRow}>
@@ -94,6 +116,17 @@ function OrderItemRow({ item }) {
           <Text style={styles.orderItemMeta}>Đơn giá: {formatPrice(unitPrice)}</Text>
           <Text style={styles.orderItemMeta}>SL: {quantity}</Text>
         </View>
+        {canReview ? (
+          <TouchableOpacity
+            style={[styles.reviewItemBtn, hasReview && styles.reviewItemBtnDone]}
+            activeOpacity={0.85}
+            onPress={() => onReview(item)}
+          >
+            <Text style={[styles.reviewItemBtnText, hasReview && styles.reviewItemBtnTextDone]}>
+              {hasReview ? "Xem đánh giá" : "Đánh giá sản phẩm"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <View style={styles.orderItemAmountWrap}>
         <Text style={styles.orderItemAmountLabel}>Thành tiền</Text>
@@ -101,6 +134,12 @@ function OrderItemRow({ item }) {
       </View>
     </View>
   );
+}
+
+function canReviewOrder(order) {
+  const orderStatus = String(order?.status || "").toLowerCase();
+  const deliveryStatus = String(order?.deliveryStatus || "").toLowerCase();
+  return orderStatus === "completed" || ["delivered", "returned"].includes(deliveryStatus);
 }
 
 function isApprovedReturn(order) {
@@ -121,10 +160,49 @@ function ApprovedReturnNotice() {
   );
 }
 
+function resolveImageMeta(asset) {
+  const uri = asset?.uri;
+  const mimeType = asset?.mimeType || inferContentTypeFromUri(uri);
+  const fileName = asset?.fileName || `review-${Date.now()}.${extensionFromContentType(mimeType)}`;
+
+  return {
+    uri,
+    mimeType,
+    fileName,
+    publicUrl: null,
+  };
+}
+
+function inferContentTypeFromUri(uri) {
+  const normalized = String(uri || "").toLowerCase();
+  if (normalized.endsWith(".png")) return "image/png";
+  if (normalized.endsWith(".webp")) return "image/webp";
+  if (normalized.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
+function extensionFromContentType(contentType) {
+  switch (contentType) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    default:
+      return "jpeg";
+  }
+}
+
 export default function OrderTrackingScreen({ route, navigation }) {
   const { orderId } = route?.params || {};
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reviewingItem, setReviewingItem] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState([]);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     if (!orderId) {
@@ -157,6 +235,120 @@ export default function OrderTrackingScreen({ route, navigation }) {
   }, [orderId]);
 
   const progressStep = useMemo(() => getProgressStep(order?.status), [order?.status]);
+  const reviewable = useMemo(() => canReviewOrder(order), [order]);
+
+  const openReviewModal = (item) => {
+    setReviewingItem(item);
+    setReviewRating(Number(item.review?.rating || 5));
+    setReviewComment(item.review?.comment || "");
+    setReviewImages(
+      Array.isArray(item.review?.images)
+        ? item.review.images.map((url) => ({ uri: url, publicUrl: url }))
+        : [],
+    );
+  };
+
+  const closeReviewModal = () => {
+    if (submittingReview) return;
+    setReviewingItem(null);
+    setReviewComment("");
+    setReviewRating(5);
+    setReviewImages([]);
+  };
+
+  const handlePickReviewImage = async () => {
+    try {
+      if (reviewImages.length >= 4) {
+        Alert.alert("Giới hạn ảnh", "Bạn có thể gửi tối đa 4 ảnh cho mỗi đánh giá.");
+        return;
+      }
+
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Quyền truy cập", "Vui lòng cấp quyền truy cập thư viện ảnh.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        setReviewImages((current) => [...current, resolveImageMeta(result.assets[0])].slice(0, 4));
+      }
+    } catch (error) {
+      console.warn("Lỗi chọn ảnh đánh giá:", error);
+    }
+  };
+
+  const handleRemoveReviewImage = (index) => {
+    setReviewImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewingItem) return;
+
+    try {
+      setSubmittingReview(true);
+      const uploadedImageUrls = [];
+      for (const image of reviewImages) {
+        if (image.publicUrl) {
+          uploadedImageUrls.push(image.publicUrl);
+          continue;
+        }
+
+        const upload = await createProductReviewUpload(reviewingItem.productId, {
+          orderItemId: reviewingItem.id,
+          fileName: image.fileName,
+          contentType: image.mimeType,
+        });
+        await uploadFileToSignedUrl(upload.uploadUrl, image.uri, image.mimeType);
+        uploadedImageUrls.push(upload.publicUrl);
+      }
+
+      const savedReview = reviewingItem.review?.id
+        ? await updateProductReview(reviewingItem.productId, reviewingItem.review.id, {
+            rating: reviewRating,
+            comment: reviewComment,
+            images: uploadedImageUrls,
+          })
+        : await createProductReview(reviewingItem.productId, {
+            orderItemId: reviewingItem.id,
+            rating: reviewRating,
+            comment: reviewComment,
+            images: uploadedImageUrls,
+          });
+
+      setOrder((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          items: (current.items || []).map((item) =>
+            Number(item.id) === Number(reviewingItem.id) ? { ...item, review: savedReview } : item,
+          ),
+        };
+      });
+      Alert.alert(
+        reviewingItem.review?.id ? "Đã cập nhật đánh giá" : "Đã gửi đánh giá",
+        "Cảm ơn bạn đã đánh giá sản phẩm.",
+      );
+      setReviewingItem(null);
+      setReviewComment("");
+      setReviewRating(5);
+      setReviewImages([]);
+    } catch (error) {
+      const message =
+        error?.code === "CONFLICT"
+          ? "Sản phẩm trong đơn này đã được đánh giá trước đó."
+          : error?.message || "Không thể gửi đánh giá. Vui lòng thử lại.";
+      Alert.alert("Lỗi đánh giá", message);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -251,14 +443,154 @@ export default function OrderTrackingScreen({ route, navigation }) {
           </View>
           {(order.items || []).length > 0 ? (
             (order.items || []).map((item) => (
-              <OrderItemRow key={item.id || `${item.productId}-${item.quantity}`} item={item} />
+              <OrderItemRow
+                key={item.id || `${item.productId}-${item.quantity}`}
+                item={item}
+                canReview={reviewable}
+                onReview={openReviewModal}
+              />
             ))
           ) : (
             <Text style={styles.emptyItemsText}>Đơn hàng chưa có thông tin sản phẩm.</Text>
           )}
         </View>
       </ScrollView>
+
+      <ReviewModal
+        item={reviewingItem}
+        visible={!!reviewingItem}
+        rating={reviewRating}
+        comment={reviewComment}
+        images={reviewImages}
+        submitting={submittingReview}
+        onRatingChange={setReviewRating}
+        onCommentChange={setReviewComment}
+        onPickImage={handlePickReviewImage}
+        onRemoveImage={handleRemoveReviewImage}
+        onClose={closeReviewModal}
+        onSubmit={handleSubmitReview}
+      />
     </SafeAreaView>
+  );
+}
+
+function ReviewModal({
+  visible,
+  item,
+  rating,
+  comment,
+  images,
+  submitting,
+  onRatingChange,
+  onCommentChange,
+  onPickImage,
+  onRemoveImage,
+  onClose,
+  onSubmit,
+}) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Pressable style={styles.modalDismissArea} onPress={Keyboard.dismiss} />
+        <Pressable style={styles.reviewModalSheet} onPress={Keyboard.dismiss}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.reviewModalTitle}>
+            {item?.review?.id ? "Xem và chỉnh sửa đánh giá" : "Đánh giá sản phẩm"}
+          </Text>
+          <Text style={styles.reviewModalProduct} numberOfLines={2}>
+            {item?.name || `Sản phẩm #${item?.productId || ""}`}
+          </Text>
+
+          <View style={styles.reviewStars}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <TouchableOpacity
+                key={star}
+                activeOpacity={0.8}
+                onPress={() => onRatingChange(star)}
+                disabled={submitting}
+              >
+                <Text style={styles.reviewStarText}>{star <= rating ? "★" : "☆"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TextInput
+            style={styles.reviewInput}
+            value={comment}
+            onChangeText={onCommentChange}
+            placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
+            placeholderTextColor="#AA9C8F"
+            multiline
+            maxLength={1000}
+            editable={!submitting}
+            returnKeyType="done"
+            blurOnSubmit
+            onSubmitEditing={Keyboard.dismiss}
+          />
+          <Text style={styles.reviewInputHint}>{comment.length}/1000 ký tự</Text>
+
+          <View style={styles.reviewImageHeader}>
+            <Text style={styles.reviewImageTitle}>Ảnh đánh giá</Text>
+            <TouchableOpacity
+              style={styles.reviewImageAddBtn}
+              onPress={onPickImage}
+              activeOpacity={0.85}
+              disabled={submitting || images.length >= 4}
+            >
+              <Text style={styles.reviewImageAddText}>Thêm ảnh</Text>
+            </TouchableOpacity>
+          </View>
+          {images.length > 0 ? (
+            <View style={styles.reviewImageList}>
+              {images.map((image, index) => (
+                <View key={`${image.uri}-${index}`} style={styles.reviewImageWrap}>
+                  <Image source={{ uri: image.uri }} style={styles.reviewImageThumb} />
+                  <TouchableOpacity
+                    style={styles.reviewImageRemove}
+                    onPress={() => onRemoveImage(index)}
+                    disabled={submitting}
+                  >
+                    <Text style={styles.reviewImageRemoveText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.reviewImageHint}>
+              Có thể thêm tối đa 4 ảnh thực tế của sản phẩm.
+            </Text>
+          )}
+
+          <View style={styles.reviewModalActions}>
+            <TouchableOpacity
+              style={styles.reviewCancelBtn}
+              activeOpacity={0.85}
+              onPress={onClose}
+              disabled={submitting}
+            >
+              <Text style={styles.reviewCancelText}>Đóng</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reviewSubmitBtn, submitting && styles.reviewSubmitBtnDisabled]}
+              activeOpacity={0.85}
+              onPress={onSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#FFFDF9" size="small" />
+              ) : (
+                <Text style={styles.reviewSubmitText}>
+                  {item?.review?.id ? "Lưu đánh giá" : "Gửi đánh giá"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -491,6 +823,25 @@ const styles = StyleSheet.create({
   itemPriceBreakdown: {
     marginTop: 4,
   },
+  reviewItemBtn: {
+    alignSelf: "flex-start",
+    backgroundColor: "#1E1815",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  reviewItemBtnDone: {
+    backgroundColor: "#F5ECE3",
+  },
+  reviewItemBtnText: {
+    color: "#FFFDF9",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  reviewItemBtnTextDone: {
+    color: "#7A685B",
+  },
   orderItemAmountWrap: {
     minWidth: 92,
     alignItems: "flex-end",
@@ -518,5 +869,162 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     marginBottom: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(24, 18, 14, 0.34)",
+  },
+  modalDismissArea: {
+    flex: 1,
+  },
+  reviewModalSheet: {
+    backgroundColor: "#FCF9F4",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 30,
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D3C4B6",
+    marginBottom: 14,
+  },
+  reviewModalTitle: {
+    color: "#1E1815",
+    fontSize: 21,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  reviewModalProduct: {
+    color: "#76675B",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  reviewStars: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  reviewStarText: {
+    color: "#D99152",
+    fontSize: 34,
+    fontWeight: "900",
+    marginRight: 7,
+  },
+  reviewInput: {
+    minHeight: 116,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E6DBCE",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#1E1815",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: "top",
+  },
+  reviewInputHint: {
+    color: "#AA9C8F",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+    marginTop: 8,
+  },
+  reviewImageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  reviewImageTitle: {
+    color: "#1E1815",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  reviewImageAddBtn: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#F5ECE3",
+  },
+  reviewImageAddText: {
+    color: "#9B4B1F",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  reviewImageList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  reviewImageWrap: {
+    position: "relative",
+  },
+  reviewImageThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    backgroundColor: "#EFE8E0",
+  },
+  reviewImageRemove: {
+    position: "absolute",
+    top: -7,
+    right: -7,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#1E1815",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewImageRemoveText: {
+    color: "#FFFDF9",
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "900",
+  },
+  reviewImageHint: {
+    color: "#AA9C8F",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  reviewModalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  reviewCancelBtn: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: "#F5ECE3",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  reviewCancelText: {
+    color: "#7A685B",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  reviewSubmitBtn: {
+    flex: 1.3,
+    borderRadius: 16,
+    backgroundColor: "#1E1815",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  reviewSubmitBtnDisabled: {
+    opacity: 0.65,
+  },
+  reviewSubmitText: {
+    color: "#FFFDF9",
+    fontSize: 14,
+    fontWeight: "800",
   },
 });

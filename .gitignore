@@ -9,6 +9,8 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+__pycache__/
+*.py[cod]
 
 # OS/Editor
 .DS_Store
@@ -32,6 +34,10 @@ mobile-app/web-build/
 # Docker local volumes/data
 *.pid
 n8n_data/
+
+# Local AI model artifacts are too large for normal git; upload/sync them to servers separately.
+ai/saved_model_stage1/
+ai/saved_model_stage2/
 
 
 .agents/

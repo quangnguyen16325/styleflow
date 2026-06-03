@@ -22,6 +22,7 @@ import ProfileScreen from "../screens/ProfileScreen";
 // Screens — Stack children
 import ProductListScreen from "../screens/ProductListScreen";
 import ProductDetailScreen from "../screens/ProductDetailScreen";
+import ProductReviewsScreen from "../screens/ProductReviewsScreen";
 import CheckoutScreen from "../screens/CheckoutScreen";
 import SuccessScreen from "../screens/SuccessScreen";
 import OrderScreen from "../screens/OrderScreen";
@@ -133,6 +134,15 @@ function MainAppStack() {
         options={() => ({
           headerShown: true,
           title: "Chi tiết",
+          ...createStackScreenOptions(),
+        })}
+      />
+      <Stack.Screen
+        name="ProductReviews"
+        component={ProductReviewsScreen}
+        options={() => ({
+          headerShown: true,
+          title: "Đánh giá sản phẩm",
           ...createStackScreenOptions(),
         })}
       />

@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Package,
   Receipt,
+  Star,
   ShoppingCart,
   Tags,
   Truck,
@@ -17,6 +18,7 @@ import { getPortalRoleConfig, getStoredAdminUser, normalizeRole } from "../../ut
 const adminMenuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/products", label: "Inventory", icon: Package },
+  { to: "/reviews", label: "Reviews", icon: Star },
   { to: "/categories", label: "Categories", icon: Tags },
   { to: "/orders", label: "Orders", icon: ShoppingCart },
   { to: "/users", label: "Users", icon: Users },
@@ -33,6 +35,7 @@ const staffMenuItems = [
   { to: "/issues", label: "Issues", icon: AlertTriangle },
   { to: "/refund-requests", label: "Refunds", icon: Receipt },
   { to: "/products", label: "Inventory", icon: Package },
+  { to: "/reviews", label: "Reviews", icon: Star },
   { to: "/categories", label: "Categories", icon: Tags },
 ];
 
