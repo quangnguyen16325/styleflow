@@ -253,6 +253,26 @@ CREATE TABLE IF NOT EXISTS product_reviews (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS product_review_ai_analysis (
+  id BIGSERIAL PRIMARY KEY,
+  review_id BIGINT NOT NULL UNIQUE REFERENCES product_reviews(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  overall_label VARCHAR(30) NOT NULL,
+  overall_confidence NUMERIC(6, 4) NOT NULL DEFAULT 0,
+  aspects JSONB NOT NULL DEFAULT '[]'::jsonb,
+  model_version VARCHAR(120),
+  raw_response JSONB NOT NULL DEFAULT '{}'::jsonb,
+  analyzed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_review_ai_analysis_product
+ON product_review_ai_analysis(product_id);
+
+CREATE INDEX IF NOT EXISTS idx_product_review_ai_analysis_overall
+ON product_review_ai_analysis(overall_label);
+
 ALTER TABLE customers
 ADD COLUMN IF NOT EXISTS password_hash TEXT;
 

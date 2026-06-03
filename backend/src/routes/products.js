@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { requireAuth } from "../middleware/require-auth.js";
+import { analyzeAndStoreProductReview } from "../services/review-ai.js";
 import {
   createReviewImageUploadUrl,
   getR2Config,
@@ -221,6 +222,8 @@ router.post("/:id/reviews", requireAuth, async (req, res) => {
       ],
     );
 
+    await analyzeAndStoreProductReview(rows[0]);
+
     return res.status(201).json(mapReviewRow(rows[0], { includePrivate: true }));
   } catch (error) {
     if (error?.code === "23505") {
@@ -279,6 +282,8 @@ router.put("/:productId/reviews/:reviewId", requireAuth, async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json(notFound("Review not found"));
     }
+
+    await analyzeAndStoreProductReview(rows[0]);
 
     return res.json(mapReviewRow(rows[0], { includePrivate: true }));
   } catch (error) {
