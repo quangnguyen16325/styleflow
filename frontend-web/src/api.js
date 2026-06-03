@@ -102,6 +102,9 @@ class ApiService {
   static async getProductInventoryTransactions(id, params = {}) {
     return client.get(`/admin/products/${id}/inventory-transactions`, { params });
   }
+  static async getProductReviewInsights(id) {
+    return client.get(`/admin/products/${id}/review-insights`);
+  }
 
   // PRODUCT REVIEWS
   static async getReviews(params = {}) {

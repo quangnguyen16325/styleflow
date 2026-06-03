@@ -56,6 +56,7 @@ export default function ProductDetails() {
   const [stockInSubmitting, setStockInSubmitting] = useState(false);
   const [stockInError, setStockInError] = useState("");
   const [stockInSuccess, setStockInSuccess] = useState("");
+  const [reviewInsights, setReviewInsights] = useState(null);
   const fileInputRef = useRef(null);
 
   const loadProductDetails = useCallback(
@@ -64,17 +65,19 @@ export default function ProductDetails() {
         setLoading(true);
       }
 
-      const [productData, transactionData] = await Promise.all([
+      const [productData, transactionData, reviewInsightData] = await Promise.all([
         ApiService.getProduct(id),
         ApiService.getProductInventoryTransactions(id, {
           limit: INVENTORY_LOG_PAGE_SIZE,
           offset: 0,
         }),
+        ApiService.getProductReviewInsights(id),
       ]);
 
       setProduct(productData);
       setInventoryTransactions(Array.isArray(transactionData?.items) ? transactionData.items : []);
       setInventoryTransactionTotal(Number(transactionData?.total ?? 0));
+      setReviewInsights(reviewInsightData);
       setError(null);
     },
     [id],
@@ -574,6 +577,167 @@ export default function ProductDetails() {
         </div>
       </div>
 
+      {/* AI Review Insights */}
+      <div
+        className="card"
+        style={{ padding: "var(--spacing-xl)", marginBottom: "var(--spacing-xl)" }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "var(--spacing-md)",
+            alignItems: "flex-start",
+            marginBottom: "var(--spacing-md)",
+            borderBottom: "1px solid var(--color-border)",
+            paddingBottom: "var(--spacing-sm)",
+          }}
+        >
+          <div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "var(--font-size-md)",
+                fontWeight: "var(--font-weight-semibold)",
+              }}
+            >
+              AI Review Insights
+            </h3>
+            <p
+              style={{
+                margin: "var(--spacing-xs) 0 0 0",
+                color: "var(--color-text-muted)",
+                fontSize: "var(--font-size-sm)",
+              }}
+            >
+              Summary from visible customer reviews analyzed by the AI sentiment service.
+            </p>
+          </div>
+          <Link
+            to={`/reviews?productId=${product.id}`}
+            className="link"
+            style={{ fontSize: "var(--font-size-sm)" }}
+          >
+            View reviews
+          </Link>
+        </div>
+
+        {!reviewInsights || reviewInsights.aiReviewCount === 0 ? (
+          <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+            No AI-analyzed review is available for this product yet.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: "var(--spacing-lg)" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "var(--spacing-md)",
+              }}
+            >
+              <InsightMetric
+                label="AI Reviews"
+                value={`${reviewInsights.aiReviewCount}/${reviewInsights.reviewCount}`}
+                helper="analyzed / visible"
+              />
+              <InsightMetric
+                label="Positive"
+                value={formatPercent(
+                  reviewInsights.sentiment?.positive,
+                  reviewInsights.aiReviewCount,
+                )}
+                helper={`${reviewInsights.sentiment?.positive || 0} reviews`}
+                tone="positive"
+              />
+              <InsightMetric
+                label="Negative"
+                value={formatPercent(
+                  reviewInsights.sentiment?.negative,
+                  reviewInsights.aiReviewCount,
+                )}
+                helper={`${reviewInsights.sentiment?.negative || 0} reviews`}
+                tone="negative"
+              />
+              <InsightMetric
+                label="Avg Rating"
+                value={Number(reviewInsights.ratingAverage || 0).toFixed(1)}
+                helper="visible reviews"
+              />
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "var(--spacing-md)",
+              }}
+            >
+              <AspectInsightList
+                title="Praised Aspects"
+                emptyText="No positive aspect detected."
+                aspects={reviewInsights.topPositiveAspects}
+                tone="positive"
+              />
+              <AspectInsightList
+                title="Needs Attention"
+                emptyText="No negative aspect detected."
+                aspects={reviewInsights.topNegativeAspects}
+                tone="negative"
+              />
+            </div>
+
+            {Array.isArray(reviewInsights.recentNegativeReviews) &&
+            reviewInsights.recentNegativeReviews.length > 0 ? (
+              <div>
+                <h4
+                  style={{
+                    margin: "0 0 var(--spacing-sm) 0",
+                    fontSize: "var(--font-size-sm)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    color: "var(--color-dark)",
+                  }}
+                >
+                  Recent Negative Reviews
+                </h4>
+                <div style={{ display: "grid", gap: "var(--spacing-sm)" }}>
+                  {reviewInsights.recentNegativeReviews.map((review) => (
+                    <div
+                      key={review.id}
+                      style={{
+                        border: "1px solid var(--color-border)",
+                        borderRadius: "var(--radius-md)",
+                        padding: "var(--spacing-md)",
+                        background: "var(--color-bg)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: "var(--spacing-sm)",
+                          marginBottom: "var(--spacing-xs)",
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--font-size-xs)",
+                        }}
+                      >
+                        <span>
+                          #{review.id} · {review.customerName || "Customer"} · {review.rating}★
+                        </span>
+                        <span>{formatDateTime(review.createdAt)}</span>
+                      </div>
+                      <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-dark)" }}>
+                        {review.comment || "—"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+
       {/* Inventory Metrics */}
       <h3
         style={{
@@ -871,4 +1035,116 @@ function formatSignedQuantity(value) {
   const quantity = Number(value);
   if (!Number.isFinite(quantity)) return "—";
   return quantity > 0 ? `+${quantity.toLocaleString("vi-VN")}` : quantity.toLocaleString("vi-VN");
+}
+
+function InsightMetric({ label, value, helper, tone = "default" }) {
+  const colors = {
+    positive: { bg: "#E6F4EA", color: "#1F7A3F" },
+    negative: { bg: "#FDE8E8", color: "#B42318" },
+    default: { bg: "var(--color-bg)", color: "var(--color-dark)" },
+  };
+  const color = colors[tone] || colors.default;
+
+  return (
+    <div
+      style={{
+        padding: "var(--spacing-md)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-md)",
+        background: color.bg,
+      }}
+    >
+      <div
+        style={{
+          color: "var(--color-text-secondary)",
+          fontSize: "var(--font-size-xs)",
+          textTransform: "uppercase",
+          fontWeight: "var(--font-weight-semibold)",
+          letterSpacing: "0.4px",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          marginTop: "var(--spacing-xs)",
+          color: color.color,
+          fontSize: "24px",
+          fontWeight: "var(--font-weight-bold)",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}>
+        {helper}
+      </div>
+    </div>
+  );
+}
+
+function AspectInsightList({ title, aspects, emptyText, tone }) {
+  const hasAspects = Array.isArray(aspects) && aspects.length > 0;
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-md)",
+        padding: "var(--spacing-md)",
+      }}
+    >
+      <h4
+        style={{
+          margin: "0 0 var(--spacing-sm) 0",
+          fontSize: "var(--font-size-sm)",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          color: "var(--color-dark)",
+        }}
+      >
+        {title}
+      </h4>
+      {!hasAspects ? (
+        <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+          {emptyText}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          {aspects.map((aspect) => (
+            <span
+              key={`${aspect.key}-${aspect.label}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 10px",
+                borderRadius: "999px",
+                background: tone === "negative" ? "#FDE8E8" : "#E6F4EA",
+                color: tone === "negative" ? "#B42318" : "#1F7A3F",
+                fontSize: "var(--font-size-xs)",
+                fontWeight: "var(--font-weight-semibold)",
+              }}
+            >
+              {aspect.aspect || formatAiLabel(aspect.key)}
+              <span style={{ opacity: 0.75 }}>×{aspect.count}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatPercent(value, total) {
+  const numerator = Number(value || 0);
+  const denominator = Number(total || 0);
+  if (!denominator) return "0%";
+  return `${Math.round((numerator / denominator) * 100)}%`;
+}
+
+function formatAiLabel(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }

@@ -52,6 +52,7 @@ export default function ReviewList() {
     searchParams.get("aiAspectLabel"),
     AI_ASPECT_LABEL_VALUES,
   );
+  const productIdFilter = normalizePositiveInteger(searchParams.get("productId"));
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -68,6 +69,7 @@ export default function ReviewList() {
       aiOverall: aiOverallFilter !== "ALL" ? aiOverallFilter : undefined,
       aiAspect: aiAspectFilter !== "ALL" ? aiAspectFilter : undefined,
       aiAspectLabel: aiAspectLabelFilter !== "ALL" ? aiAspectLabelFilter : undefined,
+      productId: productIdFilter || undefined,
       limit: 100,
     })
       .then((data) => {
@@ -75,7 +77,7 @@ export default function ReviewList() {
       })
       .catch((err) => setError(err))
       .finally(() => setLoading(false));
-  }, [aiAspectFilter, aiAspectLabelFilter, aiOverallFilter, statusFilter]);
+  }, [aiAspectFilter, aiAspectLabelFilter, aiOverallFilter, productIdFilter, statusFilter]);
 
   useEffect(() => {
     fetchReviews();
@@ -152,6 +154,7 @@ export default function ReviewList() {
           <h2>Product Reviews</h2>
           <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>
             {reviews.length} reviews · {visibleCount} visible
+            {productIdFilter ? ` · product #${productIdFilter}` : ""}
           </span>
         </div>
         <button
@@ -455,6 +458,11 @@ function normalizeFilterValue(value, allowedValues) {
   const normalized = value.trim().toLowerCase();
   const matchedValue = allowedValues.find((allowed) => allowed.toLowerCase() === normalized);
   return matchedValue || "ALL";
+}
+
+function normalizePositiveInteger(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function formatAiLabel(label) {
