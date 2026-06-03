@@ -26,6 +26,53 @@ const DELIVERY_SORT_PRIORITY = {
   returned: 5,
 };
 
+const SHIPPER_QUEUE_FILTERS = [
+  {
+    value: "work",
+    title: "Need action",
+    description: "Active, retry and return pickup",
+    tone: "warning",
+  },
+  {
+    value: "all",
+    title: "All deliveries",
+    description: "Everything assigned to you",
+    tone: "default",
+  },
+  {
+    value: "retry",
+    title: "Need retry",
+    description: "Failed deliveries to try again",
+    tone: "warning",
+  },
+  {
+    value: "pickup",
+    title: "Return pickup",
+    description: "Approved returns to collect",
+    tone: "success",
+  },
+  {
+    value: "active",
+    title: "Active route",
+    description: "Handover, ready or in transit",
+    tone: "info",
+  },
+  {
+    value: "done",
+    title: "Done",
+    description: "Delivered or returned",
+    tone: "default",
+  },
+];
+
+const DELIVERY_FAILURE_REASONS = [
+  "Khách không nghe máy",
+  "Sai hoặc thiếu địa chỉ",
+  "Khách hẹn giao lại sau",
+  "Khách từ chối nhận hàng",
+  "Khách chưa bàn giao hàng trả",
+];
+
 function getDeliverySortPriority(order) {
   const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
   const refundStatus = String(order.latestRefundRequestStatus || "").toLowerCase();
@@ -87,11 +134,13 @@ function getDeliveryLockMessage(order, availableStatuses) {
 export default function ShipperDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get("q") || "";
+  const queueFilter = normalizeQueueFilter(searchParams.get("queue"));
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [deliveryReasons, setDeliveryReasons] = useState({});
+  const [copiedOrderId, setCopiedOrderId] = useState(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -112,9 +161,11 @@ export default function ShipperDashboard() {
 
   const sortedOrders = useMemo(() => {
     const term = normalizeSearchText(searchTerm);
-    const filteredOrders = term
-      ? orders.filter((order) => matchesDeliverySearch(order, term))
-      : orders;
+    const filteredOrders = orders.filter((order) => {
+      const matchesQueue = queueFilter === "all" || matchesShipperQueue(order, queueFilter);
+      const matchesSearch = term ? matchesDeliverySearch(order, term) : true;
+      return matchesQueue && matchesSearch;
+    });
 
     return [...filteredOrders].sort((a, b) => {
       const aPriority = getDeliverySortPriority(a);
@@ -126,9 +177,18 @@ export default function ShipperDashboard() {
 
       return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
     });
-  }, [orders, searchTerm]);
+  }, [orders, queueFilter, searchTerm]);
 
+  const queueCounts = useMemo(() => buildShipperQueueCounts(orders), [orders]);
   const updateDeliveryStatus = async (orderId, status) => {
+    const order = orders.find((currentOrder) => currentOrder.id === orderId);
+    if (status === "DELIVERED" && getShipperCollectionAmount(order) > 0) {
+      const confirmed = window.confirm(
+        `Confirm COD collection for order #${orderId}: ${formatShipperCollectionAmount(order)}?`,
+      );
+      if (!confirmed) return;
+    }
+
     try {
       setUpdatingOrderId(orderId);
       setError(null);
@@ -144,6 +204,23 @@ export default function ShipperDashboard() {
       setError(err);
     } finally {
       setUpdatingOrderId(null);
+    }
+  };
+
+  const setPresetReason = (orderId, reason) => {
+    setDeliveryReasons((current) => ({ ...current, [orderId]: reason }));
+  };
+
+  const copyAddress = async (order) => {
+    const address = order.shipping?.fullAddress || "";
+    if (!address.trim()) return;
+
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedOrderId(order.id);
+      window.setTimeout(() => setCopiedOrderId(null), 1600);
+    } catch {
+      setError(new Error("Unable to copy address. Please copy it manually."));
     }
   };
 
@@ -166,6 +243,18 @@ export default function ShipperDashboard() {
     setSearchParams(nextParams, { replace: true });
   };
 
+  const handleQueueFilterChange = (nextQueue) => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (nextQueue === "work") {
+      nextParams.delete("queue");
+    } else {
+      nextParams.set("queue", nextQueue);
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
   if (loading) return <LoadingSpinner message="Loading your deliveries..." />;
 
   return (
@@ -176,8 +265,71 @@ export default function ShipperDashboard() {
           <p className="page-subtitle">
             Orders assigned to you. Update delivery status after each real delivery event.
             {searchTerm ? ` Showing matches for "${searchTerm}".` : ""}
+            {queueFilter !== "work" ? ` Filtered by ${formatQueueFilterLabel(queueFilter)}.` : ""}
           </p>
         </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: "var(--spacing-md)",
+          marginBottom: "var(--spacing-lg)",
+        }}
+      >
+        {SHIPPER_QUEUE_FILTERS.map((filter) => (
+          <button
+            key={filter.value}
+            type="button"
+            onClick={() => handleQueueFilterChange(filter.value)}
+            style={{
+              textAlign: "left",
+              padding: "var(--spacing-md)",
+              borderRadius: "var(--radius-lg)",
+              border:
+                queueFilter === filter.value
+                  ? "2px solid var(--color-primary)"
+                  : "1px solid var(--color-border-light)",
+              background: getQueueFilterBackground(filter.tone, queueFilter === filter.value),
+              boxShadow: queueFilter === filter.value ? "var(--shadow-md)" : "var(--shadow-sm)",
+              cursor: "pointer",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "var(--spacing-sm)",
+                alignItems: "flex-start",
+                marginBottom: 6,
+              }}
+            >
+              <span
+                style={{
+                  color: "var(--color-dark)",
+                  fontSize: "var(--font-size-sm)",
+                  fontWeight: "var(--font-weight-bold)",
+                }}
+              >
+                {filter.title}
+              </span>
+              <span
+                style={{
+                  color: getQueueFilterColor(filter.tone),
+                  fontSize: "var(--font-size-xl)",
+                  fontWeight: 900,
+                  lineHeight: 1,
+                }}
+              >
+                {queueCounts[filter.value] ?? 0}
+              </span>
+            </div>
+            <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}>
+              {filter.description}
+            </div>
+          </button>
+        ))}
       </div>
 
       <div
@@ -204,6 +356,15 @@ export default function ShipperDashboard() {
             Clear
           </button>
         ) : null}
+        {queueFilter !== "work" ? (
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => handleQueueFilterChange("work")}
+          >
+            Clear filter
+          </button>
+        ) : null}
       </div>
 
       {error && (
@@ -215,11 +376,19 @@ export default function ShipperDashboard() {
       {sortedOrders.length === 0 ? (
         <div className="card" style={{ padding: "var(--spacing-xl)" }}>
           <EmptyState
-            title={searchTerm ? "No Deliveries Found" : "No Assigned Orders"}
+            title={
+              searchTerm
+                ? "No Deliveries Found"
+                : queueFilter === "work"
+                  ? "No Orders Need Action"
+                  : "No Assigned Orders"
+            }
             description={
               searchTerm
-                ? "No assigned deliveries match your current search."
-                : "You do not have delivery orders assigned right now."
+                ? "No assigned deliveries match your current search/filter."
+                : queueFilter === "work"
+                  ? "Returned and completed orders are hidden by default. Use All deliveries or Done to review old orders."
+                  : "You do not have delivery orders assigned right now."
             }
           />
         </div>
@@ -232,6 +401,9 @@ export default function ShipperDashboard() {
                 const deliveryLockMessage = getDeliveryLockMessage(order, availableStatuses);
                 const isDeliveryLocked = availableStatuses.length === 0;
                 const collectionAmount = getShipperCollectionAmount(order);
+                const phone = order.shipping?.receiverPhone || "";
+                const address = order.shipping?.fullAddress || "";
+                const mapsUrl = buildMapUrl(address);
 
                 return (
                   <>
@@ -305,17 +477,50 @@ export default function ShipperDashboard() {
                       <InfoRow label="Last fail" value={order.lastDeliveryFailedReason} />
                     ) : null}
 
-                    <Link
-                      to={`/shipper/orders/${order.id}`}
-                      className="btn-secondary btn-sm"
+                    <div
                       style={{
-                        display: "inline-flex",
+                        display: "flex",
+                        gap: "var(--spacing-sm)",
+                        flexWrap: "wrap",
                         marginTop: "var(--spacing-sm)",
-                        textDecoration: "none",
                       }}
                     >
-                      View order details
-                    </Link>
+                      <Link
+                        to={`/shipper/orders/${order.id}`}
+                        className="btn-secondary btn-sm"
+                        style={{ display: "inline-flex", textDecoration: "none" }}
+                      >
+                        View order details
+                      </Link>
+                      {phone ? (
+                        <a
+                          href={`tel:${phone}`}
+                          className="btn-secondary btn-sm"
+                          style={{ textDecoration: "none" }}
+                        >
+                          Call customer
+                        </a>
+                      ) : null}
+                      {mapsUrl ? (
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-secondary btn-sm"
+                          style={{ textDecoration: "none" }}
+                        >
+                          Open map
+                        </a>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn-secondary btn-sm"
+                        onClick={() => copyAddress(order)}
+                        disabled={!address}
+                      >
+                        {copiedOrderId === order.id ? "Copied" : "Copy address"}
+                      </button>
+                    </div>
 
                     <div style={{ marginTop: "var(--spacing-md)" }}>
                       {deliveryLockMessage ? (
@@ -331,6 +536,30 @@ export default function ShipperDashboard() {
                           {deliveryLockMessage}
                         </div>
                       ) : null}
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "var(--spacing-xs)",
+                          marginBottom: "var(--spacing-sm)",
+                        }}
+                      >
+                        {DELIVERY_FAILURE_REASONS.map((reason) => (
+                          <button
+                            key={reason}
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            onClick={() => setPresetReason(order.id, reason)}
+                            disabled={updatingOrderId === order.id || isDeliveryLocked}
+                            style={{
+                              padding: "5px 9px",
+                              fontSize: "var(--font-size-xs)",
+                            }}
+                          >
+                            {reason}
+                          </button>
+                        ))}
+                      </div>
                       <textarea
                         className="form-input"
                         value={deliveryReasons[order.id] || ""}
@@ -422,7 +651,108 @@ function shouldShowReturnPickupBadge(order) {
   return refundStatus === "approved" && deliveryStatus !== "returned";
 }
 
+function buildShipperQueueCounts(orders) {
+  const counts = {
+    work: 0,
+    all: Array.isArray(orders) ? orders.length : 0,
+    retry: 0,
+    pickup: 0,
+    active: 0,
+    done: 0,
+  };
+
+  if (!Array.isArray(orders)) {
+    return counts;
+  }
+
+  orders.forEach((order) => {
+    if (matchesShipperQueue(order, "work")) counts.work += 1;
+    if (matchesShipperQueue(order, "retry")) counts.retry += 1;
+    if (matchesShipperQueue(order, "pickup")) counts.pickup += 1;
+    if (matchesShipperQueue(order, "active")) counts.active += 1;
+    if (matchesShipperQueue(order, "done")) counts.done += 1;
+  });
+
+  return counts;
+}
+
+function matchesShipperQueue(order, queue) {
+  const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
+  const deliveryFailCount = Number(order.deliveryFailCount || 0);
+  const isReturnPickup = shouldShowReturnPickupBadge(order);
+
+  if (queue === "retry") {
+    return (
+      ["retry_pending", "delivery_failed", "failed"].includes(deliveryStatus) ||
+      (deliveryFailCount > 0 && !["returning", "returned", "delivered"].includes(deliveryStatus))
+    );
+  }
+
+  if (queue === "pickup") {
+    return isReturnPickup;
+  }
+
+  if (queue === "work") {
+    return (
+      isReturnPickup ||
+      matchesShipperQueue(order, "retry") ||
+      ["handover", "ready_to_ship", "in_transit"].includes(deliveryStatus)
+    );
+  }
+
+  if (queue === "active") {
+    return !isReturnPickup && ["handover", "ready_to_ship", "in_transit"].includes(deliveryStatus);
+  }
+
+  if (queue === "done") {
+    return !isReturnPickup && ["delivered", "returned"].includes(deliveryStatus);
+  }
+
+  return true;
+}
+
+function normalizeQueueFilter(value) {
+  const normalized = String(value || "work")
+    .trim()
+    .toLowerCase();
+  return SHIPPER_QUEUE_FILTERS.some((filter) => filter.value === normalized) ? normalized : "work";
+}
+
+function formatQueueFilterLabel(value) {
+  return SHIPPER_QUEUE_FILTERS.find((filter) => filter.value === value)?.title || "deliveries";
+}
+
+function getQueueFilterBackground(tone, active) {
+  if (active) {
+    return "linear-gradient(135deg, #fff8f1, #ffffff)";
+  }
+
+  const backgrounds = {
+    warning: "var(--color-warning-light)",
+    success: "var(--color-success-light)",
+    info: "var(--color-info-light)",
+    default: "#fff",
+  };
+
+  return backgrounds[tone] || backgrounds.default;
+}
+
+function getQueueFilterColor(tone) {
+  const colors = {
+    warning: "var(--color-warning)",
+    success: "var(--color-success)",
+    info: "var(--color-info)",
+    default: "var(--color-dark)",
+  };
+
+  return colors[tone] || colors.default;
+}
+
 function getShipperCollectionAmount(order) {
+  if (!order) {
+    return 0;
+  }
+
   const paymentGateway = String(order.paymentGateway || "").toUpperCase();
   const paymentStatus = String(order.paymentStatus || "").toLowerCase();
   const deliveryStatus = String(order.deliveryStatus || "").toLowerCase();
@@ -441,6 +771,12 @@ function getShipperCollectionAmount(order) {
 
   const amount = Number(order.totalAmount);
   return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function buildMapUrl(address) {
+  const normalizedAddress = String(address || "").trim();
+  if (!normalizedAddress) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(normalizedAddress)}`;
 }
 
 function formatShipperCollectionAmount(order) {
