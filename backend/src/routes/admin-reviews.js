@@ -3,6 +3,8 @@ import { pool } from "../db/pool.js";
 
 const router = Router();
 const REVIEW_STATUSES = new Set(["visible", "hidden", "deleted"]);
+const AI_LABELS = new Set(["POSITIVE", "NEGATIVE", "NEUTRAL", "NO_ASPECT"]);
+const AI_ASPECT_KEYS = new Set(["material", "design", "price", "service", "general"]);
 
 router.get("/", async (req, res) => {
   const status = normalizeStatusFilter(req.query.status);
@@ -30,6 +32,46 @@ router.get("/", async (req, res) => {
     conditions.push(`pr.product_id = $${params.length}`);
   }
 
+  const aiOverall = normalizeAiLabelFilter(req.query.aiOverall);
+  if (req.query.aiOverall != null && !aiOverall) {
+    return res.status(400).json(validationError("Invalid AI overall filter"));
+  }
+
+  if (aiOverall) {
+    params.push(aiOverall);
+    conditions.push(`pra.overall_label = $${params.length}`);
+  }
+
+  const aiAspect = normalizeAiAspectFilter(req.query.aiAspect);
+  if (req.query.aiAspect != null && !aiAspect) {
+    return res.status(400).json(validationError("Invalid AI aspect filter"));
+  }
+
+  const aiAspectLabel = normalizeAiLabelFilter(req.query.aiAspectLabel);
+  if (req.query.aiAspectLabel != null && !aiAspectLabel) {
+    return res.status(400).json(validationError("Invalid AI aspect label filter"));
+  }
+
+  if (aiAspect || aiAspectLabel) {
+    const aspectConditions = [];
+    if (aiAspect) {
+      params.push(aiAspect);
+      aspectConditions.push(`aspect_item->>'key' = $${params.length}`);
+    }
+    if (aiAspectLabel) {
+      params.push(aiAspectLabel);
+      aspectConditions.push(`aspect_item->>'label' = $${params.length}`);
+    }
+
+    conditions.push(`
+      EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(COALESCE(pra.aspects, '[]'::jsonb)) AS aspect_item
+        WHERE ${aspectConditions.join(" AND ")}
+      )
+    `);
+  }
+
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   try {
@@ -54,10 +96,16 @@ router.get("/", async (req, res) => {
           pr.product_name_snapshot,
           pr.created_at,
           pr.updated_at,
+          pra.overall_label AS ai_overall_label,
+          pra.overall_confidence AS ai_overall_confidence,
+          pra.aspects AS ai_aspects,
+          pra.model_version AS ai_model_version,
+          pra.analyzed_at AS ai_analyzed_at,
           p.name AS product_name,
           c.full_name AS customer_name,
           c.email AS customer_email
         FROM product_reviews pr
+        LEFT JOIN product_review_ai_analysis pra ON pra.review_id = pr.id
         JOIN products p ON p.id = pr.product_id
         JOIN customers c ON c.id = pr.customer_id
         ${whereClause}
@@ -72,6 +120,7 @@ router.get("/", async (req, res) => {
       `
         SELECT COUNT(*)::int AS total
         FROM product_reviews pr
+        LEFT JOIN product_review_ai_analysis pra ON pra.review_id = pr.id
         ${whereClause}
       `,
       countParams,
@@ -147,6 +196,17 @@ function mapAdminReviewRow(row) {
     productName: row.product_name_snapshot || row.product_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    aiAnalysis: row.ai_overall_label
+      ? {
+          overall: {
+            label: row.ai_overall_label,
+            confidence: Number(row.ai_overall_confidence || 0),
+          },
+          aspects: Array.isArray(row.ai_aspects) ? row.ai_aspects : [],
+          modelVersion: row.ai_model_version,
+          analyzedAt: row.ai_analyzed_at,
+        }
+      : null,
   };
 }
 
@@ -157,6 +217,24 @@ function normalizeStatusFilter(value) {
 
   const normalized = value.trim().toLowerCase();
   return REVIEW_STATUSES.has(normalized) ? normalized : null;
+}
+
+function normalizeAiLabelFilter(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+  return AI_LABELS.has(normalized) ? normalized : null;
+}
+
+function normalizeAiAspectFilter(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return AI_ASPECT_KEYS.has(normalized) ? normalized : null;
 }
 
 function parsePositiveInteger(value) {

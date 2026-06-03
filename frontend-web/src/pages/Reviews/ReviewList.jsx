@@ -15,9 +15,43 @@ const REVIEW_STATUSES = [
 
 const STATUS_VALUES = REVIEW_STATUSES.map((status) => status.value);
 
+const AI_OVERALL_OPTIONS = [
+  { value: "ALL", label: "All AI Sentiments" },
+  { value: "POSITIVE", label: "AI Positive" },
+  { value: "NEGATIVE", label: "AI Negative" },
+  { value: "NEUTRAL", label: "AI Neutral" },
+];
+
+const AI_ASPECT_OPTIONS = [
+  { value: "ALL", label: "All Aspects" },
+  { value: "material", label: "Material" },
+  { value: "design", label: "Design" },
+  { value: "price", label: "Price" },
+  { value: "service", label: "Service" },
+  { value: "general", label: "General" },
+];
+
+const AI_ASPECT_LABEL_OPTIONS = [
+  { value: "ALL", label: "All Aspect Labels" },
+  { value: "POSITIVE", label: "Aspect Positive" },
+  { value: "NEGATIVE", label: "Aspect Negative" },
+  { value: "NEUTRAL", label: "Aspect Neutral" },
+  { value: "NO_ASPECT", label: "No Aspect" },
+];
+
+const AI_OVERALL_VALUES = AI_OVERALL_OPTIONS.map((option) => option.value);
+const AI_ASPECT_VALUES = AI_ASPECT_OPTIONS.map((option) => option.value);
+const AI_ASPECT_LABEL_VALUES = AI_ASPECT_LABEL_OPTIONS.map((option) => option.value);
+
 export default function ReviewList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = normalizeFilterValue(searchParams.get("status"), STATUS_VALUES);
+  const aiOverallFilter = normalizeFilterValue(searchParams.get("aiOverall"), AI_OVERALL_VALUES);
+  const aiAspectFilter = normalizeFilterValue(searchParams.get("aiAspect"), AI_ASPECT_VALUES);
+  const aiAspectLabelFilter = normalizeFilterValue(
+    searchParams.get("aiAspectLabel"),
+    AI_ASPECT_LABEL_VALUES,
+  );
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,6 +63,9 @@ export default function ReviewList() {
 
     ApiService.getReviews({
       status: statusFilter !== "ALL" ? statusFilter : undefined,
+      aiOverall: aiOverallFilter !== "ALL" ? aiOverallFilter : undefined,
+      aiAspect: aiAspectFilter !== "ALL" ? aiAspectFilter : undefined,
+      aiAspectLabel: aiAspectLabelFilter !== "ALL" ? aiAspectLabelFilter : undefined,
       limit: 100,
     })
       .then((data) => {
@@ -36,7 +73,7 @@ export default function ReviewList() {
       })
       .catch((err) => setError(err))
       .finally(() => setLoading(false));
-  }, [statusFilter]);
+  }, [aiAspectFilter, aiAspectLabelFilter, aiOverallFilter, statusFilter]);
 
   useEffect(() => {
     fetchReviews();
@@ -47,15 +84,15 @@ export default function ReviewList() {
     [reviews],
   );
 
-  const handleStatusChange = (nextStatus) => {
+  const handleFilterChange = (key, nextValue) => {
     setLoading(true);
     setError(null);
 
     const nextParams = new URLSearchParams(searchParams);
-    if (nextStatus === "ALL") {
-      nextParams.delete("status");
+    if (nextValue === "ALL") {
+      nextParams.delete(key);
     } else {
-      nextParams.set("status", nextStatus);
+      nextParams.set(key, nextValue);
     }
     setSearchParams(nextParams, { replace: true });
   };
@@ -106,7 +143,7 @@ export default function ReviewList() {
       >
         <select
           value={statusFilter}
-          onChange={(event) => handleStatusChange(event.target.value)}
+          onChange={(event) => handleFilterChange("status", event.target.value)}
           className="form-select"
           style={{ width: "220px" }}
           aria-label="Filter reviews by status"
@@ -114,6 +151,45 @@ export default function ReviewList() {
           {REVIEW_STATUSES.map((status) => (
             <option key={status.value} value={status.value}>
               {status.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={aiOverallFilter}
+          onChange={(event) => handleFilterChange("aiOverall", event.target.value)}
+          className="form-select"
+          style={{ width: "220px" }}
+          aria-label="Filter reviews by AI sentiment"
+        >
+          {AI_OVERALL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={aiAspectFilter}
+          onChange={(event) => handleFilterChange("aiAspect", event.target.value)}
+          className="form-select"
+          style={{ width: "190px" }}
+          aria-label="Filter reviews by AI aspect"
+        >
+          {AI_ASPECT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={aiAspectLabelFilter}
+          onChange={(event) => handleFilterChange("aiAspectLabel", event.target.value)}
+          className="form-select"
+          style={{ width: "220px" }}
+          aria-label="Filter reviews by AI aspect label"
+        >
+          {AI_ASPECT_LABEL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -127,7 +203,7 @@ export default function ReviewList() {
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <table style={{ minWidth: "1040px" }}>
+            <table style={{ minWidth: "1260px" }}>
               <thead>
                 <tr>
                   <th>ID</th>
@@ -137,6 +213,7 @@ export default function ReviewList() {
                   <th>Comment</th>
                   <th>Images</th>
                   <th>Status</th>
+                  <th>AI</th>
                   <th>Created</th>
                   <th>Actions</th>
                 </tr>
@@ -209,6 +286,9 @@ export default function ReviewList() {
                     <td>
                       <StatusBadge value={review.status} />
                     </td>
+                    <td style={{ minWidth: "210px" }}>
+                      <ReviewAiSummary aiAnalysis={review.aiAnalysis} />
+                    </td>
                     <td
                       style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}
                     >
@@ -256,6 +336,70 @@ export default function ReviewList() {
   );
 }
 
+function ReviewAiSummary({ aiAnalysis }) {
+  if (!aiAnalysis?.overall?.label) {
+    return (
+      <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
+        Not analyzed
+      </span>
+    );
+  }
+
+  const usefulAspects = Array.isArray(aiAnalysis.aspects)
+    ? aiAnalysis.aspects.filter((aspect) => aspect.label && aspect.label !== "NO_ASPECT")
+    : [];
+
+  return (
+    <div style={{ display: "grid", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+        <AiBadge label={aiAnalysis.overall.label} />
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)" }}>
+          {formatConfidence(aiAnalysis.overall.confidence)}
+        </span>
+      </div>
+      {usefulAspects.length > 0 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+          {usefulAspects.slice(0, 4).map((aspect) => (
+            <AiBadge
+              key={`${aspect.key}-${aspect.label}`}
+              label={aspect.label}
+              text={`${aspect.aspect || aspect.key}: ${formatAiLabel(aspect.label)}`}
+              compact
+            />
+          ))}
+        </div>
+      ) : (
+        <span style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}>
+          No clear aspect
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AiBadge({ label, text = null, compact = false }) {
+  const normalized = String(label || "").toUpperCase();
+  const tone = getAiTone(normalized);
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: compact ? "3px 8px" : "5px 10px",
+        borderRadius: "999px",
+        backgroundColor: tone.bg,
+        color: tone.color,
+        fontSize: "var(--font-size-xs)",
+        fontWeight: "var(--font-weight-bold)",
+        lineHeight: 1.2,
+      }}
+    >
+      {text || formatAiLabel(normalized)}
+    </span>
+  );
+}
+
 function normalizeFilterValue(value, allowedValues) {
   if (!value) {
     return "ALL";
@@ -264,4 +408,32 @@ function normalizeFilterValue(value, allowedValues) {
   const normalized = value.trim().toLowerCase();
   const matchedValue = allowedValues.find((allowed) => allowed.toLowerCase() === normalized);
   return matchedValue || "ALL";
+}
+
+function formatAiLabel(label) {
+  return String(label || "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatConfidence(value) {
+  const confidence = Number(value || 0);
+  return confidence > 0 ? `${Math.round(confidence * 100)}%` : "—";
+}
+
+function getAiTone(label) {
+  if (label === "POSITIVE") {
+    return { bg: "#E6F4EA", color: "#1F7A3F" };
+  }
+
+  if (label === "NEGATIVE") {
+    return { bg: "#FDE8E8", color: "#B42318" };
+  }
+
+  if (label === "NEUTRAL") {
+    return { bg: "#FFF4D6", color: "#925F00" };
+  }
+
+  return { bg: "#EEF2F6", color: "#475467" };
 }
