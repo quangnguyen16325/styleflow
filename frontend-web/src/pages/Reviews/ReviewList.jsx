@@ -705,6 +705,13 @@ function ReviewAiReportPanel({ report, loading, error, period, onPeriodChange, o
 
           <section>
             <h4 style={{ margin: "0 0 var(--spacing-sm)", color: "var(--color-dark)" }}>
+              Negative aspects
+            </h4>
+            <AspectNegativeBarChart aspects={report.aspectBreakdown || []} />
+          </section>
+
+          <section>
+            <h4 style={{ margin: "0 0 var(--spacing-sm)", color: "var(--color-dark)" }}>
               Suggested admin actions
             </h4>
             <AiActionSuggestions suggestions={report.actionSuggestions || []} />
@@ -715,6 +722,92 @@ function ReviewAiReportPanel({ report, loading, error, period, onPeriodChange, o
           Click AI Report to load analysis.
         </div>
       )}
+    </div>
+  );
+}
+
+function AspectNegativeBarChart({ aspects }) {
+  const rows = Array.isArray(aspects)
+    ? aspects
+        .filter((aspect) => Number(aspect.negativeCount || 0) > 0)
+        .sort((a, b) => Number(b.negativeCount || 0) - Number(a.negativeCount || 0))
+        .slice(0, 5)
+    : [];
+
+  if (rows.length === 0) {
+    return <MiniEmptyState text="No negative aspect data in this period." />;
+  }
+
+  const maxNegative = Math.max(...rows.map((aspect) => Number(aspect.negativeCount || 0)), 1);
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: "var(--spacing-sm)",
+        padding: "var(--spacing-md)",
+        borderRadius: "var(--radius-md)",
+        border: "1px solid var(--color-border-light)",
+        background: "#fff",
+      }}
+    >
+      {rows.map((aspect) => {
+        const negativeCount = Number(aspect.negativeCount || 0);
+        const totalCount = Number(aspect.totalCount || 0);
+        const width = Math.max((negativeCount / maxNegative) * 100, 8);
+
+        return (
+          <div
+            key={aspect.key}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "110px minmax(0, 1fr) 80px",
+              gap: "var(--spacing-sm)",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                color: "var(--color-dark)",
+                fontWeight: "var(--font-weight-semibold)",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {aspect.aspect}
+            </span>
+            <div
+              style={{
+                height: 14,
+                borderRadius: "999px",
+                background: "var(--color-bg)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${width}%`,
+                  height: "100%",
+                  borderRadius: "999px",
+                  background: "linear-gradient(90deg, #F97316, #B42318)",
+                }}
+              />
+            </div>
+            <span
+              style={{
+                color: "var(--color-danger)",
+                fontSize: "var(--font-size-sm)",
+                fontWeight: "var(--font-weight-bold)",
+                textAlign: "right",
+              }}
+            >
+              {negativeCount}/{totalCount}
+            </span>
+          </div>
+        );
+      })}
+      <div style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}>
+        Shows negative aspect mentions in the selected period.
+      </div>
     </div>
   );
 }
