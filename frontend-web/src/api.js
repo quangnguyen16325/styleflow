@@ -108,6 +108,9 @@ class ApiService {
   static async getReviewAiAlerts() {
     return client.get("/admin/analytics/review-ai-alerts");
   }
+  static async getReviewAiReport(params = {}) {
+    return client.get("/admin/analytics/review-ai-report", { params });
+  }
 
   // PRODUCT REVIEWS
   static async getReviews(params = {}) {

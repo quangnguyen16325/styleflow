@@ -1,7 +1,105 @@
 import { Router } from "express";
 import { pool } from "../db/pool.js";
+import { getReviewAiServiceHealth } from "../services/review-ai.js";
 
 const router = Router();
+
+router.get("/review-ai-report", async (req, res) => {
+  const period = normalizeReportPeriod(req.query.period);
+  if (!period) {
+    return res.status(400).json(validationError("period must be week or month"));
+  }
+
+  const periodConfig = getReportPeriodConfig(period);
+
+  try {
+    const [summaryResult, trendResult, aspectResult, pipelineHealth] = await Promise.all([
+      pool.query(
+        `
+          SELECT
+            COUNT(pr.id)::int AS visible_review_count,
+            COUNT(pra.id)::int AS analyzed_review_count,
+            COUNT(pr.id) FILTER (WHERE pra.id IS NULL)::int AS unanalyzed_review_count,
+            COUNT(pr.id) FILTER (WHERE pra.overall_label = 'POSITIVE')::int AS positive_count,
+            COUNT(pr.id) FILTER (WHERE pra.overall_label = 'NEGATIVE')::int AS negative_count,
+            COUNT(pr.id) FILTER (WHERE pra.overall_label = 'NEUTRAL')::int AS neutral_count
+          FROM product_reviews pr
+          LEFT JOIN product_review_ai_analysis pra ON pra.review_id = pr.id
+          WHERE pr.status = 'visible'
+        `,
+      ),
+      pool.query(
+        `
+          SELECT
+            date_trunc('${periodConfig.dateTrunc}', pr.created_at)::date AS bucket_start,
+            COUNT(pra.id)::int AS analyzed_count,
+            COUNT(pra.id) FILTER (WHERE pra.overall_label = 'POSITIVE')::int AS positive_count,
+            COUNT(pra.id) FILTER (WHERE pra.overall_label = 'NEGATIVE')::int AS negative_count,
+            COUNT(pra.id) FILTER (WHERE pra.overall_label = 'NEUTRAL')::int AS neutral_count,
+            COALESCE(ROUND(AVG(pr.rating)::numeric, 2), 0) AS rating_average
+          FROM product_reviews pr
+          JOIN product_review_ai_analysis pra ON pra.review_id = pr.id
+          WHERE pr.status = 'visible'
+            AND pr.created_at >= NOW() - INTERVAL '${periodConfig.interval}'
+          GROUP BY bucket_start
+          ORDER BY bucket_start ASC
+        `,
+      ),
+      pool.query(
+        `
+          SELECT
+            aspect_item->>'key' AS aspect_key,
+            aspect_item->>'aspect' AS aspect_name,
+            aspect_item->>'label' AS label,
+            COUNT(*)::int AS count,
+            COALESCE(ROUND(AVG((aspect_item->>'confidence')::numeric), 4), 0) AS avg_confidence
+          FROM product_review_ai_analysis pra
+          JOIN product_reviews pr ON pr.id = pra.review_id
+          CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pra.aspects, '[]'::jsonb)) AS aspect_item
+          WHERE pr.status = 'visible'
+            AND pr.created_at >= NOW() - INTERVAL '${periodConfig.interval}'
+            AND aspect_item->>'label' IN ('POSITIVE', 'NEGATIVE', 'NEUTRAL')
+          GROUP BY aspect_key, aspect_name, label
+          ORDER BY count DESC, avg_confidence DESC, aspect_name ASC
+        `,
+      ),
+      getReviewAiServiceHealth(),
+    ]);
+
+    const summary = summaryResult.rows[0] || {};
+    const visibleReviewCount = Number(summary.visible_review_count || 0);
+    const analyzedReviewCount = Number(summary.analyzed_review_count || 0);
+    const unanalyzedReviewCount = Number(summary.unanalyzed_review_count || 0);
+
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      period,
+      summary: {
+        visibleReviewCount,
+        analyzedReviewCount,
+        unanalyzedReviewCount,
+        positiveCount: Number(summary.positive_count || 0),
+        negativeCount: Number(summary.negative_count || 0),
+        neutralCount: Number(summary.neutral_count || 0),
+        unanalyzedRate:
+          visibleReviewCount > 0
+            ? Number((unanalyzedReviewCount / visibleReviewCount).toFixed(4))
+            : 0,
+      },
+      sentimentTrend: trendResult.rows.map(mapSentimentTrendRow),
+      aspectBreakdown: mapAspectBreakdown(aspectResult.rows),
+      actionSuggestions: buildAiActionSuggestions(aspectResult.rows),
+      pipeline: buildAiPipelineReport({
+        health: pipelineHealth,
+        visibleReviewCount,
+        unanalyzedReviewCount,
+      }),
+    });
+  } catch (error) {
+    console.error("GET /admin/analytics/review-ai-report failed:", error);
+    return res.status(500).json(internalError("Failed to fetch review AI report"));
+  }
+});
 
 router.get("/review-ai-alerts", async (_req, res) => {
   try {
@@ -242,6 +340,133 @@ function mapSalesAnalyticsRow(row) {
     soldQty: Number(row.sold_qty),
     revenue: Number(row.revenue),
     orderCount: Number(row.order_count),
+  };
+}
+
+function normalizeReportPeriod(value) {
+  if (value == null || value === "") {
+    return "week";
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  return ["week", "month"].includes(normalized) ? normalized : null;
+}
+
+function getReportPeriodConfig(period) {
+  if (period === "month") {
+    return {
+      dateTrunc: "month",
+      interval: "12 months",
+    };
+  }
+
+  return {
+    dateTrunc: "week",
+    interval: "12 weeks",
+  };
+}
+
+function mapSentimentTrendRow(row) {
+  const analyzedCount = Number(row.analyzed_count || 0);
+  const positiveCount = Number(row.positive_count || 0);
+  const negativeCount = Number(row.negative_count || 0);
+
+  return {
+    bucketStart: row.bucket_start,
+    analyzedCount,
+    positiveCount,
+    negativeCount,
+    neutralCount: Number(row.neutral_count || 0),
+    ratingAverage: Number(row.rating_average || 0),
+    positiveRate: analyzedCount > 0 ? Number((positiveCount / analyzedCount).toFixed(4)) : 0,
+    negativeRate: analyzedCount > 0 ? Number((negativeCount / analyzedCount).toFixed(4)) : 0,
+  };
+}
+
+function mapAspectBreakdown(rows) {
+  const byAspect = new Map();
+
+  rows.forEach((row) => {
+    const key = row.aspect_key || "";
+    if (!key) {
+      return;
+    }
+
+    if (!byAspect.has(key)) {
+      byAspect.set(key, {
+        key,
+        aspect: row.aspect_name || key,
+        positiveCount: 0,
+        negativeCount: 0,
+        neutralCount: 0,
+        totalCount: 0,
+        averageConfidence: 0,
+      });
+    }
+
+    const item = byAspect.get(key);
+    const count = Number(row.count || 0);
+    const label = String(row.label || "").toUpperCase();
+    item.totalCount += count;
+    item.averageConfidence = Math.max(item.averageConfidence, Number(row.avg_confidence || 0));
+
+    if (label === "POSITIVE") item.positiveCount += count;
+    if (label === "NEGATIVE") item.negativeCount += count;
+    if (label === "NEUTRAL") item.neutralCount += count;
+  });
+
+  return Array.from(byAspect.values()).sort(
+    (a, b) => b.negativeCount - a.negativeCount || b.totalCount - a.totalCount,
+  );
+}
+
+function buildAiActionSuggestions(rows) {
+  return mapAspectBreakdown(rows)
+    .filter((aspect) => aspect.negativeCount > 0)
+    .slice(0, 5)
+    .map((aspect) => ({
+      key: aspect.key,
+      aspect: aspect.aspect,
+      negativeCount: aspect.negativeCount,
+      totalCount: aspect.totalCount,
+      severity: aspect.negativeCount >= 5 ? "high" : aspect.negativeCount >= 2 ? "medium" : "low",
+      suggestion: getAspectActionSuggestion(aspect.key),
+    }));
+}
+
+function getAspectActionSuggestion(key) {
+  const suggestions = {
+    material:
+      "Kiểm tra lại mô tả chất liệu, ảnh chi tiết vải/da và chất lượng lô hàng hoặc supplier.",
+    design: "Rà soát form dáng, size chart, ảnh mặc thật và kỳ vọng thiết kế trên trang sản phẩm.",
+    price: "Đánh giá lại giá bán, khuyến mãi, phí phát sinh và cách truyền thông giá trị sản phẩm.",
+    service:
+      "Kiểm tra vận hành CSKH, tốc độ phản hồi, đóng gói, giao hàng và quy trình xử lý khiếu nại.",
+    general: "Đọc các review tiêu cực gần nhất để xác định vấn đề chung chưa thuộc nhóm cụ thể.",
+  };
+
+  return suggestions[key] || suggestions.general;
+}
+
+function buildAiPipelineReport({ health, visibleReviewCount, unanalyzedReviewCount }) {
+  const unanalyzedRate =
+    visibleReviewCount > 0 ? Number((unanalyzedReviewCount / visibleReviewCount).toFixed(4)) : 0;
+  const warnings = [];
+
+  if (health.status !== "ok") {
+    warnings.push("AI service is not healthy. Check container, model files and AI_SERVICE_URL.");
+  }
+
+  if (unanalyzedReviewCount >= 5 || unanalyzedRate >= 0.15) {
+    warnings.push("Many visible reviews are not analyzed. Run AI backfill or inspect AI failures.");
+  }
+
+  return {
+    ...health,
+    unanalyzedReviewCount,
+    unanalyzedRate,
+    warningLevel: warnings.length > 0 ? "warning" : "ok",
+    warnings,
   };
 }
 

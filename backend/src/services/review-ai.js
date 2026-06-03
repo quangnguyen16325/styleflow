@@ -2,6 +2,7 @@ import { pool } from "../db/pool.js";
 
 const AI_SERVICE_URL = normalizeBaseUrl(process.env.AI_SERVICE_URL);
 const AI_TIMEOUT_MS = parsePositiveInteger(process.env.AI_SERVICE_TIMEOUT_MS) || 3500;
+const AI_RETRY_ATTEMPTS = parseNonNegativeInteger(process.env.AI_SERVICE_RETRY_ATTEMPTS) ?? 1;
 
 export async function analyzeAndStoreProductReview(review) {
   if (!review?.id || !review?.product_id) {
@@ -23,22 +24,95 @@ export async function analyzeAndStoreProductReview(review) {
     await upsertReviewAiAnalysis(review, analysis);
     return analysis;
   } catch (error) {
-    console.warn(`AI review analysis skipped for review ${review.id}:`, error.message);
+    logAiPipelineWarning(`analysis skipped for review ${review.id}: ${error.message}`);
     return null;
   }
 }
 
+export async function getReviewAiServiceHealth() {
+  if (!AI_SERVICE_URL) {
+    return {
+      configured: false,
+      status: "unconfigured",
+      timeoutMs: AI_TIMEOUT_MS,
+      retryAttempts: AI_RETRY_ATTEMPTS,
+      error: "AI_SERVICE_URL is not configured",
+    };
+  }
+
+  const startedAt = Date.now();
+  try {
+    const data = await requestJsonWithRetry(`${AI_SERVICE_URL}/health`, {
+      method: "GET",
+      timeoutMs: AI_TIMEOUT_MS,
+      retries: AI_RETRY_ATTEMPTS,
+    });
+
+    return {
+      configured: true,
+      status: data?.status === "ok" ? "ok" : "degraded",
+      responseTimeMs: Date.now() - startedAt,
+      timeoutMs: AI_TIMEOUT_MS,
+      retryAttempts: AI_RETRY_ATTEMPTS,
+      device: data?.device || null,
+      modelVersion: data?.modelVersion || null,
+      raw: data,
+    };
+  } catch (error) {
+    logAiPipelineWarning(`healthcheck failed: ${error.message}`);
+    return {
+      configured: true,
+      status: "down",
+      responseTimeMs: Date.now() - startedAt,
+      timeoutMs: AI_TIMEOUT_MS,
+      retryAttempts: AI_RETRY_ATTEMPTS,
+      error: error.message,
+    };
+  }
+}
+
 async function requestReviewAnalysis(text) {
+  const data = await requestJsonWithRetry(`${AI_SERVICE_URL}/analyze-review`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+    timeoutMs: AI_TIMEOUT_MS,
+    retries: AI_RETRY_ATTEMPTS,
+  });
+  validateAnalysisResponse(data);
+  return data;
+}
+
+async function requestJsonWithRetry(url, { method, body = null, timeoutMs, retries }) {
+  let lastError = null;
+  const attempts = retries + 1;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await requestJson(url, { method, body, timeoutMs });
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        logAiPipelineWarning(
+          `request attempt ${attempt}/${attempts} failed for ${url}: ${error.message}`,
+        );
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+async function requestJson(url, { method, body = null, timeoutMs }) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${AI_SERVICE_URL}/analyze-review`, {
-      method: "POST",
+    const response = await fetch(url, {
+      method,
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ text }),
+      body,
       signal: controller.signal,
     });
 
@@ -46,9 +120,7 @@ async function requestReviewAnalysis(text) {
       throw new Error(`AI service returned HTTP ${response.status}`);
     }
 
-    const data = await response.json();
-    validateAnalysisResponse(data);
-    return data;
+    return await response.json();
   } finally {
     clearTimeout(timeout);
   }
@@ -116,4 +188,13 @@ function normalizeBaseUrl(value) {
 function parsePositiveInteger(value) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseNonNegativeInteger(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function logAiPipelineWarning(message) {
+  console.warn(`[review-ai] ${message}`);
 }

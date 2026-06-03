@@ -73,6 +73,11 @@ export default function ReviewList() {
   const [updatingId, setUpdatingId] = useState(null);
   const [aiBackfillRunning, setAiBackfillRunning] = useState(false);
   const [aiBackfillResult, setAiBackfillResult] = useState(null);
+  const [aiReportVisible, setAiReportVisible] = useState(false);
+  const [aiReportPeriod, setAiReportPeriod] = useState("week");
+  const [aiReport, setAiReport] = useState(null);
+  const [aiReportLoading, setAiReportLoading] = useState(false);
+  const [aiReportError, setAiReportError] = useState(null);
 
   const fetchReviews = useCallback(() => {
     setLoading(true);
@@ -192,6 +197,35 @@ export default function ReviewList() {
     }
   };
 
+  const fetchAiReport = useCallback(
+    async (period = aiReportPeriod) => {
+      try {
+        setAiReportLoading(true);
+        setAiReportError(null);
+        const data = await ApiService.getReviewAiReport({ period });
+        setAiReport(data);
+      } catch (err) {
+        setAiReportError(err);
+      } finally {
+        setAiReportLoading(false);
+      }
+    },
+    [aiReportPeriod],
+  );
+
+  const toggleAiReport = () => {
+    const nextVisible = !aiReportVisible;
+    setAiReportVisible(nextVisible);
+    if (nextVisible && !aiReport) {
+      fetchAiReport();
+    }
+  };
+
+  const handleAiReportPeriodChange = (nextPeriod) => {
+    setAiReportPeriod(nextPeriod);
+    fetchAiReport(nextPeriod);
+  };
+
   if (loading) return <LoadingSpinner message="Loading product reviews..." />;
   if (error) return <ErrorMessage error={error} onRetry={fetchReviews} />;
 
@@ -206,14 +240,19 @@ export default function ReviewList() {
             {productIdFilter ? ` · product #${productIdFilter}` : ""}
           </span>
         </div>
-        <button
-          className="btn-secondary"
-          type="button"
-          onClick={handleAiBackfill}
-          disabled={aiBackfillRunning}
-        >
-          {aiBackfillRunning ? "Analyzing..." : "Analyze Missing AI"}
-        </button>
+        <div style={{ display: "flex", gap: "var(--spacing-sm)", flexWrap: "wrap" }}>
+          <button className="btn-secondary" type="button" onClick={toggleAiReport}>
+            {aiReportVisible ? "Hide AI Report" : "AI Report"}
+          </button>
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={handleAiBackfill}
+            disabled={aiBackfillRunning}
+          >
+            {aiBackfillRunning ? "Analyzing..." : "Analyze Missing AI"}
+          </button>
+        </div>
       </div>
 
       {aiBackfillResult ? (
@@ -250,6 +289,17 @@ export default function ReviewList() {
         </div>
         <div>Rows with a soft orange highlight are flagged by AI for moderation review.</div>
       </div>
+
+      {aiReportVisible ? (
+        <ReviewAiReportPanel
+          report={aiReport}
+          loading={aiReportLoading}
+          error={aiReportError}
+          period={aiReportPeriod}
+          onPeriodChange={handleAiReportPeriodChange}
+          onRetry={() => fetchAiReport()}
+        />
+      ) : null}
 
       <div
         style={{
@@ -570,6 +620,273 @@ export default function ReviewList() {
   );
 }
 
+function ReviewAiReportPanel({ report, loading, error, period, onPeriodChange, onRetry }) {
+  return (
+    <div
+      className="card"
+      style={{ marginBottom: "var(--spacing-lg)", padding: "var(--spacing-lg)" }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "var(--spacing-md)",
+          flexWrap: "wrap",
+          marginBottom: "var(--spacing-lg)",
+        }}
+      >
+        <div>
+          <h3 style={{ margin: 0, color: "var(--color-dark)" }}>AI Review Report</h3>
+          <p
+            style={{
+              margin: "4px 0 0",
+              color: "var(--color-text-muted)",
+              fontSize: "var(--font-size-sm)",
+            }}
+          >
+            Trend, action suggestions and AI pipeline health. Alert counts stay on Dashboard.
+          </p>
+        </div>
+        <select
+          className="form-select"
+          value={period}
+          onChange={(event) => onPeriodChange(event.target.value)}
+          style={{ width: "160px", marginBottom: 0 }}
+          aria-label="AI report period"
+        >
+          <option value="week">Weekly</option>
+          <option value="month">Monthly</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: "var(--spacing-md)", color: "var(--color-text-muted)" }}>
+          Loading AI report...
+        </div>
+      ) : error ? (
+        <div
+          style={{
+            padding: "var(--spacing-md)",
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-danger-light)",
+            color: "var(--color-danger)",
+          }}
+        >
+          <div style={{ marginBottom: "var(--spacing-sm)" }}>
+            {error.message || "Failed to load AI report"}
+          </div>
+          <button type="button" className="btn-secondary btn-sm" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      ) : report ? (
+        <div style={{ display: "grid", gap: "var(--spacing-lg)" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+              gap: "var(--spacing-lg)",
+            }}
+          >
+            <section>
+              <h4 style={{ margin: "0 0 var(--spacing-sm)", color: "var(--color-dark)" }}>
+                Sentiment over time
+              </h4>
+              <SentimentTrendChart items={report.sentimentTrend || []} />
+            </section>
+            <section>
+              <h4 style={{ margin: "0 0 var(--spacing-sm)", color: "var(--color-dark)" }}>
+                AI pipeline
+              </h4>
+              <AiPipelineStatus pipeline={report.pipeline} />
+            </section>
+          </div>
+
+          <section>
+            <h4 style={{ margin: "0 0 var(--spacing-sm)", color: "var(--color-dark)" }}>
+              Suggested admin actions
+            </h4>
+            <AiActionSuggestions suggestions={report.actionSuggestions || []} />
+          </section>
+        </div>
+      ) : (
+        <div style={{ padding: "var(--spacing-md)", color: "var(--color-text-muted)" }}>
+          Click AI Report to load analysis.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SentimentTrendChart({ items }) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return <MiniEmptyState text="No analyzed review trend yet." />;
+  }
+
+  return (
+    <div style={{ display: "grid", gap: "var(--spacing-sm)" }}>
+      {items.map((item) => {
+        const total = Math.max(Number(item.analyzedCount || 0), 1);
+        const positiveWidth = (Number(item.positiveCount || 0) / total) * 100;
+        const neutralWidth = (Number(item.neutralCount || 0) / total) * 100;
+        const negativeWidth = (Number(item.negativeCount || 0) / total) * 100;
+
+        return (
+          <div key={item.bucketStart}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "var(--spacing-sm)",
+                color: "var(--color-text-muted)",
+                fontSize: "var(--font-size-xs)",
+                marginBottom: 4,
+              }}
+            >
+              <span>{formatBucketDate(item.bucketStart)}</span>
+              <span>
+                {item.analyzedCount} reviews · {formatPercent(item.negativeRate)} negative
+              </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                height: 12,
+                overflow: "hidden",
+                borderRadius: "999px",
+                background: "var(--color-bg)",
+              }}
+            >
+              <div style={{ width: `${positiveWidth}%`, background: "#1F7A3F" }} />
+              <div style={{ width: `${neutralWidth}%`, background: "#D99152" }} />
+              <div style={{ width: `${negativeWidth}%`, background: "#B42318" }} />
+            </div>
+          </div>
+        );
+      })}
+      <div
+        style={{
+          display: "flex",
+          gap: "var(--spacing-md)",
+          flexWrap: "wrap",
+          color: "var(--color-text-muted)",
+          fontSize: "var(--font-size-xs)",
+        }}
+      >
+        <LegendDot color="#1F7A3F" label="Positive" />
+        <LegendDot color="#D99152" label="Neutral" />
+        <LegendDot color="#B42318" label="Negative" />
+      </div>
+    </div>
+  );
+}
+
+function AiPipelineStatus({ pipeline }) {
+  if (!pipeline) {
+    return <MiniEmptyState text="No pipeline health data." />;
+  }
+
+  const healthy = pipeline.status === "ok" && pipeline.warningLevel === "ok";
+
+  return (
+    <div
+      style={{
+        padding: "var(--spacing-md)",
+        borderRadius: "var(--radius-md)",
+        border: "1px solid var(--color-border-light)",
+        background: healthy ? "var(--color-success-light)" : "var(--color-warning-light)",
+        display: "grid",
+        gap: "var(--spacing-sm)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-sm)" }}>
+        <AiBadge label={healthy ? "POSITIVE" : "NEUTRAL"} text={healthy ? "Healthy" : "Warning"} />
+        <strong style={{ color: "var(--color-dark)" }}>{pipeline.status}</strong>
+      </div>
+      <div style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)" }}>
+        Model: {pipeline.modelVersion || "N/A"} · Timeout {pipeline.timeoutMs || 0}ms · Retry{" "}
+        {pipeline.retryAttempts ?? 0}
+      </div>
+      <div style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)" }}>
+        Unanalyzed: {pipeline.unanalyzedReviewCount ?? 0} ({formatPercent(pipeline.unanalyzedRate)})
+      </div>
+      {Array.isArray(pipeline.warnings) && pipeline.warnings.length > 0 ? (
+        <ul style={{ margin: 0, paddingLeft: 18, color: "var(--color-warning)" }}>
+          {pipeline.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function AiActionSuggestions({ suggestions }) {
+  if (!Array.isArray(suggestions) || suggestions.length === 0) {
+    return <MiniEmptyState text="No negative aspect is strong enough for an action suggestion." />;
+  }
+
+  return (
+    <div style={{ display: "grid", gap: "var(--spacing-sm)" }}>
+      {suggestions.map((suggestion) => (
+        <div
+          key={suggestion.key}
+          style={{
+            padding: "var(--spacing-md)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border-light)",
+            background: suggestion.severity === "high" ? "var(--color-danger-light)" : "#fff",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--spacing-sm)",
+              marginBottom: 6,
+            }}
+          >
+            <strong style={{ color: "var(--color-dark)" }}>{suggestion.aspect}</strong>
+            <span style={{ color: "var(--color-danger)", fontWeight: 800 }}>
+              {suggestion.negativeCount}/{suggestion.totalCount} negative
+            </span>
+          </div>
+          <div style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)" }}>
+            {suggestion.suggestion}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LegendDot({ color, label }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+      {label}
+    </span>
+  );
+}
+
+function MiniEmptyState({ text }) {
+  return (
+    <div
+      style={{
+        padding: "var(--spacing-md)",
+        borderRadius: "var(--radius-md)",
+        background: "var(--color-bg)",
+        color: "var(--color-text-muted)",
+        fontSize: "var(--font-size-sm)",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
 function ReviewAiSummary({ aiAnalysis }) {
   if (!aiAnalysis?.overall?.label) {
     return (
@@ -674,6 +991,19 @@ function formatAiLabel(label) {
 function formatConfidence(value) {
   const confidence = Number(value || 0);
   return confidence > 0 ? `${Math.round(confidence * 100)}%` : "—";
+}
+
+function formatPercent(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "0%";
+  return `${Math.round(amount * 100)}%`;
+}
+
+function formatBucketDate(value) {
+  if (!value) return "Unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleDateString("vi-VN", { month: "short", day: "numeric" });
 }
 
 function getAiTone(label) {
