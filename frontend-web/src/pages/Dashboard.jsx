@@ -226,22 +226,6 @@ export default function Dashboard() {
         accent: "#c52828",
       },
       {
-        key: "aiReviews",
-        title: "AI Reviews",
-        total: stats.aiAlerts?.needsAttentionCount ?? 0,
-        sub:
-          (stats.aiAlerts?.needsAttention7dCount ?? 0) > 0
-            ? `${stats.aiAlerts?.needsAttention7dCount ?? 0} new this week`
-            : `${stats.aiAlerts?.unanalyzedReviewCount ?? 0} waiting analysis`,
-        subColor:
-          (stats.aiAlerts?.needsAttentionCount ?? 0) > 0
-            ? "var(--color-danger)"
-            : "var(--color-text-muted)",
-        link: "/reviews?needsAttention=true",
-        icon: AlertTriangle,
-        accent: "#dc6803",
-      },
-      {
         key: "refunds",
         title: "Refunds",
         total: stats.refunds?.total ?? 0,
@@ -287,8 +271,6 @@ export default function Dashboard() {
           </p>
         </div>
       </div>
-
-      <ReviewAiAlertsPanel alerts={stats.aiAlerts} />
 
       <div
         style={{
@@ -419,6 +401,8 @@ export default function Dashboard() {
         ))}
       </div>
 
+      <ReviewAiAlertsPanel alerts={stats.aiAlerts} />
+
       <div
         style={{
           display: "grid",
@@ -431,8 +415,9 @@ export default function Dashboard() {
           title="Orders Needing Action"
           subtitle="Payment, delivery, address change and return queues."
           emptyText="No urgent order queue right now."
+          viewAllTo="/orders"
         >
-          {stats.actionOrders?.map(({ order, action }) => (
+          {stats.actionOrders?.slice(0, 4).map(({ order, action }) => (
             <Link
               key={order.id}
               to={`/orders/${order.id}`}
@@ -489,8 +474,9 @@ export default function Dashboard() {
           title="Recent Activity"
           subtitle="Latest orders, issues and return requests."
           emptyText="No recent activity found."
+          viewAllTo="/orders"
         >
-          {stats.recentActivity?.map((activity) => (
+          {stats.recentActivity?.slice(0, 5).map((activity) => (
             <Link
               key={activity.id}
               to={activity.to}
@@ -646,12 +632,6 @@ function ReviewAiAlertsPanel({ alerts }) {
           value={String(alerts?.needsAttentionCount ?? 0)}
           hint={`${alerts?.needsAttention7dCount ?? 0} new in 7 days`}
           tone={hasAlerts ? "danger" : "default"}
-        />
-        <AiMetricCard
-          label="Attention rate"
-          value={formatPercent(alerts?.attentionRate ?? 0)}
-          hint={`${alerts?.analyzedReviewCount ?? 0} analyzed reviews`}
-          tone={Number(alerts?.attentionRate || 0) >= 0.2 ? "warning" : "default"}
         />
         <AiMetricCard
           label="Waiting analysis"
@@ -882,14 +862,37 @@ function EmptyMiniState({ text }) {
   );
 }
 
-function DashboardPanel({ title, subtitle, emptyText, children }) {
+function DashboardPanel({ title, subtitle, emptyText, children, viewAllTo = null }) {
   const hasChildren = Children.count(children) > 0;
 
   return (
     <div className="card" style={{ padding: "var(--spacing-lg)" }}>
-      <h3 style={{ margin: 0, fontSize: "var(--font-size-md)", color: "var(--color-dark)" }}>
-        {title}
-      </h3>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--spacing-md)",
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: "var(--font-size-md)", color: "var(--color-dark)" }}>
+          {title}
+        </h3>
+        {viewAllTo ? (
+          <Link
+            to={viewAllTo}
+            style={{
+              color: "var(--color-primary)",
+              fontSize: "var(--font-size-sm)",
+              fontWeight: "var(--font-weight-semibold)",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            View all
+          </Link>
+        ) : null}
+      </div>
       <p
         style={{
           color: "var(--color-text-muted)",
@@ -1002,11 +1005,6 @@ function getExpandedCardDetails(cardKey, stats) {
       { label: "Pending", value: String(stats.refunds?.pending ?? 0) },
       { label: "Action queue", value: String(stats.actionOrders?.length ?? 0) },
     ],
-    aiReviews: [
-      { label: "Needs attention", value: String(stats.aiAlerts?.needsAttentionCount ?? 0) },
-      { label: "New this week", value: String(stats.aiAlerts?.needsAttention7dCount ?? 0) },
-      { label: "Waiting analysis", value: String(stats.aiAlerts?.unanalyzedReviewCount ?? 0) },
-    ],
   };
 
   return detailsByKey[cardKey] || [];
@@ -1113,12 +1111,6 @@ function formatCurrencyCompact(value) {
   }
 
   return `${amount.toLocaleString("vi-VN")} đ`;
-}
-
-function formatPercent(value) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return "0%";
-  return `${Math.round(amount * 100)}%`;
 }
 
 function formatDecimal(value) {

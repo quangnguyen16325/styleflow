@@ -373,7 +373,7 @@ export default function ReviewList() {
       ) : (
         <div className="card" style={{ overflow: "hidden" }}>
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <table style={{ minWidth: "1260px" }}>
+            <table style={{ minWidth: "1320px" }}>
               <thead>
                 <tr>
                   <th>ID</th>
@@ -481,8 +481,8 @@ export default function ReviewList() {
                       >
                         {review.createdAt ? new Date(review.createdAt).toLocaleString() : "—"}
                       </td>
-                      <td>
-                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <td style={{ minWidth: "180px", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "nowrap" }}>
                           {review.status !== "visible" ? (
                             <button
                               className="btn-secondary btn-sm"
